@@ -190,6 +190,6 @@ b2 install --prefix=D:\develop\boost --build-type=complete --toolset=msvc-14.4 t
 2. 打开 `x64 Native Tools Command Prompt for VS2022` 切换操作目录至 `d:\workspace\libtorrent` 目录下，执行命令：
 
 ```
-b2 --toolset=msvc-14.4 link=static runtime-link=static openssl-lib=D:\develop\openssl-3.4.0\lib openssl-include=D:\develop\openssl-3.4.0\include
+b2 --toolset=msvc-14.4 link=static runtime-link=static openssl-lib=C:\OpenSSL-Win64\lib openssl-include=C:\OpenSSL-Win64\include
 ```
 
