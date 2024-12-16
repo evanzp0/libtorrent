@@ -136,9 +136,6 @@ Result: PASS
 nmake install C:\OpenSSL-Win64
 ```
 
-
-
-
 ## 下载并编译 boost
 
 1. https://www.boost.org/ 下载 boost 源码 `boost_1_82_0.zip` 解压到 `d:\develop\boost` 。
