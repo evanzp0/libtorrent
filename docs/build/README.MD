@@ -55,7 +55,7 @@ https://github.com/openssl/openssl/releases/download/openssl-3.4.0/openssl-3.4.0
   >  使用 VS2022 的开发人员提示工具切换到源码目录，注意选择要编译的位数所对应的版本，不要选择 cross 版本。所有的选项都要统一，即：编译 32 位的就启动 x86，配置 Makefile时为命令行为 VC-WIN32; 编译 64 位的就启动 x64，配置 Makefile时为命令行为 VC-WIN64A，本文以编译 64 位为例。
 
 
-  4. 编译速度
+  ~~4. 编译速度~~
 
   ```
   nmake
@@ -70,7 +70,7 @@ https://github.com/openssl/openssl/releases/download/openssl-3.4.0/openssl-3.4.0
   > 注意：
   > 如果因为环境原因编译失败，需要将源文件目录删除，重新解压源文件再进行编译。
 
-  5. 安装二进制和库
+  ~~5. 安装二进制和库~~
 
   ```
   nmake install_sw
@@ -78,7 +78,7 @@ https://github.com/openssl/openssl/releases/download/openssl-3.4.0/openssl-3.4.0
 
   使用 install_sw 代替 install 是因为默认 install 会生成 40M 左右的 HTML 文档，若不需要就使用 install_sw 仅安装二进制文件和库
 
-  6. 添加环境变量
+  ~~6. 添加环境变量~~
   
   将编译后的安装目录下的 bin 文件夹添加到系统 Path 目录下 打开 cmd 使用 openssl version -a 测试
 
@@ -96,7 +96,7 @@ https://github.com/openssl/openssl/releases/download/openssl-3.4.0/openssl-3.4.0
   CPUINFO: N/A
   ```
 
-  7. 下载
+  ~~7. 下载~~
 
   已编译的动态链接版及静态链接版，已经移除了 pdb 调试符号文件，确保文件大小
 
