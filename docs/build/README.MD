@@ -18,15 +18,15 @@ perl -v
 
 https://strawberryperl.com/download/5.32.1.1/strawberry-perl-5.32.1.1-64bit.zip
 
-2. 下载并安装 nasm 2.0
+~~2. 下载并安装 nasm 2.0~~
 
 https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/win64/nasm-2.16.03-win64.zip
 
-3. 下载 openssl 源码，并解压
+~~3. 下载 openssl 3.0 源码，并解压~~
 
 https://github.com/openssl/openssl/releases/download/openssl-3.4.0/openssl-3.4.0.tar.gz
 
-4. 编译 openssl
+~~4. 编译 openssl 3.0~~
 
   1. 打开 `x64 Native Tools Command Prompt for VS 2022` 命令行工具
   2. 进入 openssl 源码目录
@@ -103,6 +103,41 @@ https://github.com/openssl/openssl/releases/download/openssl-3.4.0/openssl-3.4.0
   [动态链接版](https://cdn.taurusxin.com/softwares/openssl/openssl-3.1.3-windows-amd64-dynamic.zip)
 
   [静态链接版](https://cdn.taurusxin.com/softwares/openssl/openssl-3.1.3-windows-amd64-static.zip)
+
+2. 下载 openssl 源码
+https://github.com/openssl/openssl/releases/download/OpenSSL_1_1_1w/openssl-1.1.1w.tar.gz
+
+并解压文件到 `D:\tmp\openssl-1.1.1` 目录下
+
+3. 编译 openssl 源码
+
+```
+cd D:\tmp\openssl-1.1.1
+perl D:\tmp\openssl-1.1.1\Configure VC-WIN64A no-asm no-shared
+```
+
+4. 检查编辑结果
+
+```
+nmake test
+```
+
+显示结果 PASS 为编译通过
+
+```
+All tests successful.
+Files=159, Tests=2360, 407 wallclock secs ( 0.09 usr +  0.01 sys =  0.11 CPU)
+Result: PASS
+```
+
+5. 安装
+
+```
+nmake install C:\OpenSSL-Win64
+```
+
+
+
 
 ## 下载并编译 boost
 
