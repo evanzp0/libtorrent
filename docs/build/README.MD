@@ -106,7 +106,7 @@ https://github.com/openssl/openssl/releases/download/openssl-3.4.0/openssl-3.4.0
 
 ## 下载并编译 boost
 
-1. https://www.boost.org/ 下载 boost 源码 boost_1_82_0.zip解压。
+1. https://www.boost.org/ 下载 boost 源码 `boost_1_82_0.zip` 解压到 `d:\develop\boost` 。
 
 2. 使用  `x64 Native Tools Command Prompt for VS2022` 切换操作目录至 boost 下 （避免PC中多个VS版本的影响）
 3. 基于 VS2022 的 CMD 运行 `boost_1_82_0/tools/build/bootstrap.bat` 会自动使用 `VC14.4` 在该目录下生成生成 `b2.exe` （新版本不会生成 `bjam.exe`）
@@ -142,3 +142,22 @@ https://github.com/openssl/openssl/releases/download/openssl-3.4.0/openssl-3.4.0
 >        C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22621.0\ucrt\x64
 >        C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22621.0\um\x64
 > ```
+
+4. 复制 `b2.exe` 到 `D:\develop\boost` 目录下
+5. 该目录下运行命令
+
+```
+b2 install --prefix=D:\develop\boost --build-type=complete --toolset=msvc-14.4 threading=multi address-model=64 debug release
+```
+
+执行完毕后会生成 `include` 、 `lib` 、 `share` 三个目录。
+
+## 编译 libtorrent
+
+1. 设置系统变量 `BOOST_ROOT = d:\develop\boost`
+2. 打开 `x64 Native Tools Command Prompt for VS2022` 切换操作目录至 `d:\workspace\libtorrent` 目录下，执行命令：
+
+```
+b2 msvc-14.4 variant=release link=static runtime-link=static debug-symbols=on
+```
+
