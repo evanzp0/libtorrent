@@ -182,7 +182,7 @@ nmake install d:\develop\OpenSSL-Win64
 b2 install --prefix=D:\develop\boost --build-type=complete --toolset=msvc-14.4 threading=multi address-model=64 debug release
 ```
 
-执行完毕后会生成 `include` 、 `lib` 、 `share` 三个目录。
+执行完毕后 `D:\develop\boost` 下会生成 `include` 、 `lib` 、 `share` 三个目录。
 
 ## 编译 libtorrent
 
