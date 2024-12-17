@@ -138,10 +138,10 @@ nmake install d:\develop\OpenSSL-Win64
 
 ## 下载并编译 boost
 
-1. https://www.boost.org/ 下载 boost 源码 `boost_1_82_0.zip` 解压到 `d:\develop\boost` 。
+1. https://www.boost.org/ 下载 boost 源码 `boost_1_82_0.zip` 解压到 `d:\develop\boost\bin` 。
 
-2. 使用  `x64 Native Tools Command Prompt for VS2022` 切换操作目录至 boost 下 （避免PC中多个VS版本的影响）
-3. 基于 VS2022 的 CMD 运行 `boost_1_82_0/tools/build/bootstrap.bat` 会自动使用 `VC14.4` 在该目录下生成生成 `b2.exe` （新版本不会生成 `bjam.exe`）
+2. 使用  `x64 Native Tools Command Prompt for VS2022` 切换操作目录至 boost\bin 下 （避免PC中多个VS版本的影响）
+3. 基于 VS2022 的 CMD 运行 `d:\develop\boost\bin\bootstrap.bat` 会自动使用 `VC14.3` 在该目录下生成生成 `b2.exe` （新版本不会生成 `bjam.exe`）
 
 > 个人建议：首先去配置一下 cl 命令的环境变量，避免提示以下问题：
 > ```
@@ -175,14 +175,33 @@ nmake install d:\develop\OpenSSL-Win64
 >        C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22621.0\um\x64
 > ```
 
-4. 复制 `b2.exe` 到 `D:\develop\boost` 目录下
-5. 该目录下运行命令
+4. 该目录下运行命令
+
+方式一：
+
+将 boost 编译的库和 include 头文件都安装到 D:\develop\boost
 
 ```
-b2 install --prefix=D:\develop\boost --build-type=complete --toolset=msvc-14.4 threading=multi address-model=64 debug release
-```
+cd d:\develop\boost\bin
 
+b2 install --prefix=D:\develop\boost --build-type=complete --toolset=msvc-14.3 link=static runtime-link=static threading=multi address-model=64 debug release
+```
 执行完毕后 `D:\develop\boost` 下会生成 `include` 、 `lib` 、 `share` 三个目录。
+
+方式二：
+
+head 文件夹路径：D:\develop\boost\bin\boost
+lib 库文件夹路径：D:\develop\boost\bin\stage\lib
+
+```
+b2 --toolset=msvc-14.3 link=static runtime-link=static --build-type=complete stage threading=multi address-model=64 debug release
+```
+
+* --toolset=msvc-14.3 定义了 MSVC++ 版本号, `C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC` 下的子目录名就是对应的 MSVC++ 版本号
+* link=static 定义了链接库为静态，就是将链接库本身编译为静态的，动态设置为 shared
+* runtime-link=static 定义了运行链接库为静态，就是程序使用此库打包时为静态的，动态设置为 shared
+* --build-type=complete 定义了编译所有支持的变种库
+* stage 定义了库文件路径：.\stage\lib。想要更换其他路径使用 --stagedir=directory 参数来定义
 
 ## 编译 libtorrent
 
@@ -190,13 +209,13 @@ b2 install --prefix=D:\develop\boost --build-type=complete --toolset=msvc-14.4 t
 2. 打开 `x64 Native Tools Command Prompt for VS2022` 切换操作目录至 `d:\workspace\libtorrent` 目录下，执行命令：
 
 ```
-b2 --toolset=msvc-14.4 link=static runtime-link=static openssl-lib=d:\develop\OpenSSL-Win64\lib openssl-include=d:\develop\OpenSSL-Win64\include
+b2 --toolset=msvc-14.3 link=static runtime-link=static openssl-lib=d:\develop\OpenSSL-Win64\lib openssl-include=d:\develop\OpenSSL-Win64\include
 ```
 
 3. 安装 libtorrent
 
 ```
-b2 install --toolset=msvc-14.4 link=static runtime-link=static --prefix=d:\develop\libtorrent
+b2 install --toolset=msvc-14.3 --prefix=d:\develop\libtorrent link=static runtime-link=static openssl-lib=d:\develop\OpenSSL-Win64\lib openssl-include=d:\develop\OpenSSL-Win64\include
 ```
 
 安装完成后，`d:\develop\libtorrent` 目录下会生成 `lib` 、 `include` 、 `share` 三个目录。
