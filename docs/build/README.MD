@@ -205,7 +205,7 @@ b2 --toolset=msvc-14.3 link=static runtime-link=static --build-type=complete sta
 
 ## 编译 libtorrent
 
-1. 设置系统变量 `BOOST_ROOT = d:\develop\boost`
+1. 设置系统变量 `BOOST_ROOT = d:\develop\boost\bin`, 并将其加入到 `path` 系统变量中。
 2. 打开 `x64 Native Tools Command Prompt for VS2022` 切换操作目录至 `d:\workspace\libtorrent` 目录下，执行命令：
 
 ```
@@ -215,7 +215,7 @@ b2 --toolset=msvc-14.3 link=static runtime-link=static openssl-lib=d:\develop\Op
 3. 安装 libtorrent
 
 ```
-b2 install --toolset=msvc-14.3 --prefix=d:\develop\libtorrent link=static runtime-link=static openssl-lib=d:\develop\OpenSSL-Win64\lib openssl-include=d:\develop\OpenSSL-Win64\include
+b2 install --toolset=msvc-14.3 --prefix=d:\develop\libtorrent link=static runtime-link=static
 ```
 
 安装完成后，`d:\develop\libtorrent` 目录下会生成 `lib` 、 `include` 、 `share` 三个目录。
