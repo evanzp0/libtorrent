@@ -46,10 +46,20 @@ private:
 	int m_bit_idx;
 };
 
+/**
+ * 这是一个用户定义的字面量运算符，用于将一个无符号长整型字面量转换为 bit_t 类型的对象。
+ * 
+ * 例如：
+ * auto myBit = 123_bit;  // 这将调用operator ""_bit(123)来创建一个 bit_t {m_bit_idx: 123} 类型的对象
+ *
+ */
 constexpr bit_t operator ""_bit(unsigned long long int b) { return bit_t{static_cast<int>(b)}; }
 
 namespace flags {
 
+/**
+ * bitfield_flag 变量名 = x_bit 表示变量为二进制的第 x 位为 1 。 
+ */
 template<typename UnderlyingType, typename Tag
 	, typename Cond = typename std::enable_if<std::is_integral<UnderlyingType>::value>::type>
 struct bitfield_flag
@@ -63,6 +73,8 @@ struct bitfield_flag
 	constexpr bitfield_flag(bitfield_flag&& rhs) noexcept = default;
 	constexpr bitfield_flag() noexcept : m_val(0) {}
 	explicit constexpr bitfield_flag(UnderlyingType const val) noexcept : m_val(val) {}
+
+	// 注意： 位构造函数是有一个对 1 进行左移 bit 次的操作的构造函数。
 	constexpr bitfield_flag(bit_t const bit) noexcept : m_val(static_cast<UnderlyingType>(UnderlyingType{1} << static_cast<int>(bit))) {}
 #if TORRENT_ABI_VERSION >= 2
 	explicit constexpr operator UnderlyingType() const noexcept { return m_val; }

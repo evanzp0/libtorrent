@@ -73,6 +73,10 @@ namespace libtorrent {
 // bitmask type used to define alert categories. Categories can be enabled
 // and disabled by the settings_pack::alert_mask setting. Constants are defined
 // in the lt::alert_category namespace
+/**
+ * alert_category_t 是一个位域标志类型，用于定义不同类型的警报类别。
+ * 就是一个 32 位的二进制数，二进制的每一位代表了一个类别。
+ */
 using alert_category_t = flags::bitfield_flag<std::uint32_t, struct alert_category_tag>;
 
 namespace alert_category {
@@ -87,8 +91,21 @@ namespace alert_category {
 	// * .torrent files errors
 	// * listen socket errors
 	// * port mapping errors
+	//
+	/**
+	 * 创建一个 bit_t { m_bit_idx: 0 } 的对象。
+	 * 
+	 * alert_category_t 变量名 = x_bit 表示变量为二进制的第 x 位为 1 。 
+	 * 所以 alert_category_t error = 0_bit 就表示 error 值为 b0000 0001 (1)。
+	 */
 	constexpr alert_category_t error = 0_bit;
 
+	/**
+	 * 这段代码定义了一个名为 peer 的常量，它是 alert_category_t 类型的，并且被赋值为 1_bit。
+	 * 
+	 * alert_category_t 变量名 = x_bit 表示变量为二进制的第 x 位为 1 。 
+	 * 所以 alert_category_t peer = 1_bit 就表示 peer 值为 b0000 0010 (2)。
+	 */
 	// Enables alerts when peers send invalid requests, get banned or
 	// snubbed.
 	constexpr alert_category_t peer = 1_bit;
@@ -108,6 +125,12 @@ namespace alert_category {
 	constexpr alert_category_t connect = 5_bit;
 
 	// Enables alerts for when a torrent or the session changes state.
+	/**
+	 * 这段代码定义了一个名为 peer 的常量，它是 alert_category_t 类型的，并且被赋值为 1_bit。
+	 * 
+	 * alert_category_t 变量名 = x_bit 表示变量为二进制的第 x 位为 1 。 
+	 * 所以 alert_category_t status = 6_bit 就表示 peer 值为 b0100 0000 (64)。
+	 */
 	constexpr alert_category_t status = 6_bit;
 
 	// Alerts when a peer is blocked by the ip blocker or port blocker.

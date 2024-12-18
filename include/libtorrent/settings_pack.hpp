@@ -122,6 +122,11 @@ namespace aux {
 		~settings_interface() = default;
 	};
 
+	/**
+	 * settings_pack 有三个私有成员：m_strings, m_ints 和 m_bools。
+	 * 这三个成员分别为存放 pair<std::uint16_t, std::string>, pair<std::uint16_t, std::int>, pair<std::uint16_t, bool> 类型的 vector。
+	 * 通过 set_str(), set_int(), set_bool 这三个方法可以分别向 m_strings, m_ints 和 m_bools 中存放 key/value 对。
+	 */
 	// The ``settings_pack`` struct, contains the names of all settings as
 	// enum values. These values are passed in to the ``set_str()``,
 	// ``set_int()``, ``set_bool()`` functions, to specify the setting to
@@ -181,11 +186,11 @@ namespace aux {
 		// bits indicate what type the setting has. (string, int, bool)
 		enum type_bases
 		{
-			string_type_base = 0x0000,
-			int_type_base =    0x4000,
-			bool_type_base =   0x8000,
-			type_mask =        0xc000,
-			index_mask =       0x3fff
+			string_type_base = 0x0000, // 0000 0000 0000 0000
+			int_type_base =    0x4000, // 0100 0000 0000 0000
+			bool_type_base =   0x8000, // 1000 0000 0000 0000
+			type_mask =        0xc000, // 1100 0000 0000 0000
+			index_mask =       0x3fff  // 0011 1111 1111 1111 
 		};
 
 		// internal
@@ -197,6 +202,15 @@ namespace aux {
 			for (auto const& b : m_bools) f(b.first, b.second);
 		}
 
+		/**
+		 * 用 2 个字节的整数的枚举值来代表一个字符串。
+		 * 其中，第一个字节用于表示类型，第二个字节用于表示其在字符串的枚举值索引。
+		 * 将枚举值和 type_mask 进行与运算，就可以得到具体的类型(string_type_base, int_type_base, bool_type_base)。
+		 * 
+		 * 例如：
+		 * string_types::handshake_client_version = 3,
+		 * 将 0000 0000 0000 0011 (3) & 1100 0000 0000 0000 (type_mask) = 0000 0000 0000 0000 (string_type_base)
+		 */
 		// hidden
 		enum string_types
 		{
@@ -205,7 +219,7 @@ namespace aux {
 			// libtorrent/libtorrent-version". This name will not only be used when
 			// making HTTP requests, but also when sending extended headers to
 			// peers that support that extension. It may not contain \r or \n
-			user_agent = string_type_base,
+			user_agent = string_type_base, //0x0000 , b0000 0000 0000 0000
 
 			// ``announce_ip`` is the ip address passed along to trackers as the
 			// ``&ip=`` parameter. If left as the default, that parameter is
@@ -1017,13 +1031,22 @@ namespace aux {
 			max_bool_setting_internal
 		};
 
+		/**
+		 * 用 2 个字节的整数的枚举值来代表一个整数。
+		 * 其中，第一个字节用于表示类型，第二个字节用于表示其在字符串的枚举值索引。
+		 * 将枚举值和 type_mask 进行与运算，就可以得到具体的类型(string_type_base, int_type_base, bool_type_base)。
+		 * 
+		 * 例如：
+		 * int_types::stop_tracker_timeout = 0x4002 (16386),
+		 * 将 0100 0000 0000 0010 (0x4002) & 1100 0000 0000 0000 (type_mask) = 0100 0000 0000 0000 (int_types_base)
+		 */
 		// hidden
 		enum int_types
 		{
 			// ``tracker_completion_timeout`` is the number of seconds the tracker
 			// connection will wait from when it sent the request until it
 			// considers the tracker to have timed-out.
-			tracker_completion_timeout = int_type_base,
+			tracker_completion_timeout = int_type_base, // 0x4000 , b0100 0000 0000 0000
 
 			// ``tracker_receive_timeout`` is the number of seconds to wait to
 			// receive any data from the tracker. If no data is received for this
