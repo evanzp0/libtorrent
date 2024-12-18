@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "D:\\dev_tools\\Python27\\include",
+                "D:\\develop\\boost\\include\\boost-1_87",
+                "${workspaceFolder}\\include"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "windowsSdkVersion": "10.0.22621.0",
+            "compilerPath": "cl.exe",
+            "cppStandard": "c++17",
+            "compilerArgs": [
+                "${workspaceFolder}"
+            ]
+        }
+    ],
+    "version": 4
+}
