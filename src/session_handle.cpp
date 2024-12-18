@@ -133,12 +133,16 @@ namespace libtorrent {
 				ex = std::current_exception();
 			}
 #endif
+			// 使用互斥锁mut保护done变量的修改。
 			std::unique_lock<std::mutex> l(s->mut);
+			// 设置done为true并通知(唤醒)所有等待的线程。
 			done = true;
 			s->cond.notify_all();
 		});
 
+		// 等待函直到 done 变为 true
 		aux::torrent_wait(done, *s);
+		
 		if (ex) std::rethrow_exception(ex);
 	}
 

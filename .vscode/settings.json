@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.vim": "lua",
+        "vector": "cpp"
+    }
+}

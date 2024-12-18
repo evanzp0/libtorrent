@@ -64,15 +64,25 @@ TORRENT_VERSION_NAMESPACE_3
 	// along with all information necessary to add that torrent to a session.
 	// The key fields when adding a torrent are:
 	//
+	// add_torrent_params 包含 `.torrent` 文件 的所有信息，用于将该 torrent 添加到 session 中。
+	// 一个 torrent 的关键字段是：
+	//
 	// * ti - the immutable info-dict part of the torrent
+	// * ti - torrent 的不可变的 info-dict 域
+	//
 	// * info_hash - when you don't have the metadata (.torrent file). This
 	//   uniquely identifies the torrent and can validate the info-dict when
 	//   received from the swarm.
+	//  * info_hash - 没有 metadata (.torrent 文件)的情况下，info_hash 字段唯一标识 torrent ，
+	//   当从下载集群中接收 metadata 后，可以使用 info_hash 验证 info-dict 中的内容。
 	//
 	// In order to add a torrent to a session, one of those fields must be set
 	// in addition to ``save_path``. The add_torrent_params object can then be
 	// passed into one of the ``session::add_torrent()`` overloads or
 	// ``session::async_add_torrent()``.
+	// 
+	// 为了能将 torrent 添加到 session 中，`save_path` 必须设置。这样，add_torrent_params 对象
+	// 就可以被传入 ``session::add_torrent()`` 或 ``session::async_add_torrent()`` 的其中一个重载函数。
 	//
 	// If you only specify the info-hash, the torrent file will be downloaded
 	// from peers, which requires them to support the metadata extension. For
@@ -80,8 +90,11 @@ TORRENT_VERSION_NAMESPACE_3
 	// enabled (``TORRENT_DISABLE_EXTENSIONS`` must not be defined). It also
 	// takes an optional ``name`` argument. This may be left empty in case no
 	// name should be assigned to the torrent. In case it's not, the name is
-	// used for the torrent as long as it doesn't have metadata. See
+	// used for the torrent as long as it doesn't have metadata . See
 	// ``torrent_handle::name``.
+	//
+	// 如果 name 不为空，且 torrent 没有 metadata, 则 name 会临时被 torrent 使用。
+	// 如果有 metadata, torrent 会使用 metadata 中解析出的 name 。
 	//
 	// The ``add_torrent_params`` is also used when requesting resume data for a
 	// torrent. It can be saved to and restored from a file and added back to a
@@ -89,9 +102,16 @@ TORRENT_VERSION_NAMESPACE_3
 	// ``add_torrent_params`` objects, see read_resume_data() and
 	// write_resume_data().
 	//
+	// add_torrent_params 还能在 torrent 恢复数据是使用。它也可以被保存到文件，并添加回新的 session 中。
+	// 具体参见 `read_resume_data()` 和 `write_resume_data()`。
+	//
 	// The ``add_torrent_params`` is also used to represent a parsed .torrent
 	// file. It can be loaded via load_torrent_file(), load_torrent_buffer() and
 	// load_torrent_parsed(). It can be saved via write_torrent_file().
+	// 
+	// add_torrent_params 也能表示解析后的 .torrent 文件。
+	// 它可以通过 load_torrent_file()，load_torrent_buffer() 和 load_torrent_parsed() 加载。
+	// 也能通过 write_torrent_file() 保存。
 #include "libtorrent/aux_/disable_warnings_push.hpp"
 	struct TORRENT_EXPORT add_torrent_params
 	{

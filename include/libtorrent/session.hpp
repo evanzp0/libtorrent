@@ -146,6 +146,11 @@ namespace aux {
 	// the settings to be set and pass it in to ``session::apply_settings()``.
 	//
 	// see apply_settings().
+	/**
+	 * session的结构体，它是libtorrent库中的一个关键组件，用于运行网络循环和管理多个torrent（种子）会话。
+	 * 一旦它创建，session对象将启动主线程，该线程负责处理所有工作。
+	 * 主线程在没有任何torrent参与时处于空闲状态。
+	 */
 	struct TORRENT_EXPORT session : session_handle
 	{
 		// Constructs the session objects which acts as the container of torrents.
@@ -189,6 +194,7 @@ namespace aux {
 		session(session const&) = delete;
 		session& operator=(session const&) = delete;
 
+// ABI 2 中废弃的 session 构造函数
 #if TORRENT_ABI_VERSION <= 2
 #include "libtorrent/aux_/disable_deprecation_warnings_push.hpp"
 
@@ -272,6 +278,11 @@ namespace aux {
 		// The only valid operation is calling the destructor::
 		//
 		// 	struct session_proxy {};
+		/**
+		 * 使用外部io_context时，需要特别注意会话对象的正确终止。
+		 * 在销毁session对象之前，必须先调用abort()方法并保存返回的session_proxy对象，
+		 * 然后确保io_context::run()已经返回，最后才能销毁session对象和session_proxy对象。
+		 */
 		session_proxy abort();
 
 	private:
@@ -290,8 +301,8 @@ namespace aux {
 		// data shared between the main thread
 		// and the working thread
 		std::shared_ptr<io_context> m_io_service;
-		std::shared_ptr<std::thread> m_thread;
-		std::shared_ptr<aux::session_impl> m_impl;
+		std::shared_ptr<std::thread> m_thread; // 工作线程
+		std::shared_ptr<aux::session_impl> m_impl; // 会话实现的智能指针
 	};
 
 }

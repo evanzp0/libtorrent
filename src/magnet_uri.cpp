@@ -299,19 +299,44 @@ namespace libtorrent {
 		return ret;
 	}
 
+	/**
+	 * parse_magnet_uri 函数用于解析一个给定的 Magnet URI，并填充 add_torrent_params 结构体，
+	 * 以便后续进行种子文件的添加或处理。
+	 * 该函数接受三个参数：
+	 * 	- string_view uri（待解析的 Magnet URI）、
+	 * 	- add_torrent_params& p（用于存储解析结果的结构体引用）、
+	 * 	- error_code& ec（用于记录解析过程中可能发生的错误）。
+	 */
 	void parse_magnet_uri(string_view uri, add_torrent_params& p, error_code& ec)
 	{
+        // 清除错误代码
 		ec.clear();
+        // 用于存储解析出的显示名称
 		std::string display_name;
 
 		string_view sv(uri);
+        // 检查 URI 是否以 "magnet:?" 开头，
+        // 如果不是，则设置错误代码 ec 为 errors::unsupported_url_protocol 并返回。
 		if (sv.substr(0, 8) != "magnet:?"_sv)
 		{
 			ec = errors::unsupported_url_protocol;
 			return;
 		}
+		// 移除 URI 开头的 "magnet:?" 部分，以便后续解析参数。
 		sv = sv.substr(8);
 
+        // 使用一个循环来遍历 URI 中的参数，直到没有更多参数为止。对于每个参数，执行以下步骤：
+        // 1. 分割参数名和值：使用 split_string 函数将参数名和值从 URI 中分割出来。
+        // 2. 处理参数名中的数字后缀：如果参数名中包含 . 后跟数字，则移除这些数字后缀（假设它们没有实际意义）。
+        // 3. 根据参数名进行判断，并执行相应的操作：
+        //   - dn（显示名称），则将值作为显示名称解析出来，并存储在 display_name 中。
+        //   - tr（追踪器），则将值作为 tracker URL 解析出来，并存储在 p.trackers 中。
+        //   - ws（Web 种子），则将值作为 Web 种子 URL 解析出来，并存储在 p.url_seeds 中。
+        //   - xt（扩展主题），则将值作为 BTIH 哈希值解析出来，并存储在 p.info_hashes 中，支持 urn:btih: 和 urn:btmh: 两种格式。
+        //   - so（仅选择文件），则将值作为 Info-Hash 哈希值解析出来，并存储在 p.info_hashes 中。
+        //   - x.pe（对等点），则将值作为 Peer 地址解析出来，并存储在 p.peers 中。
+        //   - dht（DHT 节点），则将值作为 DHT 节点解析出来，并存储在 p.dht_nodes 中。
+        //   - 如果参数名不是上述任何一种，则忽略该参数。
 		int tier = 0;
 		bool has_ih[2] = { false, false };
 		while (!sv.empty())
@@ -334,6 +359,7 @@ namespace libtorrent {
 			if (string_equal_no_case(name, "dn"_sv)) // display name
 			{
 				error_code e;
+                // 用于对 URL 编码的字符串 value 进行解码。
 				display_name = unescape_string(value, e);
 			}
 			else if (string_equal_no_case(name, "tr"_sv)) // tracker
@@ -347,7 +373,9 @@ namespace libtorrent {
 				if (!e && !tracker.empty())
 				{
 #if TORRENT_USE_I2P
-					if (!(p.flags & torrent_flags::i2p_torrent) && is_i2p_url(tracker))
+					if (!(p.flags & torrent_flags::i2p_torrent) 
+                            // 检查 URL 是否为 I2P URL
+                            && is_i2p_url(tracker))
 						p.flags |= torrent_flags::i2p_torrent;
 #endif
 
@@ -379,6 +407,7 @@ namespace libtorrent {
 					if (value.size() == 40) aux::from_hex(value, info_hash.data());
 					else if (value.size() == 32)
 					{
+                        // 对 Base32 编码的字符串 value 进行解码
 						std::string const ih = base32decode(value);
 						if (ih.size() != 20)
 						{
@@ -476,6 +505,7 @@ namespace libtorrent {
 			else if (string_equal_no_case(name, "x.pe"_sv))
 			{
 				error_code e;
+                // 解析字符串 value 得到一个 TCP/IP 端点
 				tcp::endpoint endp = parse_endpoint(value, e);
 				if (!e) p.peers.push_back(std::move(endp));
 			}
@@ -493,6 +523,8 @@ namespace libtorrent {
 #endif
 		}
 
+        // 检查是否解析到了至少一个有效的信息哈希（urn:btih: 或 urn:btmh:），
+        // 如果没有，则设置错误代码 ec 为 errors::missing_info_hash_in_uri 并返回。
 		if (!has_ih[0] && !has_ih[1])
 		{
 			ec = errors::missing_info_hash_in_uri;
@@ -502,6 +534,7 @@ namespace libtorrent {
 #if TORRENT_ABI_VERSION < 3
 		p.info_hash = p.info_hashes.get_best();
 #endif
+        // 如果解析出了显示名称，则将其设置为 add_torrent_params 结构体的 name 成员。
 		if (!display_name.empty()) p.name = display_name;
 	}
 

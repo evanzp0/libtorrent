@@ -72,11 +72,21 @@ void dump_call_profile()
 #endif
 }
 
+/**
+ * 该函数用于等待一个特定的条件（这里是done变量的值变为true）发生
+ */
 void torrent_wait(bool& done, aux::session_impl& ses)
 {
-	blocking_call();
+	// blocking_call() 是不必要的或者用于特定的初始化或同步目的
+	blocking_call(); 
+	
 	std::unique_lock<std::mutex> l(ses.mut);
-	while (!done) { ses.cond.wait(l); }
+	while (!done) { 
+		// wait方法会原子地解锁l（即释放ses.mut），然后等待条件变量的通知（即另一个线程调用notify_one或notify_all）。
+		// 一旦条件变量被通知，wait方法会重新锁定l，然后检查循环条件（这里是!done）。
+		// 如果done仍然为false，则继续等待；如果为true，则退出循环。
+		ses.cond.wait(l);
+	}
 }
 
 } } // namespace aux namespace libtorrent
