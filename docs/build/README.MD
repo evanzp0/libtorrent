@@ -219,3 +219,130 @@ b2 install --toolset=msvc-14.3 --prefix=d:\develop\libtorrent link=static runtim
 ```
 
 安装完成后，`d:\develop\libtorrent` 目录下会生成 `lib` 、 `include` 、 `share` 三个目录。
+
+## 创建一个新的 C++ 项目
+1. 在 `d:\workspace` 目录下新建 `libtorrent_learning` 目录
+
+```
+cd d:\workspace
+mkdir libtorrent_learning
+cd libtorrent_learning
+```
+
+2. 新建一个 src 目录，用于存放源代码
+
+```
+mkdir src
+```
+
+3. 在 src 目录下新建一个 `lt_client.cpp` 文件，写入以下内容:
+
+```cpp
+#include <libtorrent/session.hpp>
+#include <libtorrent/add_torrent_params.hpp>
+#include <libtorrent/torrent_handle.hpp>
+#include <libtorrent/magnet_uri.hpp>
+
+int main(int argc, char const* argv[])
+{
+        if (argc != 2) {
+                fprintf(stderr, "usage: %s <magnet-url>\n");
+                return 1;
+        }
+        lt::session ses;
+
+        lt::add_torrent_params atp = lt::parse_magnet_uri(argv[1]);
+        atp.save_path = "."; // save in current dir
+        lt::torrent_handle h = ses.add_torrent(atp);
+
+        // ...
+}
+```
+
+4. 在 `d:\workspace\libtorrent_learning` 目录下新建一个 `CMakeLists.txt` 文件，写入以下内容:
+
+```cmake 
+cmake_minimum_required(VERSION 3.31)
+
+# 设置策略CMP0091为NEW，新策略
+if (POLICY CMP0091)
+    cmake_policy(SET CMP0091 NEW)
+endif (POLICY CMP0091)
+
+# 指定C++标准
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_definitions( -D_WIN32_WINNT=0x0A00 )
+
+# 声明一个工程
+project(learn_cmake)
+
+set(Boost_COMPILER vc143)
+set(Boost_USE_STATIC_RUNTIME not ON)
+
+include_directories(
+    "D:/develop/libtorrent/include"
+    "D:/develop/boost/include/boost-1_87")
+
+find_library(LIBTORRENT_LIB libtorrent-rasterbar "D:/develop/libtorrent/lib")
+find_library(LIBTRY_SIGNAL_LIB libtry_signal "D:/develop/libtorrent/lib")
+find_library(OPENSSL_CRYPTO_LIB libcrypto "D:/develop/OpenSSL-Win64/lib")
+find_library(OPENSSL_LIB libssl "D:/develop/OpenSSL-Win64/lib")
+find_library(BOOST_SYSTEM_LIB libboost_system-vc143-mt-sgd-x64-1_87 "D:/develop/libtorrent/lib")
+
+# 添加一个exe
+add_executable(lt_client ./src/lt_client.cpp)
+
+target_link_libraries(lt_client ${LIBTORRENT_LIB} ${OPENSSL_CRYPTO_LIB} ${OPENSSL_LIB} ${LIBTRY_SIGNAL_LIB} ${BOOST_SYSTEM_LIB} iphlpapi.lib crypt32.lib)
+
+# 设置MT/MTd
+set_property(TARGET lt_client PROPERTY
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+```
+
+5. 编译
+
+```
+cd d:\workspace\libtorrent_learning
+mkdir build
+cd build
+cmake .. -G "NMake Makefiles"
+nmake
+```
+
+编译成功后，在 `build` 目录下，能看到生成的可执行文件 `lt_client.exe` 。
+
+6. VSCode 中的源码浏览跳设置
+
+打开 setting 面板，搜索 browe ，找到 `C_Cpp: Browse.path` ，将其设置为 `D:/workspace/libtorrent/src` ( `libtorrent` 源码目录)。
+这样，按住 `alt + 鼠标右键`，就可以跳转代码了。
+
+7. VSCode 中编辑时的代码引用提示设置
+
+在项目根目录新建 `.vscode` 文件夹，并创建 `c_cpp_properties.json` ，输入以下内容，编辑时的 include 就不会报错了。
+
+```json
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "D:/develop/libtorrent/include",
+                "D:/develop/boost/include/boost-1_87"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "_WIN32_WINNT=0x0A00"
+            ],
+            "windowsSdkVersion": "10.0.22621.0",
+            "compilerPath": "cl.exe",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}
+```
