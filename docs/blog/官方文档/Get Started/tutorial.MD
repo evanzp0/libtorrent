@@ -1,5 +1,7 @@
 # Libtorrent tutorial
 
+## session 及其他相关的概念
+
 在 libtorrent 中，启动和下载 `torrent` 的基本功能是通过创建一个 `session` (会话) 来实现的， `session` 为 `torrent` 提供了上下文和一个容器。这是通过 [session](https://www.libtorrent.org/reference-Session.html#session) 类来完成的，尽管其大部分接口都在 [session_handle](https://www.libtorrent.org/reference-Session.html#session_handle) 下有文档说明 (译者注: session 继承自 session_handle ) 。
 
 要向 session 中添加一个 torrent，你需要填充一个 [add_torrent_params](https://www.libtorrent.org/reference-Add_Torrent.html#add_torrent_params) 对象，并将其传递给 [add_torrent()](https://www.libtorrent.org/reference-Session.html#add_torrent()) 或 [async_add_torrent()](https://www.libtorrent.org/reference-Session.html#async_add_torrent()) 方法。
@@ -101,3 +103,28 @@ catch (std::exception& e)
   std::cerr << "Error: " << e.what() << std::endl;
 }
 ```
+
+## alert masks (警报掩码)
+
+这个程序的输出将会非常详细，这可能是一个很好的起点，有助于你了解正在发生什么。Alerts 被分为不同的 [alert](https://www.libtorrent.org/reference-Alerts.html#alert) 类别。每个类别都可以通过 *`alert mask` (警报掩码)* 独立地启用和禁用。
+
+*`alert mask`* 是 libtorrent 提供的一个配置选项。有很多配置选项，具体可以参见 [settings_pack](https://www.libtorrent.org/reference-Settings.html#settings_pack) 。*`alert mask`* 设置的值是一个整数，由多个类别标志通过 OR 位运算合成。
+
+例如，为了只查看最相关的警报，可以这样构建会话（ `session` ）：
+
+```cpp
+lt::settings_pack pack;
+pack.set_int(lt::settings_pack::alert_mask
+        , lt::alert_category::error
+        | lt::alert_category::storage
+        | lt::alert_category::status);
+
+lt::session ses(pack);
+```
+
+虽然可以在 `session` 开始后通过调用 [apply_settings()](https://www.libtorrent.org/reference-Session.html#apply_settings()) 来更新配置选项，但最好还是在启动 `session` 之前设置一些配置，比如监听接口（ [listen_interfaces](https://www.libtorrent.org/reference-Settings.html#listen_interfaces) ），以避免竞态条件。如果你使用默认设置启动 `session` 然后立即更改它们，那么在更改生效之前，仍然会有一段空窗期程序使用的是默认设置。
+
+更改设置可能会触发监听套接字的关闭和重新打开，以及发送 NAT-PMP 和 UPnP 更新。因此，通常建议将设置更新批量处理为单次调用 (译者注：就是将多个更新参数放在一起集中更新)。
+
+## session destruction (会话销毁)
+
