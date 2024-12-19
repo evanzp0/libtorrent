@@ -1,6 +1,14 @@
 {
     "files.associations": {
         "*.vim": "lua",
-        "vector": "cpp"
+        "vector": "cpp",
+        "chrono": "cpp",
+        "xlocale": "cpp",
+        "format": "cpp",
+        "map": "cpp",
+        "random": "cpp",
+        "ostream": "cpp",
+        "charconv": "cpp",
+        "xstring": "cpp"
     }
 }
