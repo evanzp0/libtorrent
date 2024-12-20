@@ -154,6 +154,15 @@ TORRENT_VERSION_NAMESPACE_3
 		// special values for error_file to describe which file or component
 		// encountered the error (``errc``).
 		// the error did not occur on a file
+		/**
+		 * static constexpr 关键字组合用于声明一个静态常量。这意味着 error_file_none 将在编译时确定其值，
+		 * 并且在整个程序中保持不变。同时，由于它是静态的，因此它只在定义它的文件或翻译单元内可见。
+		 * 
+		 * error_file_none 被 -1 初始化为 -1，这意味着它是一个静态常量。
+		 * 
+		 * 这定义了一个具有 file_index_t 类型的常量，
+		 * 这比像 ``static const error_file_none = -1;`` 这样没有定义类型的整数常量要安全的多。
+		 */
 		static constexpr file_index_t error_file_none{-1};
 
 		// the error occurred setting up the SSL context

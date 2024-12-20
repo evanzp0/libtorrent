@@ -298,6 +298,7 @@ namespace libtorrent {
 		// that the ABI is the same for debug builds and release builds. It
 		// appears to be very hard to match debug builds with debug versions of
 		// libtorrent
+		// m_type:7 是一个位字段，它能使用一个字节中的 7 位，它和 m_type_queried 在一起共用一个字节
 		std::uint8_t m_type:7;
 
 	public:
@@ -306,6 +307,7 @@ namespace libtorrent {
 		// program has not yet queried the type of this entry, and should not
 		// assume that it has a certain type. This is asserted in the accessor
 		// functions. This does not apply if exceptions are used.
+		// m_type_queried:7 是一个位字段，它能使用一个字节中的 1 位，它和 m_type 在一起共用一个字节
 		mutable std::uint8_t m_type_queried:1;
 	};
 
