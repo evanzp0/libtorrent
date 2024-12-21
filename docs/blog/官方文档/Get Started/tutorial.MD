@@ -589,4 +589,4 @@ catch (std::exception& e)
 
 编码和解码分别有两种独立的机制。解码时，使用 `bdecode()` 函数，该函数返回一个 [bdecode_node](https://www.libtorrent.org/reference-Bdecoding.html#bdecode_node) 。编码时，则使用接受一个 [entry](https://www.libtorrent.org/reference-Bencoding.html#entry) 对象的 `bencode()` 函数。 
 
-`bdecode()` 的一个关键特性是，它不会从解析的缓冲区中复制任何数据。相反，它构建了一个指向缓冲区内部的引用树结构。只要 `bdecode_node` 在使用中，缓冲区就必须保持活跃和有效。有关 `bdecode()` 的性能详细信息，请参阅相关的 blog 文章 ([bdecode parsers](https://blog.libtorrent.org/2015/03/bdecode-parsers/))。
+`bdecode()` 的一个关键特性是，它不会从解析的缓冲区中复制任何数据。相反，它构建了一个指向缓冲区内部的引用树结构。只要 `bdecode_node` 在使用中，缓冲区就必须保持活跃和有效。有关 `bdecode()` 的性能详细信息，请参阅相关的 blog 文章 ([bdecode parsers](../bencode_parsers.MD))。
