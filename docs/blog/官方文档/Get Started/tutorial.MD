@@ -578,3 +578,15 @@ catch (std::exception& e)
   std::cerr << "Error: " << e.what() << std::endl;
 }
 ```
+
+## torrent files (种子文件)
+
+要将种子文件添加到 `session` 中（与磁力链接相对），必须先将其加载到 [torrent_info](https://www.libtorrent.org/reference-Torrent_Info.html#torrent_info) 对象中。 `torrent_info` 对象可以通过文件名、缓冲区或 `bencoded` 结构来创建。当通过文件名添加时，会对文件大小进行合理性检查和限制，如果要添加任意大小的种子文件，请在构造函数外部加载该文件。 `torrent_info` 对象提供了在将 `.torrent` 文件添加到会话之前，查询该文件信息以及对其进行修改的机会。
+
+## bencoding (bencoding 编码)
+
+`Bencoding` （或称为 `bencoded` 结构）是 `BitTorrent` 默认使用的数据存储格式，应用于如 `.torrent` 文件、 `Tracker` 的 `announce` 和 `scrape` 响应以及一些线路协议扩展中。 libtorrent 提供了一个高效的框架，通过 [bdecode()](https://www.libtorrent.org/reference-Bdecoding.html#bdecode()) 函数来解码 bencoded 数据。
+
+编码和解码分别有两种独立的机制。解码时，使用 `bdecode()` 函数，该函数返回一个 [bdecode_node](https://www.libtorrent.org/reference-Bdecoding.html#bdecode_node) 。编码时，则使用接受一个 [entry](https://www.libtorrent.org/reference-Bencoding.html#entry) 对象的 `bencode()` 函数。 
+
+`bdecode()` 的一个关键特性是，它不会从解析的缓冲区中复制任何数据。相反，它构建了一个指向缓冲区内部的引用树结构。只要 `bdecode_node` 在使用中，缓冲区就必须保持活跃和有效。有关 `bdecode()` 的性能详细信息，请参阅相关的 blog 文章 ([bdecode parsers](https://blog.libtorrent.org/2015/03/bdecode-parsers/))。
