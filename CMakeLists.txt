@@ -14,6 +14,9 @@ project(libtorrent
 )
 set (SOVERSION "${VER_MAJOR}.${VER_MINOR}")
 
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/source-charset:utf-8>")
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/execution-charset:gbk>")
+
 include(GNUInstallDirs)
 include(GeneratePkgConfig)
 

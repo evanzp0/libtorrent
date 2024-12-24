@@ -109,6 +109,10 @@ namespace {
 		return start;
 	}
 
+	/** 
+	 * - token: 代表当前 token frame 在 token 列表中的 index
+	 * - state: 代表 token 的类型, 0: key (如果 token 是 dict), 1: value
+	*/
 	struct stack_frame
 	{
 		stack_frame() : token(0), state(0) {}
@@ -124,6 +128,7 @@ namespace {
 	// should only be called for non last item in array
 	int token_source_span(bdecode_token const& t)
 	{
+		// (&t) 是取 t 的地址，然后把 (&t) 作为数组首地址（索引是从0开始的），[1] 是取 t素组中的下一个元素
 		return (&t)[1].offset - t.offset;
 	}
 
@@ -158,6 +163,8 @@ namespace aux {
 	// by 'ec'.
 	// WARNING: the val is an out-parameter that is expected to be initialized
 	// to 0 or a *positive* number.
+	//
+	// 返回 buffer 中尚未解析部分的开始位置 start
 	char const* parse_int(char const* start, char const* end, char delimiter
 		, std::int64_t& val, bdecode_errors::error_code_enum& ec)
 	{
@@ -170,6 +177,7 @@ namespace aux {
 				ec = bdecode_errors::expected_digit;
 				return start;
 			}
+			// 检查 val * 10 是否会溢出
 			if (val > std::numeric_limits<std::int64_t>::max() / 10)
 			{
 				ec = bdecode_errors::overflow;
@@ -447,6 +455,7 @@ namespace aux {
 			item = m_last_index;
 		}
 
+		// while 结束，item == i，获得此时的 token
 		while (item < i)
 		{
 			token += tokens[token].next_item;
@@ -820,7 +829,11 @@ namespace aux {
 
 		// this is the stack of bdecode_token indices, into m_tokens.
 		// sp is the stack pointer, as index into the array, stack
+		//
+		// 这是一个 stack ，它里面的每一个 frame 都有 m_tokens 中对应 bdecode_token 的 index。sp 是栈指针，是 stack 数组的索引。
 		int sp = 0;
+
+		// 在宏中，stack_frame 通过 alloca_destructor 在函数结束时析构
 		TORRENT_ALLOCA(stack, stack_frame, depth_limit);
 
 		// TODO: 2 attempt to simplify this implementation by embracing the span
@@ -948,6 +961,8 @@ namespace aux {
 					++start;
 					if (start >= end) TORRENT_FAIL_BDECODE(bdecode_errors::unexpected_eof);
 					bdecode_errors::error_code_enum e = bdecode_errors::no_error;
+
+					// 解析出后续字符串的 len 值，并返回 buffer 尚未解析的 start 位置
 					start = parse_int(start, end, ':', len, e);
 					if (e)
 						TORRENT_FAIL_BDECODE(e);

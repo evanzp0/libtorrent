@@ -180,6 +180,9 @@ struct bdecode_token
 	{
 		max_offset = (1 << 29) - 1,
 		max_next_item = (1 << 29) - 1,
+		//  (1 << 3) - 1：header 表示 buffer 中，header 的有效下标 index 最后一位不能超过 255，
+		// 也就是说 header 的 10 进制的长度字符串范围是 [0, 255]（256个阿拉伯数字）
+		// + 2是把 ':' 和 后面第一个字符的位置算进去了
 		short_string_max_header = (1 << 3) - 1 + 2,
 		long_string_max_header = 8 + (1 << 3) - 1 + 2
 	};
