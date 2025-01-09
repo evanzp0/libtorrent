@@ -72,3 +72,71 @@ using boost::asio::ip::tcp;
 using boost::asio::ip::udp;
 ```
 
+它们是在 `<libtorrent/socket.hpp>` 头文件里定义的。
+
+`using` 语句将提供对以下内容的便捷访问：
+
+```cpp
+tcp::endpoint
+udp::endpoint
+```
+
+这些是 libtorrent 中使用的端点类型。端点（endpoint） 是一个带有关联端口号的地址。
+
+关于这些类型的文档，请参考 [asio 文档](https://www.boost.org/doc/libs/1_66_0/doc/html/boost_asio.html)。
+
+## exceptions (异常)
+
+在 libtorrent 中，许多函数都有两个版本：
+
+- 一个版本在出错时抛出异常。
+
+- 另一个版本接受一个 `error_code` 引用，并在出错时填充错误代码。
+
+对于抛出异常的情况，libtorrent 会抛出 `boost::system::system_error` 异常，该异常携带一个描述底层错误的 `error_code`。
+
+
+### translating error codes (翻译错误代码)
+
+对于系统错误（即属于通用类别或系统类别的错误），`error_code::message()` 函数通常会返回本地化的错误字符串。
+
+然而，属于 libtorrent 错误类别的错误不会本地化，它们仅提供英文描述。为了翻译 libtorrent 错误，
+可以将 `error_code` 对象的错误类别与 `lt::libtorrent_category()` 进行比较，如果匹配，则说明错误代码属于上述列表中的错误。
+你可以提供自己的从错误代码到字符串的映射，并实现本地化。在这种情况下，你不能依赖 `error_code::message()` 来生成字符串。
+
+错误代码的数值是 API 的一部分，并且会保持不变，尽管可能会在末尾添加新的错误代码。
+
+以下是一个如何翻译错误代码的简单示例：
+
+```cpp
+std::string error_code_to_string(boost::system::error_code const& ec)
+{
+        if (ec.category() != lt::libtorrent_category())
+        {
+                return ec.message();
+        }
+        // the error is a libtorrent error
+
+        int code = ec.value();
+        static const char const* swedish[] =
+        {
+                "inget fel",
+                "en fil i torrenten kolliderar med en fil fran en annan torrent",
+                "hash check misslyckades",
+                "torrentfilen ar inte en dictionary",
+                "'info'-nyckeln saknas eller ar korrupt i torrentfilen",
+                "'info'-faltet ar inte en dictionary",
+                "'piece length' faltet saknas eller ar korrupt i torrentfilen",
+                "torrentfilen saknar namnfaltet",
+                "ogiltigt namn i torrentfilen (kan vara en attack)",
+                // ... more strings here
+        };
+
+        // use the default error string in case we don't have it
+        // in our translated list
+        if (code < 0 || code >= sizeof(swedish)/sizeof(swedish[0]))
+                return ec.message();
+
+        return swedish[code];
+}
+```
