@@ -214,7 +214,7 @@ struct save_resume_data_alert : torrent_alert
 在例子基础上，更新了以下内容：
 
 1. 不使用阻塞调用
-2. 打印洪流状态更新，而不是原始日志
+2. 打印 torrent 状态更新，而不是原始日志
 3. 保存和加载恢复文件
 
 ```cpp
