@@ -209,7 +209,7 @@ struct save_resume_data_alert : torrent_alert
 };
 ```
 
-`params` 字段是一个 [add_torrent_params](https://www.libtorrent.org/reference-Add_Torrent.html#add_torrent_params) 对象，它包含了将 `torrent` 加回 session 中时所需的所有状态。这个对象可以使用 [write_resume_data()](https://www.libtorrent.org/reference-Resume_Data.html#write_resume_data()) 或 [write_resume_data_buf()](https://www.libtorrent.org/reference-Resume_Data.html#write_resume_data_buf()) 方法进行序列化 (**译者注：**序列化就是对数据进行 bencoded 编码)，使**译者注：**对数据进行 bencoded 编码用 [read_resume_data()](https://www.libtorrent.org/reference-Resume_Data.html#read_resume_data()) 方法可以进行反序列化。
+`params` 字段是一个 [add_torrent_params](https://www.libtorrent.org/reference-Add_Torrent.html#add_torrent_params) 对象，它包含了将 `torrent` 加回 session 中时所需的所有状态。这个对象可以使用 [write_resume_data()](https://www.libtorrent.org/reference-Resume_Data.html#write_resume_data()) 或 [write_resume_data_buf()](https://www.libtorrent.org/reference-Resume_Data.html#write_resume_data_buf()) 方法进行序列化 (**译者注：**序列化就是对数据进行 bencoded 编码)，使对数据进行 bencoded 编码用 [read_resume_data()](https://www.libtorrent.org/reference-Resume_Data.html#read_resume_data()) 方法可以进行反序列化。
 
 在例子基础上，更新了以下内容：
 
