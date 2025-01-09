@@ -48,7 +48,7 @@ int main(int argc, char const* argv[])
 
 > **译者注：** `alert` 结构的子类包括 `torrent_alert` 、 `piece_finished_alert` 、 `peer_connect_alert` 等等，这些子类都是在 `alert_type.hpp` 文件中定义的。
 
-为了能程序化地响应某些事件，可以使用 [alert_cast](https://www.libtorrent.org/reference-Alerts.html#alert_cast()) 尝试将警报对象向下转换为更具体的类型 (译者注：向下转型后我们可以获取特定的 `alert` 子类中特有的成员数据)。
+为了能程序化地响应某些事件，可以使用 [alert_cast](https://www.libtorrent.org/reference-Alerts.html#alert_cast()) 尝试将 alert 对象向下转换为更具体的类型 (译者注：向下转型后我们可以获取特定的 `alert` 子类中特有的成员数据)。
 
 为了能打印出 libtorrent 中的事件以及能在 `torrent` 下载完成时退出，我们可以定期轮询 `session` 以获取 alerts 并打印它们，并同时监听 [torrent_finished_alert](https://www.libtorrent.org/reference-Alerts.html#torrent_finished_alert) ，该警报会在一个 `torrent` 下载完成时发布。
 
