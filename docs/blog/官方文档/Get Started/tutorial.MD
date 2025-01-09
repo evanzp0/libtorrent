@@ -8,7 +8,7 @@
 
 > **译者注：** 在 libtorrent `中，add_torrent_params` 是一个结构体或类，用于指定要添加的 `torrent` 的各种参数，比如 `torrent` 文件的路径、保存位置、下载模式等。通过填充这个对象，你可以告诉 libtorrent 你想要如何下载这个 `torrent` 。
 > 
-> 然后，你可以将这个填充好的 `add_torrent_params` 对象作为参数传递给 `add_torrent()` 或 `async_add_torrent()` 方法。`add_torrent()` 方法会同步地添加 `torrent` 到 `session` 中，并立即返回结果；而 `async_add_torrent()` 方法则是异步的，它会在后台添加 `torrent` ，并通过某种方式（比如回调或 `alert` ）通知调用方添加的结果。
+> 然后，你可以将这个填充好的 `add_torrent_params` 对象作为参数传递给 `add_torrent()` 或 `async_add_torrent()` 方法。`add_torrent()` 方法会同步地添加 `torrent` 到 `session` 中，并立即返回结果；而 `async_add_torrent()` 方法则是异步的，它会在后台添加 `torrent` ，并通过 [add_torrent_alert](https://www.libtorrent.org/reference-Alerts.html#add_torrent_alert) 消息通知调用方添加的结果。
 
 `add_torrent()` 是一个阻塞调用，它会返回一个 [torrent_handle](https://www.libtorrent.org/reference-Torrent_Handle.html#torrent_handle) 。
 
