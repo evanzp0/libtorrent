@@ -303,6 +303,18 @@ namespace {
 		set_piece_hashes(t, p, sett, default_disk_io_constructor, f, ec);
 	}
 
+	/**
+	 * @brief 设置种子文件的哈希值
+	 *
+	 * 该函数用于为给定的种子文件（torrent）设置每个块的哈希值。
+	 *
+	 * @param t 种子文件对象
+	 * @param p torrent 文件所在目录的路径
+	 * @param sett 包含配置设置的接口，用于获取如哈希线程数等配置
+	 * @param disk_io 一个函数或函数对象，用于创建磁盘I/O操作的接口
+	 * @param f  一个回调函数，每当一个数据块的哈希计算完成后被调用
+	 * @param ec 错误码对象，用于返回错误信息的引用
+	 */
 	void set_piece_hashes(create_torrent& t, std::string const& p
 		, settings_interface const& sett, disk_io_constructor_type disk_io
 		, std::function<void(piece_index_t)> const& f, error_code& ec)
