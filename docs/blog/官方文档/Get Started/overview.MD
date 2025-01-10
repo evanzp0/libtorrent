@@ -140,3 +140,199 @@ std::string error_code_to_string(boost::system::error_code const& ec)
         return swedish[code];
 }
 ```
+
+## magnet links (磁力链)
+
+磁力链接是包含 `info-hash`、显示名称以及可选的 `tracker url` 的 `URI`。`magnet link` 的理念是，终端用户可以在浏览器中点击链接，
+然后由 bittorrent 应用程序进行下载，而无需任何.torrent文件。
+
+`magnet URI` 的格式如下：
+
+```
+magnet:?xt=urn:btih: Base16 encoded info-hash [ &dn= name of download ] [ &tr= tracker URL ]*
+```
+
+为了通过 `magnet link` 仅下载 `.torrent` 文件中的 `metadata`（元数据），在添加之前，
+应在 [add_torrent_params](https://www.libtorrent.org/reference-Add_Torrent.html#add_torrent_params) 中设置 `torrent_flags::upload_mode` 标志。
+
+在这种情况下，当从 `swarm`（下载群）中接收到元数据时，`torrent` 任务仍将继续运行，
+但它会断开与大多数 `peer`s（对等节点）的连接（因为与已经拥有 `metadata` 的 `peers` 保持连接是多余的）。它将仅保留对 `metadata` 的 seeding（播种）。
+
+需要注意的是，如果 `torrent` 中包含文件，那就将会导致空文件的创建。
+若需避免此情况，可以将 `file_priority` 设置为一系列 0（因为文件数量事先未知），或者将 `save_path` 设置为一个无效路径。
+
+### .torrent file
+
+要从通过 `magnet link`（或以任何方式）添加的 `torrent` 中保存一个 `.torrent` 文件，请按照以下步骤操作：
+
+- 在 [torrent_handle](https://www.libtorrent.org/reference-Torrent_Handle.html#save_resume_data()) 上调用 [save_resume_data()](https://www.libtorrent.org/reference-Torrent_Handle.html#torrent_handle) ，并确保传入 `save_info_dict` 标志。
+- 等待 `resume_data_alert` 。
+- 调用 [write_torrent_file()](https://www.libtorrent.org/reference-Resume_Data.html#write_torrent_file()) ，并传入从 [alert](https://www.libtorrent.org/reference-Alerts.html#alert) 中获取的 [add_torrent_params](https://www.libtorrent.org/reference-Add_Torrent.html#add_torrent_params
+续传数据格式与.torrent文件格式非常相似，当在续传数据中包含信息字典（info-dict）时，续传文件可以作为一个.torrent文件使用（仅有一些细微的例外）。) 对象。
+
+续传数据格式(`resume data format`)与 `.torrent` 文件格式非常相似，当在续传数据中包含 `info-dict` 时，续传文件可以作为一个 `.torrent` 文件使用（仅有一些细微的例外）。
+flat
+## BitTorrent v2 torrents (BitTorrent v2 种子)
+
+BitTorrent v2 引入了许多新特性，这些特性在此 [博客文章](https://blog.libtorrent.org/2020/09/bittorrent-v2/) 
+以及 [BEP 52](https://www.bittorrent.org/beps/bep_0052.html) 中有所概述。
+v2 协议引入了使用 `merkle hash tree`（默克尔哈希树）替代扁平的 `piece hashes list` (分片哈希列表)的可能性。
+它还支持 `hybrid torrents`（混合种子），这些 `torrents` 既是有效的经典种子（v1），也是有效的 v2 种子。
+混合种子同时包含扁平的 `piece hashes list` 和 `merkle hash tree`。
+
+这引入了一些新的错误情况。混合种子的 v1 和 v2 哈希可能会不匹配。由于 v2 种子使用 `SHA-256` 而 v1 使用 `SHA-1`，而哈希不匹配的问题只有在分片下载完成后才能被检测到。
+这将导致 `torrent_inconsistent_hashes` 错误。
+
+磁力链可能仅包含 v1 的 `info-hash` 或 v2 的 `info-hash`。如果两个独立的磁力链，一个是仅 v1 的，另一个是仅 v2 的，最终解析为同一个混合种子时，
+这两种 [torrent_handle](https://www.libtorrent.org/reference-Torrent_Handle.html#torrent_handle) 对象都会将被置于 `duplicate_torrent` 错误状态。
+在这种状态下，必须移除其中一个，另一个可以恢复，以便重新下载 `metadata` 。
+
+当两个 `torrent` 发生冲突时，会发布 [torrent_conflict_alert](https://www.libtorrent.org/reference-Alerts.html#torrent_conflict_alert)。
+该 alert 继承自 [torrent_alert](https://www.libtorrent.org/reference-Alerts.html#torrent_alert)，因此与一个 `torrent_handle` 相关联。
+它包含第二个 `torrent_handle`，指向冲突中的另一个种子，以及已下载的元数据。
+解决冲突的一种方法是移除这两个种子，并使用 `torrent_conflict_alert` 中提供的 `metadata` 重新添加。
+
+当 v1-only 或 v2-only 的磁力链解析后发现其实是 `hybird torrent` 时，与该种子关联的 [info_hash_t](https://www.libtorrent.org/reference-Core.html#info_hash_t) 对象将被更新，以同时包含 v1 和 v2 的信息哈希。
+这适用于 [torrent_handle::info_hashes()](https://www.libtorrent.org/reference-Torrent_Handle.html#info_hashes()) 和 [torrent_info::info_hashes()](https://www.libtorrent.org/reference-Torrent_Info.html#info_hashes()) 。
+
+> *译注：*
+> 举个例子，你有一个 v1-only 磁力链，只包含 v1 的 info-hash（SHA-1）。
+当你开始下载时，发现这个 v1 torrent 实际上是一个 hybird torrent（既支持 v1 也支持 v2）。
+客户端会更新这个原 v1 torrent 的 info_hash_t 对象，使其同时包含 v1 和 v2 的 info-hash。
+同样的情况也适用于 v2-only 磁力链。
+
+## queuing（队列管理）
+
+libtorrent 支持队列管理。队列管理是一种基于特定条件自动暂停和恢复种子的机制。这些条件取决于种子的整体状态（检查中、下载中或做种中）。
+
+要选择退出队列管理逻辑，请确保在添加种子时，`add_torrent_params::flags` 中清除了 `torrent_flags::auto_managed` 标志位。
+或者在种子句柄上调用 [torrent_handle::unset_flags()](https://www.libtorrent.org/reference-Torrent_Handle.html#unset_flags()) 并传入 `torrent_flags::auto_managed`。
+
+队列管理逻辑的总体目的是在任意 `torrent` 下载和上传负载下提高性能。
+例如，如果你想在有限的家用网络连接上下载 100 个 `torrent`，通过一次下载一个（或可能两个）而不是同时下载所有 `torrent`，可以提高性能。
+其好处包括：
+
+- `torrent` 平均完成时间：比同时下载所有 `torrent` 的情况减少一半。
+- 上传容量利用率：更有可能达到对等节点（peers）的互惠速率，并可能提高你的投资回报率（下载与上传的比例）。
+- 磁盘 I/O 负载：更可能集中在局部，这可能会提高 I/O 性能并减少碎片化。
+
+从根本上说，队列管理分为三个独立的队列：
+
+- checking torrents (检查中的种子队列)
+- downloading torrents (下载中的种子队列)
+- seeding torrents (做种中的种子队列)
+
+每个未处于做种状态的 `torrent` 都有一个与之关联的队列编号，这表示它在启动队列中的位置。请参阅 [torrent_status::queue_position](https://www.libtorrent.org/reference-Torrent_Status.html#queue_position)。
+
+除了每个队列的限制外，还有一个总体的限制，设置在 [settings_pack::active_limit](https://www.libtorrent.org/reference-Settings.html#active_limit) 中。
+自动管理器永远不会启动超过此数量的 `torrent`（除了下面描述的一个例外情况）。非自动管理的 `torrent` 不受此逻辑的限制，也不会被计入。
+
+在固定的时间间隔内，系统会检查是否需要重新排序哪些 `torrent` 处于活动状态，哪些 `torrent` 处于队列中。
+此间隔可以通过 [settings_pack::auto_manage_interval](https://www.libtorrent.org/reference-Settings.html#auto_manage_interval) 进行控制。
+
+为了使队列管理正常工作，需要保存并恢复所有 `torrent` 的续传数据。请参阅 [torrent_handle::save_resume_data()](https://www.libtorrent.org/reference-Torrent_Handle.html#save_resume_data())。
+
+### queue position (队列位置)
+
+队列前端的 `torrent` 会被启动，其余的 `torrent` 则按其队列位置排序。任何新添加的 `torrent` 都会被放置在队列的末尾。
+一旦某个 `torrent` 被移除或转变为做种状态，其队列位置将变为 -1，而所有原本位于它之后的 `torrent` 会依次向前移动，以填补空缺。
+
+队列位置始终是连续的，形成一个没有空缺的序列。
+
+较低的队列位置意味着更接近队列的前端，这些 `torrent` 会比队列位置较高的 `torrent` 更早启动。
+
+要查询某个 `torrent` 在队列中的位置或更改其位置，请参阅以下函数：
+
+[torrent_handle::queue_position()](https://www.libtorrent.org/reference-Torrent_Handle.html#queue_position()), 
+[torrent_handle::queue_position_up()](https://www.libtorrent.org/reference-Torrent_Handle.html#queue_position_up()),
+[torrent_handle::queue_position_down()](https://www.libtorrent.org/reference-Torrent_Handle.html#queue_position_down()), 
+[torrent_handle::queue_position_top()](https://www.libtorrent.org/reference-Torrent_Handle.html#queue_position_top()),
+[torrent_handle::queue_position_bottom()](https://www.libtorrent.org/reference-Torrent_Handle.html#queue_position_bottom()).
+
+### checking queue (检查队列)
+
+检查队列会影响处于 `torrent_status::checking`（检查中）或 `torrent_status::allocating`（分配中）状态且为自动管理的 `torrent`。
+
+检查队列会确保在其队列中的 `torrent` 在任何给定时间内，启动的 `torrent` 数量不超过 `settings_pack::active_checking_limit` 设置的限制。
+一旦某个 `torrent` 完成检查并转移到其他状态，队列中的下一个 `torrent` 将开始检查。
+
+任何通过 `force-started`（强制启动）或 `force-stopped`（强制停止）添加的 `torrent`（即未设置自动管理标志），将不受此限制的影响，它们会独立且并行地进行检查。
+
+一旦 `torrent` 完成文件检查或恢复数据检查，它将被放入下载队列，并可能立即开始下载。
+如果希望在添加种子并检查其文件时不启动下载，可以用 `stop_when_ready` 模式添加种子。
+请参阅 `add_torrent_params::flag_stop_when_ready`。此标志会在 `torrent` 准备好开始下载时立即停止它。
+
+从概念上讲，这与等待 `torrent_checked_alert` 消息，然后调用以下操作，是相同的：
+
+```
+h.set_flags(torrent_flags::paused, torrent_flags::paused | torrent_flags::auto_managed);
+```
+
+重要区别在于，它完全避免了 `torrent` 短暂进入下载状态的时间窗口。
+
+### downloading queue（下载队列）
+
+与检查队列类似，下载队列将确保在任何给定时间内，
+处于下载状态的种子数量不超过 [settings_pack::active_downloads](https://www.libtorrent.org/reference-Settings.html#active_downloads) 设置的值。
+
+这里再次使用 [torrent_status::queue_position](https://www.libtorrent.org/reference-Torrent_Status.html#queue_position) 来确定当一个下载中的 `torrent` 完成或停止/移除后，
+下一个应该启动的 `torrent` 是谁。
+
+### seeding queue（做种队列）
+
+做种队列并不使用 [torrent_status::queue_position](https://www.libtorrent.org/reference-Torrent_Status.html#queue_position) 来决定哪个 `torrent` 应该进行做种。
+相反，它会估算 `torrent` 的需求程度。一个拥有较少做种者和较多下载者的种子，被认为比那些拥有较多做种者和较少下载者的 `torrent` 更需要增加做种者。
+
+它将启动的做种数量限制在 [settings_pack::active_seeds](https://www.libtorrent.org/reference-Settings.html#active_seeds) 设定的范围内。
+
+除了这一基本倾向外，`torrent` 的优先级还可以通过指定 `seed ratio`（上传与下载的比率）、`seed-time ratio`（下载时间与做种时间的比率）
+以及 `seed-time`（为一个 `torrent` 做种的绝对时间）来控制。在这些目标全部达成之前，该 `torrent` 将被优先考虑进行做种。
+
+在已经达到做种目标的 `torrent` 中(已经达到了上传的数据量或达到了预设的上传比例的 `torrent`)，那些我们不知道有其他做种者的 `torrent` 将严格优先。
+
+为了避免频繁切换，那些启动时间不足30分钟的 `torrent` 也会优先保持做种状态。
+
+最后，对于上述条件均不适用的情况，`torrent` 将根据 `seed ratio` 来进行优先级排序。
+
+控制这些限制的相关设置包括：
+[settings_pack::share_ratio_limit](https://www.libtorrent.org/reference-Settings.html#share_ratio_limit)（分享比率限制）,
+[settings_pack::seed_time_ratio_limit](https://www.libtorrent.org/reference-Settings.html#seed_time_ratio_limit)（做种时间比率限制）,
+[settings_pack::seed_time_limit](https://www.libtorrent.org/reference-Settings.html#seed_time_ratio_limit)（做种时间限制）。
+
+### queuing options（队列选项）
+
+除了简单地启动和停止 `torrent` 外，队列机制还可以对 `torrent` 使用的资源进行更精细的控制。
+
+#### half-started torrents（半启动种子）
+
+> *译注:*
+> 半启动种子就是指：任务已经启动，但并未连接到所有可用的网络资源（如DHT或 tracker）的状态的种子。
+
+除了下载和做种的限制外，对 `torrent` 的执行操作也有限制。
+下载和做种的限制决定了是否允许连接对等节点（peers），如果不允许连接对等节点，`torrent` 将被停止且不会执行任何操作。
+如果允许连接对等节点，`torrent` 可能会执行以下操作：
+
+- announce to trackers (向 trackers 宣告)
+- announce to the DHT (向 DHT 宣告)
+- announce to local peer discovery (向本地对等节点发现宣告) / (本地服务发现 local service discovery)
+
+每个操作需要耗费一定的资源，因此可能需要单独的限制。
+这些限制分别由 [settings_pack::active_tracker_limit](https://www.libtorrent.org/reference-Settings.html#active_tracker_limit)、
+[settings_pack::active_dht_limit](https://www.libtorrent.org/reference-Settings.html#active_dht_limit) 和 
+[settings_pack::active_lsd_limit](https://www.libtorrent.org/reference-Settings.html#active_lsd_limit) 控制。
+
+具体来说，向 tracker 宣告通常比向 DHT 宣告更便宜。
+[settings_pack::active_dht_limit](https://www.libtorrent.org/reference-Settings.html#active_dht_limit) 将限制允许向 DHT 宣告的 `torrent` 数量。
+优先级较高的 `torrent` 会向 DHT 宣告，而优先级较低的则不会。不过，这些(未被允许的宣告) `torrent` 仍会被视为已启动，并会接受任何进入的对等节点。
+
+如果你不希望施加此类限制（基本上，如果你不希望有“半启动”的种子），请确保将这些限制设置为-1（无限）。
+
+#### prefer seeds（优先种子）
+
+在 active_downloads（活动下载任务数） + active_seeds（活动做种任务数） > active_limit（活动任务限制数） 的情况下，系统会面临一个模糊性问题：是应该优先满足下载任务，还是优先满足做种任务。为了解决这种模糊性，settings_pack::auto_manage_prefer_seeds 参数用于确定是否优先处理做种任务。
+
+如果 auto_manage_prefer_seeds 设置为 true，则系统会优先保留做种任务，即使这意味着需要暂停一些下载任务。
+
+如果设置为 false，则系统可能会优先保留下载任务，暂停部分做种任务。
+
+这个设置可以帮助用户在下载和做种之间根据需求进行权衡。
