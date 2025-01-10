@@ -329,10 +329,26 @@ h.set_flags(torrent_flags::paused, torrent_flags::paused | torrent_flags::auto_m
 
 #### prefer seeds（优先种子）
 
-在 active_downloads（活动下载任务数） + active_seeds（活动做种任务数） > active_limit（活动任务限制数） 的情况下，系统会面临一个模糊性问题：是应该优先满足下载任务，还是优先满足做种任务。为了解决这种模糊性，settings_pack::auto_manage_prefer_seeds 参数用于确定是否优先处理做种任务。
+在 active_downloads（活动下载任务数） + active_seeds（活动做种任务数） > active_limit（活动任务限制数） 的情况下，
+系统会面临一个模糊的问题：是应该优先满足下载任务，还是优先满足做种任务。
+为了解决这种模糊性，[settings_pack::auto_manage_prefer_seeds](https://www.libtorrent.org/reference-Settings.html#auto_manage_prefer_seeds) 参数用于确定是否优先处理做种任务。
 
-如果 auto_manage_prefer_seeds 设置为 true，则系统会优先保留做种任务，即使这意味着需要暂停一些下载任务。
+如果 `auto_manage_prefer_seeds` 设置为 `true`，则系统会优先保留做种任务，即使这意味着需要暂停一些下载任务。
 
-如果设置为 false，则系统可能会优先保留下载任务，暂停部分做种任务。
+如果设置为 `false`，则系统可能会优先保留下载任务，暂停部分做种任务。
 
 这个设置可以帮助用户在下载和做种之间根据需求进行权衡。
+
+#### inactive torrents（非活动种子）
+
+那些没有传输任何数据（无论是下载还是上传）的 `torrent` ，启动成本相对较低。
+通过将 [settings_pack::dont_count_slow_torrents](https://www.libtorrent.org/reference-Settings.html#dont_count_slow_torrents) 设置为 true，
+可以将此类 `torrent` 从下载队列和做种队列中排除，不受队列限制的影响。
+
+由于新启动的 `torrent` 有时可能需要几分钟时间才能找到对等节点（peers）、被解除阻塞（unchoked），或者找到对请求数据感兴趣的对等节点，因此种子不会立即被视为非活动状态。
+只有在持续一段时间内没有任何数据传输后，`torrent` 才会被视为非活动状态，并免除队列限制。
+
+> *译注:* 简而言之，`inactive torrents` 是指那些长时间没有数据传输的 `torrent` ，它们可以被排除在队列限制之外。
+
+
+### fast resume
