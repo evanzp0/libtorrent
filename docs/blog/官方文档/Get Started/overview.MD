@@ -111,33 +111,33 @@ udp::endpoint
 ```cpp
 std::string error_code_to_string(boost::system::error_code const& ec)
 {
-        if (ec.category() != lt::libtorrent_category())
-        {
-                return ec.message();
-        }
-        // the error is a libtorrent error
+    if (ec.category() != lt::libtorrent_category())
+    {
+        return ec.message();
+    }
+    // the error is a libtorrent error
 
-        int code = ec.value();
-        static const char const* swedish[] =
-        {
-                "inget fel",
-                "en fil i torrenten kolliderar med en fil fran en annan torrent",
-                "hash check misslyckades",
-                "torrentfilen ar inte en dictionary",
-                "'info'-nyckeln saknas eller ar korrupt i torrentfilen",
-                "'info'-faltet ar inte en dictionary",
-                "'piece length' faltet saknas eller ar korrupt i torrentfilen",
-                "torrentfilen saknar namnfaltet",
-                "ogiltigt namn i torrentfilen (kan vara en attack)",
-                // ... more strings here
-        };
+    int code = ec.value();
+    static const char const* swedish[] =
+    {
+        "inget fel",
+        "en fil i torrenten kolliderar med en fil fran en annan torrent",
+        "hash check misslyckades",
+        "torrentfilen ar inte en dictionary",
+        "'info'-nyckeln saknas eller ar korrupt i torrentfilen",
+        "'info'-faltet ar inte en dictionary",
+        "'piece length' faltet saknas eller ar korrupt i torrentfilen",
+        "torrentfilen saknar namnfaltet",
+        "ogiltigt namn i torrentfilen (kan vara en attack)",
+        // ... more strings here
+    };
 
-        // use the default error string in case we don't have it
-        // in our translated list
-        if (code < 0 || code >= sizeof(swedish)/sizeof(swedish[0]))
-                return ec.message();
+    // use the default error string in case we don't have it
+    // in our translated list
+    if (code < 0 || code >= sizeof(swedish)/sizeof(swedish[0]))
+        return ec.message();
 
-        return swedish[code];
+    return swedish[code];
 }
 ```
 
@@ -171,7 +171,7 @@ magnet:?xt=urn:btih: Base16 encoded info-hash [ &dn= name of download ] [ &tr= t
 续传数据格式与.torrent文件格式非常相似，当在续传数据中包含信息字典（info-dict）时，续传文件可以作为一个.torrent文件使用（仅有一些细微的例外）。) 对象。
 
 续传数据格式(`resume data format`)与 `.torrent` 文件格式非常相似，当在续传数据中包含 `info-dict` 时，续传文件可以作为一个 `.torrent` 文件使用（仅有一些细微的例外）。
-flat
+
 ## BitTorrent v2 torrents (BitTorrent v2 种子)
 
 BitTorrent v2 引入了许多新特性，这些特性在此 [博客文章](https://blog.libtorrent.org/2020/09/bittorrent-v2/) 
@@ -348,7 +348,282 @@ h.set_flags(torrent_flags::paused, torrent_flags::paused | torrent_flags::auto_m
 由于新启动的 `torrent` 有时可能需要几分钟时间才能找到对等节点（peers）、被解除阻塞（unchoked），或者找到对请求数据感兴趣的对等节点，因此种子不会立即被视为非活动状态。
 只有在持续一段时间内没有任何数据传输后，`torrent` 才会被视为非活动状态，并免除队列限制。
 
-> *译注:* 简而言之，`inactive torrents` 是指那些长时间没有数据传输的 `torrent` ，它们可以被排除在队列限制之外。
+> *译注:* 简而言之，`inactive torrents` 是指那些, (连上资源网络) 长时间没有数据传输的 `torrent` ，它们可以被排除在队列限制之外。
 
 
-### fast resume
+## fast resume (快速恢复)
+
+快速恢复机制是一种在 `session` 间记录下已下载的文件 pieces 及其存储位置的方式。你可以通过以下步骤生成 `fast-resume data` (快速恢复数据)：
+
+- 在 [torrent_handle](https://www.libtorrent.org/reference-Torrent_Handle.html#save_resume_data()) 上调用
+[save_resume_data()](https://www.libtorrent.org/reference-Torrent_Handle.html#save_resume_data())，并传入 save_info_dict 标志。
+- 等待 `resume_data_alert` 通知。
+- 使用 [write_resume_data()](https://www.libtorrent.org/reference-Resume_Data.html#write_resume_data()) 
+保存 [add_torrent_params](https://www.libtorrent.org/reference-Add_Torrent.html#add_torrent_params) 对象。
+
+当使用恢复数据添加 `torrent` 时，可以通过 [read_resume_data()](https://www.libtorrent.org/reference-Resume_Data.html#read_resume_data()) 加载数据。
+这会填充一个 [add_torrent_params](https://www.libtorrent.org/reference-Add_Torrent.html#add_torrent_params) 对象，
+该对象可以直接传递给会话对象的 [add_torrent()](https://www.libtorrent.org/reference-Session.html#add_torrent()) 
+或 [async_add_torrent()](https://www.libtorrent.org/reference-Session.html#async_add_torrent())。
+**此时，libtorrent 不会检查文件片段的哈希值，而是依赖快速恢复数据中提供的信息。**
+快速恢复数据还**包含未完成 pieces(片段) 中已下载的 block(块) 信息**，因此无需从零开始重新下载部分完成的 pieces 。
+
+要使用快速恢复数据，你需要将其传递给 [read_resume_data()](https://www.libtorrent.org/reference-Resume_Data.html#read_resume_data())，
+该函数会返回一个 [add_torrent_params](https://www.libtorrent.org/reference-Add_Torrent.html#add_torrent_params) 对象。
+在将其传递给 [async_add_torrent()](https://www.libtorrent.org/reference-Session.html#async_add_torrent()) 
+或 [add_torrent()](https://www.libtorrent.org/reference-Session.html#add_torrent()) 之前，可以修改此对象的字段。
+`session` 将跳过耗时的检查过程。不过，如果快速恢复数据损坏或与 `torrent` 的存储不匹配，libtorrent 可能仍然需要进行检查。
+
+### file format（ fast-resume 文件的格式）
+
+文件格式是一个经过 bencoding 编码的字典，包含以下字段：
+
+<table>
+  <thead>
+    <tr>
+      <th>字段名称</th>
+      <th>描述</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>file-format</code></td>
+      <td>字符串: "libtorrent resume file"</td>
+    </tr>
+    <tr>
+      <td><code>file-version</code></td>
+      <td>整数: 1</td>
+    </tr>
+    <tr>
+      <td><code>info-hash</code></td>
+      <td>字符串，表示此数据保存的种子的 info hash。如果是 v1 或 v1 + v2 混合种子，这是 info 部分的 20 字节 SHA-1 哈希。</td>
+    </tr>
+    <tr>
+      <td><code>info-hash2</code></td>
+      <td>字符串，表示此数据保存的种子的 v2 info hash。如果是 v2 或 v1 + v2 混合种子，这是 info 部分的 32 字节 SHA-256 哈希。</td>
+    </tr>
+    <tr>
+      <td><code>pieces</code></td>
+      <td>
+        字符串，包含每个 piece 的标志，每个字符代表一个 piece。<br />
+        Bit 1 表示我们拥有该 piece，Bit 2 表示我们已验证该 piece 正确。<br /> 
+        仅在 seed_mode 模式下适用。
+      </td>
+    </tr>
+    <tr>
+      <td><code>total_uploaded</code></td>
+      <td>整数。此种子总共上传的字节数。</td>
+    </tr>
+    <tr>
+      <td><code>total_downloaded</code></td>
+      <td>整数。此种子总共下载的字节数。</td>
+    </tr>
+    <tr>
+      <td><code>active_time</code></td>
+      <td>整数。此种子处于活动状态的总秒数（即未暂停）。</td>
+    </tr>
+    <tr>
+      <td><code>seeding_time</code></td>
+      <td>整数。此种子处于活动状态并做种的总秒数。</td>
+    </tr>
+    <tr>
+      <td><code>last_upload</code></td>
+      <td>整数。自 UTC 1970-01-01 00:00:00 计算的时间戳，代表我们最近一次对该种子上传数据的是什么时间(单位：秒)。</td>
+    </tr>
+    <tr>
+      <td><code>last_download</code></td>
+      <td>整数。自 UTC 1970-01-01 00:00:00 计算的时间戳，代表我们最近一次对该种子下载数据的是什么时间(单位：秒)。</td>
+    </tr>
+    <tr>
+      <td><code>upload_rate_limit</code></td>
+      <td>整数。如果此种子有上传速率限制，则为该限制值（字节/秒）。</td>
+    </tr>
+    <tr>
+      <td><code>download_rate_limit</code></td>
+      <td>整数。如果此种子有下载速率限制，则为该限制值（字节/秒）。</td>
+    </tr>
+    <tr>
+      <td><code>max_connections</code></td>
+      <td>整数。此种子允许的最大对等连接数（如果设置了限制）。</td>
+    </tr>
+    <tr>
+      <td><code>max_uploads</code></td>
+      <td>整数。此种子允许的最大未阻塞对等连接数（如果设置了限制）。</td>
+    </tr>
+    <tr>
+      <td><code>file_priority</code></td>
+      <td>整数列表。每个条目表示种子中文件的优先级，索引与文件顺序一致。</td>
+    </tr>
+    <tr>
+      <td><code>piece_priority</code></td>
+      <td>字节字符串。每个字节表示一个 piece 的优先级。</td>
+    </tr>
+    <tr>
+      <td><code>seed_mode</code></td>
+      <td>整数。1 表示种子处于做种模式，0 表示否。</td>
+    </tr>
+    <tr>
+      <td><code>upload_mode</code></td>
+      <td>整数。1 表示设置了 <code>torrent_flags::upload_mode</code>。</td>
+    </tr>
+    <tr>
+      <td><code>share_mode</code></td>
+      <td>整数。1 表示设置了 <code>torrent_flags::share_mode</code>。</td>
+    </tr>
+    <tr>
+      <td><code>apply_ip_filter</code></td>
+      <td>整数。1 表示设置了 <code>torrent_flags::apply_ip_filter</code>。</td>
+    </tr>
+    <tr>
+      <td><code>paused</code></td>
+      <td>整数。1 表示种子已暂停，0 表示否。</td>
+    </tr>
+    <tr>
+      <td><code>auto_managed</code></td>
+      <td>整数。1 表示种子是自动管理的，否则为 0。</td>
+    </tr>
+    <tr>
+      <td><code>super_seeding</code></td>
+      <td>整数。1 表示设置了 <code>torrent_flags::super_seeding</code>。</td>
+    </tr>
+    <tr>
+      <td><code>sequential_download</code></td>
+      <td>整数。1 表示种子处于顺序下载模式，0 表示否。</td>
+    </tr>
+    <tr>
+      <td><code>stop_when_ready</code></td>
+      <td>整数。1 表示设置了 <code>torrent_flags::stop_when_ready</code>。</td>
+    </tr>
+    <tr>
+      <td><code>disable_dht</code></td>
+      <td>整数。1 表示设置了 <code>torrent_flags::disable_dht</code>。</td>
+    </tr>
+    <tr>
+      <td><code>disable_lsd</code></td>
+      <td>整数。1 表示设置了 <code>torrent_flags::disable_lsd</code>。</td>
+    </tr>
+    <tr>
+      <td><code>disable_pex</code></td>
+      <td>整数。1 表示设置了 <code>torrent_flags::disable_pex</code>。</td>
+    </tr>
+    <tr>
+      <td><code>trackers</code></td>
+      <td>
+        字符串列表的列表。顶级列表列出所有 tracker 层级，每个二级列表是一个层级的 tracker。例如：
+<pre>trackers = [
+    # Tier 1: 第一层级的 tracker 列表
+    [
+        "udp://tracker.opentrackr.org:1337/announce",
+        "udp://tracker.openbittorrent.com:80/announce"
+    ],
+    # Tier 2: 第二层级的 tracker 列表
+    [
+        "http://tracker.example.com:80/announce"
+    ]
+]</pre>
+      </td>
+    </tr>
+    <tr>
+      <td><code>mapped_files</code></td>
+      <td>字符串列表。如果种子中任意一个文件被重命名，则此条目包含所有文件名的列表，顺序与种子文件中的顺序一致。</td>
+    </tr>
+    <tr>
+      <td><code>url-list</code></td>
+      <td>
+        字符串列表。此种子使用的 url-seed URL 列表。URL 应正确编码且不包含非法字符。<br />
+        URL-seed 是一个普通的 HTTP 或 HTTPS 链接列表，指向文件的直接下载地址。BitTorrent 客户端会作为备份，尝试从这个链接下载文件内容。<br />
+        例如：
+<pre>
+文件名称: example-file.zip
+文件大小: 100 MB
+tracker: udp://tracker.example.com:6969/announce
+url-list: 
+- https://example.com/files/example-file.zip
+- https://mirror.example.com/files/example-file.zip
+</pre>
+        在这个例子中：.torrent 文件包含两个 URL-seed 。<br />
+        当用户使用 BitTorrent 客户端下载时，客户端会优先从 p2p 网络中获取文件，如果 p2p 网络无法获取文件则尝试从 URL-seed 取文件。<br />
+        例如：
+      </td>
+    </tr>
+    <tr>
+      <td><code>httpseeds</code></td>
+      <td>
+        字符串列表。此种子使用的 HTTP seed URL 列表。URL 应正确编码且不包含非法字符。<br />
+        httpseeds 是一个普通的 HTTP 或 HTTPS 链接列表，指向文件的直接下载地址。BitTorrent 客户端会优先尝试从这个链接下载文件内容。<br />
+<pre>
+文件名称: example-file.zip
+文件大小: 100 MB
+tracker: udp://tracker.example.com:6969/announce
+httpseeds:
+- https://example.com/files/example-file.zip
+- https://mirror.example.com/files/example-file.zip
+</pre>
+        在这个例子中：.torrent 文件包含两个 httpseeds 。<br />
+        当用户使用 BitTorrent 客户端下载时，客户端会优先从 httpseeds 中获取文件，如果 httpseeds 链接无法获取文件则尝试从 p2p 网络获取文件。<br />
+      </td>
+    </tr>
+    <tr>
+      <td><code>trees</code></td>
+      <td>列表。用于 v2（或 v1 + v2 混合）种子，则此可选列表包含我们目前所知的所有文件的 Merkle 树节点。每个文件对应一个字典条目，条目的结构如下：
+        <ul>
+          <li>
+            <code>hashes</code>: 字符串。表示此文件 Merkle 哈希树中节点的 32 字节（SHA-256）哈希有序列表（对应 piece layers）。某些哈希可能为零（如果尚未下载）。
+        </li>
+          <li>
+            <code>mask</code>: 字符串。存在时，表示 <code>hashes</code> 键中包含的完整树哈希的位掩码（<code>0</code> 和 <code>1</code> 字符）。用于避免存储大量零。
+        </li>
+          <li>
+            <code>verified</code>: 字符串。表示树中哪些叶节点已验证正确。每个叶节点一个字符，<code>0</code> 表示未验证，<code>1</code> 表示已验证。<br />
+          </li>
+        </ul>
+        例如：<br />
+        完整的 trees 应包括节点 H1、H2、H3、H4，而目前 hashes 为 [XX, YY] 。<br />
+        如果 mask 为 1010，那么 XX 对应 H1, YY 对应 H3。<br />
+        如果 verified 为 0010，则表示 H3（YY）已经被验证过了的。
+      </td>
+    </tr>
+    <tr>
+      <td><code>save_path</code></td>
+      <td>字符串。此种子保存的路径。在使用 <code>move_storage()</code> 移动种子时特别有用，因为此字段会更新。</td>
+    </tr>
+    <tr>
+      <td><code>peers</code></td>
+      <td>字符串。包含上次会话中连接的对等方的 IPv4 和端口对。端点为紧凑表示形式：4 字节 IPv4 地址后跟 2 字节端口。因此，此字符串的长度应能被 6 整除。</td>
+    </tr>
+    <tr>
+      <td><code>banned_peers</code></td>
+      <td>字符串。格式与 <code>peers</code> 相同，但表示我们已禁止的 IPv4 对等方。</td>
+    </tr>
+    <tr>
+      <td><code>peers6</code></td>
+      <td>字符串。包含上次会话中连接的对等方的 IPv6 和端口对。端点为紧凑表示形式：16 字节 IPv6 地址后跟 2 字节端口。此字符串的长度应能被 18 整除。</td>
+    </tr>
+    <tr>
+      <td><code>banned_peers6</code></td>
+      <td>字符串。格式与 <code>peers6</code> 相同，但表示我们已禁止的 IPv6 对等方。</td>
+    </tr>
+    <tr>
+      <td><code>info</code></td>
+      <td>
+        如果存在此字段，则应为该种子恢复数据的 info 字典。其 SHA-1 哈希必须与 <code>info-hash</code> 字段中的哈希匹配。<br />
+        当该字段存在时，<code>torrent</code> 就可从此处加载，意味着可以仅使用 <code>resume-data</code> 文件来添加  <code>torrent</code>（无需单独加载 .torrent 文件）。<br />
+        这可能具有性能优势（比如：可以加快连接 peers、提前过滤掉一些 ips 等）。
+      </td>
+    </tr>
+    <tr>
+      <td><code>unfinished</code></td>
+      <td>字典列表, 用于 v1 种子。每个字典表示一个未完成的 piece，布局如下：
+        <ul>
+          <li><code>piece</code>: 整数，表示此条目引用的 piece 索引。</li>
+          <li><code>bitmask</code>: 字符串，表示此 piece 中已下载 block 的二进制位掩码。</li>
+          <li><code>adler32</code>: <code>bitmask</code> 标识的已下载 block 数据的 adler32 校验和。</li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <td><code>allocation</code></td>
+      <td>存储的分配模式。可以是 <code>allocate</code>（预分配磁盘空间） 或 <code>sparse</code>（按需分配磁盘空间）。</td>
+    </tr>
+  </tbody>
+</table>
