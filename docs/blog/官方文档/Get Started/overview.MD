@@ -1268,7 +1268,9 @@ libtorrent 提供了一种机制，用于从其内部查询性能和统计计数
 | peer.cancelled_piece_requests    | counter |
 | peer.piece_rejects               | counter |
 
-我们收到的传入分块请求的总数，以及由于各种原因被拒绝的分块请求的数量。`max_piece_requests` 表示我们已经从该 peer 收到了太多的未完成请求，因此我们拒绝了它。`cancelled_piece_requests` 是指对方明确要求拒绝分块的请求。
+我们收到的传入分块请求的总数，以及由于各种原因被拒绝的分块请求的数量。
+- `max_piece_requests` 表示我们已经从该 peer 收到了太多的未完成请求，因此我们拒绝了它。
+- `cancelled_piece_requests` 是指对方明确要求拒绝分块的请求。
 
 | name                             | type    |
 |----------------------------------|---------|
@@ -1335,7 +1337,11 @@ libtorrent 提供了一种机制，用于从其内部查询性能和统计计数
 | peer.num_peers_up_disk           | gauge |
 | peer.num_peers_down_disk         | gauge |
 
-每种类型 socket 的 peer 连接数。`num_peers_half_open` 计算半开（正在连接）的 peer，其他计数不包括这些 peer。`num_peers_up_unchoked_all` 是未阻塞 peer 的总数，而 `num_peers_up_unchoked` 仅计算计入限制的未阻塞 peer（即不包括因限制不适用而未阻塞的 peer）。`num_peers_up_unchoked_optimistic` 是乐观未阻塞 peer 的数量。
+每种类型 socket 的 peer 连接数。
+- `num_peers_half_open` 计算半开（正在连接）的 peer，其他计数不包括这些 peer。
+- `num_peers_up_unchoked_all` 是未阻塞 peer 的总数。
+- `num_peers_up_unchoked` 仅计算计入限制的未阻塞 peer（即不包括因限制不适用而未阻塞的 peer）。
+- `num_peers_up_unchoked_optimistic` 是乐观未阻塞 peer 的数量。
 
 | name                             | type    |
 |----------------------------------|---------|
@@ -1405,7 +1411,9 @@ libtorrent 提供了一种机制，用于从其内部查询性能和统计计数
 | ses.num_queued_download_torrents | gauge |
 | ses.num_error_torrents           | gauge |
 
-这些 gauge 计算处于不同状态的 torrent 数量。每个 torrent 只属于其中一个状态。对于可能属于多个状态的 torrent，选择最显著的状态。例如，有错误的 torrent 计为错误 torrent，无论其其他状态如何。
+这些 gauge 计算处于不同状态的 torrent 数量。每个 torrent 只属于其中一个状态。
+对于可能属于多个状态的 torrent，选择最显著的状态。
+例如，有错误的 torrent 计为错误 torrent，无论其其他状态如何。
 
 | name                             | type    |
 |----------------------------------|---------|
@@ -1414,7 +1422,8 @@ libtorrent 提供了一种机制，用于从其内部查询性能和统计计数
 | ses.num_have_pieces              | counter |
 | ses.num_total_pieces_added       | counter |
 
-这些计数器计算分块通过哈希检查的次数、成功写入磁盘的次数以及通过添加 torrent 添加的总可能分块数。例如，当添加一个包含 1000 个分块的 torrent 时，`num_total_pieces_added` 会增加 1000。
+这些计数器计算分块通过哈希检查的次数、成功写入磁盘的次数以及通过添加 torrent 添加的总可能分块数。
+例如，当添加一个包含 1000 个分块的 torrent 时，`num_total_pieces_added` 会增加 1000。
 
 | name                             | type  |
 |----------------------------------|-------|
@@ -1535,7 +1544,8 @@ BitTorrent 消息计数器。每当从或向 BitTorrent peer 发送或接收相�
 |----------------------------------|-------|
 | disk.queued_write_bytes          | gauge |
 
-我们发送到磁盘 I/O 线程进行写入的字节数。每次我们从磁盘 I/O 线程收到完成的写作业时，此值会更新为磁盘 I/O 线程实际等待写入的字节数（而不是缓存中的字节数）。
+我们发送到磁盘 I/O 线程进行写入的字节数。
+每次我们从磁盘 I/O 线程收到完成的写作业时，此值会更新为磁盘 I/O 线程实际等待写入的字节数（而不是缓存中的字节数）。
 
 | name                             | type    |
 |----------------------------------|---------|
@@ -1805,7 +1815,7 @@ DHT 发送和接收的总字节数。
 | sock_bufs.socket_recv_size19 | counter |
 | sock_bufs.socket_recv_size20 | counter |
 
-socket 发送和接收调用接受的缓冲区大小。缓冲区越大，效率越高，因为每个字节所需的系统调用更少。
+socket 发送和接收的缓冲区大小。缓冲区越大，效率越高，因为每个字节所需的系统调用更少。
 大小为 `1 << n`，其中 `n` 是计数器名称末尾的数字。
 例如，8、16、32、64、128、256、512、1024、2048、4096、8192、16384、32768、65536、131072、262144、524288、1048576 字节。
 
@@ -1813,7 +1823,7 @@ socket 发送和接收调用接受的缓冲区大小。缓冲区越大，效率�
 |--------------------------------------|-------|
 | tracker.num_queued_tracker_announces | gauge |
 
-如果达到未完成的跟踪器公告限制，跟踪器公告将被排队，以便在公告槽位可用时发出。此值衡量当前队列中的跟踪器公告数量。
+如果达到未完成的 `tracker announce` 限制，`tracker announces` 将被排队，以便在公告槽位可用时发出。此值衡量当前队列中的跟踪器公告数量。
 
 ## 术语表
 
