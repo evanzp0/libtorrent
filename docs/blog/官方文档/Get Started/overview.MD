@@ -1241,3 +1241,638 @@ libtorrent 提供了一种机制，用于从其内部查询性能和统计计数
 
 `error_peers` 是由于错误导致的对等节点断开连接的总数（不是由本客户端发起的断开），以及由本客户端发起的断开连接（`disconnected_peers`）。
 
+| name                             | type    |
+|----------------------------------|---------|
+| peer.eof_peers                   | counter |
+| peer.connreset_peers             | counter |
+| peer.connrefused_peers           | counter |
+| peer.connaborted_peers           | counter |
+| peer.notconnected_peers          | counter |
+| peer.perm_peers                  | counter |
+| peer.buffer_peers                | counter |
+| peer.unreachable_peers           | counter |
+| peer.broken_pipe_peers           | counter |
+| peer.addrinuse_peers             | counter |
+| peer.no_access_peers             | counter |
+| peer.invalid_arg_peers           | counter |
+| peer.aborted_peers               | counter |
+
+这些计数器将 peer 错误细分为更具体的类别。这些错误是由底层传输层（如 TCP 或 uTP）报告的。
+
+| name                             | type    |
+|----------------------------------|---------|
+| peer.piece_requests              | counter |
+| peer.max_piece_requests          | counter |
+| peer.invalid_piece_requests      | counter |
+| peer.choked_piece_requests       | counter |
+| peer.cancelled_piece_requests    | counter |
+| peer.piece_rejects               | counter |
+
+我们收到的传入分块请求的总数，以及由于各种原因被拒绝的分块请求的数量。`max_piece_requests` 表示我们已经从该 peer 收到了太多的未完成请求，因此我们拒绝了它。`cancelled_piece_requests` 是指对方明确要求拒绝分块的请求。
+
+| name                             | type    |
+|----------------------------------|---------|
+| peer.error_incoming_peers        | counter |
+| peer.error_outgoing_peers        | counter |
+
+这些计数器将 peer 错误细分为发生在传入 peer 还是传出 peer 上的错误。
+
+| name                             | type    |
+|----------------------------------|---------|
+| peer.error_rc4_peers             | counter |
+| peer.error_encrypted_peers       | counter |
+
+这些计数器将 peer 错误细分为发生在加密 peer（仅加密握手）和 rc4 peer（全流加密）上的错误。这些可以指示加密 peer 是否更容易失败。
+
+| name                             | type    |
+|----------------------------------|---------|
+| peer.error_tcp_peers             | counter |
+| peer.error_utp_peers             | counter |
+
+这些计数器将 peer 错误细分为发生在 uTP peer 还是 TCP peer 上的错误。这些可以指示哪种协议更容易出错。
+
+| name                             | type    |
+|----------------------------------|---------|
+| peer.connect_timeouts            | counter |
+| peer.uninteresting_peers         | counter |
+| peer.timeout_peers               | counter |
+| peer.no_memory_peers             | counter |
+| peer.too_many_peers              | counter |
+| peer.transport_timeout_peers     | counter |
+| peer.num_banned_peers            | counter |
+| peer.banned_for_hash_failure     | counter |
+| peer.connection_attempts         | counter |
+| peer.connection_attempt_loops    | counter |
+| peer.boost_connection_attempts   | counter |
+| peer.missed_connection_attempts  | counter |
+| peer.no_peer_connection_attempts | counter |
+| peer.incoming_connections        | counter |
+
+这些计数器细分为断开 peer 连接的原因。
+
+| name                             | type  |
+|----------------------------------|-------|
+| peer.num_tcp_peers               | gauge |
+| peer.num_socks5_peers            | gauge |
+| peer.num_http_proxy_peers        | gauge |
+| peer.num_utp_peers               | gauge |
+| peer.num_i2p_peers               | gauge |
+| peer.num_ssl_peers               | gauge |
+| peer.num_ssl_socks5_peers        | gauge |
+| peer.num_ssl_http_proxy_peers    | gauge |
+| peer.num_ssl_utp_peers           | gauge |
+| peer.num_peers_half_open         | gauge |
+| peer.num_peers_connected         | gauge |
+| peer.num_peers_up_interested     | gauge |
+| peer.num_peers_down_interested   | gauge |
+| peer.num_peers_up_unchoked_all   | gauge |
+| peer.num_peers_up_unchoked_optimistic | gauge |
+| peer.num_peers_up_unchoked       | gauge |
+| peer.num_peers_down_unchoked     | gauge |
+| peer.num_peers_up_requests       | gauge |
+| peer.num_peers_down_requests     | gauge |
+| peer.num_peers_end_game          | gauge |
+| peer.num_peers_up_disk           | gauge |
+| peer.num_peers_down_disk         | gauge |
+
+每种类型 socket 的 peer 连接数。`num_peers_half_open` 计算半开（正在连接）的 peer，其他计数不包括这些 peer。`num_peers_up_unchoked_all` 是未阻塞 peer 的总数，而 `num_peers_up_unchoked` 仅计算计入限制的未阻塞 peer（即不包括因限制不适用而未阻塞的 peer）。`num_peers_up_unchoked_optimistic` 是乐观未阻塞 peer 的数量。
+
+| name                             | type    |
+|----------------------------------|---------|
+| net.on_read_counter              | counter |
+| net.on_write_counter             | counter |
+| net.on_tick_counter              | counter |
+| net.on_lsd_counter               | counter |
+| net.on_lsd_peer_counter          | counter |
+| net.on_udp_counter               | counter |
+| net.on_accept_counter            | counter |
+| net.on_disk_queue_counter        | counter |
+| net.on_disk_counter              | counter |
+
+| name                             | type    |
+|----------------------------------|---------|
+| net.sent_payload_bytes           | counter |
+| net.sent_bytes                   | counter |
+| net.sent_ip_overhead_bytes       | counter |
+| net.sent_tracker_bytes           | counter |
+| net.recv_payload_bytes           | counter |
+| net.recv_bytes                   | counter |
+| net.recv_ip_overhead_bytes       | counter |
+| net.recv_tracker_bytes           | counter |
+
+会话发送和接收的总字节数。
+
+| name                             | type  |
+|----------------------------------|-------|
+| net.limiter_up_queue             | gauge |
+| net.limiter_down_queue           | gauge |
+
+当前等待速率限制器上传和下载带宽的 socket 数量。
+
+| name                             | type  |
+|----------------------------------|-------|
+| net.limiter_up_bytes             | gauge |
+| net.limiter_down_bytes           | gauge |
+
+等待从速率限制器分配的上传和下载字节数。
+
+| name                             | type    |
+|----------------------------------|---------|
+| net.recv_failed_bytes            | counter |
+
+由于哈希检查失败而必须丢弃的下载字节数。
+
+| name                             | type    |
+|----------------------------------|---------|
+| net.recv_redundant_bytes         | counter |
+
+由于多次下载（来自不同的 peer）而被丢弃的下载字节数。
+
+| name                             | type  |
+|----------------------------------|-------|
+| net.has_incoming_connections     | gauge |
+
+默认情况下为 false，当建立第一个传入连接时设置为 true。这用于判断客户端是否位于 NAT 之后。
+
+| name                             | type  |
+|----------------------------------|-------|
+| ses.num_checking_torrents        | gauge |
+| ses.num_stopped_torrents         | gauge |
+| ses.num_upload_only_torrents     | gauge |
+| ses.num_downloading_torrents     | gauge |
+| ses.num_seeding_torrents         | gauge |
+| ses.num_queued_seeding_torrents  | gauge |
+| ses.num_queued_download_torrents | gauge |
+| ses.num_error_torrents           | gauge |
+
+这些 gauge 计算处于不同状态的 torrent 数量。每个 torrent 只属于其中一个状态。对于可能属于多个状态的 torrent，选择最显著的状态。例如，有错误的 torrent 计为错误 torrent，无论其其他状态如何。
+
+| name                             | type    |
+|----------------------------------|---------|
+| ses.num_piece_passed             | counter |
+| ses.num_piece_failed             | counter |
+| ses.num_have_pieces              | counter |
+| ses.num_total_pieces_added       | counter |
+
+这些计数器计算分块通过哈希检查的次数、成功写入磁盘的次数以及通过添加 torrent 添加的总可能分块数。例如，当添加一个包含 1000 个分块的 torrent 时，`num_total_pieces_added` 会增加 1000。
+
+| name                             | type  |
+|----------------------------------|-------|
+| ses.num_unchoke_slots            | gauge |
+
+允许的未阻塞 peer 数量。
+
+| name                             | type  |
+|----------------------------------|-------|
+| ses.num_outstanding_accept       | gauge |
+
+当前正在接受传入连接的监听 socket 数量。
+
+| name                             | type    |
+|----------------------------------|---------|
+| ses.num_incoming_choke           | counter |
+| ses.num_incoming_unchoke         | counter |
+| ses.num_incoming_interested      | counter |
+| ses.num_incoming_not_interested  | counter |
+| ses.num_incoming_have            | counter |
+| ses.num_incoming_bitfield        | counter |
+| ses.num_incoming_request         | counter |
+| ses.num_incoming_piece           | counter |
+| ses.num_incoming_cancel          | counter |
+| ses.num_incoming_dht_port        | counter |
+| ses.num_incoming_suggest         | counter |
+| ses.num_incoming_have_all        | counter |
+| ses.num_incoming_have_none       | counter |
+| ses.num_incoming_reject          | counter |
+| ses.num_incoming_allowed_fast    | counter |
+| ses.num_incoming_ext_handshake   | counter |
+| ses.num_incoming_pex             | counter |
+| ses.num_incoming_metadata        | counter |
+| ses.num_incoming_extended        | counter |
+| ses.num_outgoing_choke           | counter |
+| ses.num_outgoing_unchoke         | counter |
+| ses.num_outgoing_interested      | counter |
+| ses.num_outgoing_not_interested  | counter |
+| ses.num_outgoing_have            | counter |
+| ses.num_outgoing_bitfield        | counter |
+| ses.num_outgoing_request         | counter |
+| ses.num_outgoing_piece           | counter |
+| ses.num_outgoing_cancel          | counter |
+| ses.num_outgoing_dht_port        | counter |
+| ses.num_outgoing_suggest         | counter |
+| ses.num_outgoing_have_all        | counter |
+| ses.num_outgoing_have_none       | counter |
+| ses.num_outgoing_reject          | counter |
+| ses.num_outgoing_allowed_fast    | counter |
+| ses.num_outgoing_ext_handshake   | counter |
+| ses.num_outgoing_pex             | counter |
+| ses.num_outgoing_metadata        | counter |
+| ses.num_outgoing_extended        | counter |
+| ses.num_outgoing_hash_request    | counter |
+| ses.num_outgoing_hashes          | counter |
+| ses.num_outgoing_hash_reject     | counter |
+
+BitTorrent 消息计数器。每当从或向 BitTorrent peer 发送或接收相应类型的消息时，这些计数器会增加。
+
+| name                             | type    |
+|----------------------------------|---------|
+| ses.waste_piece_timed_out        | counter |
+| ses.waste_piece_cancelled        | counter |
+| ses.waste_piece_unknown          | counter |
+| ses.waste_piece_seed             | counter |
+| ses.waste_piece_end_game         | counter |
+| ses.waste_piece_closing          | counter |
+
+由于浪费字节的原因而浪费的下载字节数。
+
+| name                             | type    |
+|----------------------------------|---------|
+| picker.piece_picker_partial_loops | counter |
+| picker.piece_picker_suggest_loops | counter |
+| picker.piece_picker_sequential_loops | counter |
+| picker.piece_picker_reverse_rare_loops | counter |
+| picker.piece_picker_rare_loops   | counter |
+| picker.piece_picker_rand_start_loops | counter |
+| picker.piece_picker_rand_loops   | counter |
+| picker.piece_picker_busy_loops   | counter |
+
+在选择分块时考虑的分块数量。
+
+| name                             | type    |
+|----------------------------------|---------|
+| picker.reject_piece_picks        | counter |
+| picker.unchoke_piece_picks       | counter |
+| picker.incoming_redundant_piece_picks | counter |
+| picker.incoming_piece_picks      | counter |
+| picker.end_game_piece_picks      | counter |
+| picker.snubbed_piece_picks       | counter |
+| picker.interesting_piece_picks   | counter |
+| picker.hash_fail_piece_picks     | counter |
+
+这将分块选择细分为触发它的事件。
+
+| name                             | type  |
+|----------------------------------|-------|
+| disk.request_latency             | gauge |
+| disk.disk_blocks_in_use          | gauge |
+
+从收到 peer 的请求到我们在 socket 上发送响应所花费的微秒数。
+
+| name                             | type  |
+|----------------------------------|-------|
+| disk.queued_disk_jobs            | gauge |
+| disk.num_running_disk_jobs       | gauge |
+| disk.num_read_jobs               | gauge |
+| disk.num_write_jobs              | gauge |
+| disk.num_jobs                    | gauge |
+| disk.blocked_disk_jobs           | gauge |
+| disk.num_writing_threads         | gauge |
+| disk.num_running_threads         | gauge |
+
+`queued_disk_jobs` 是当前排队等待磁盘线程执行的磁盘作业数量。
+
+| name                             | type  |
+|----------------------------------|-------|
+| disk.queued_write_bytes          | gauge |
+
+我们发送到磁盘 I/O 线程进行写入的字节数。每次我们从磁盘 I/O 线程收到完成的写作业时，此值会更新为磁盘 I/O 线程实际等待写入的字节数（而不是缓存中的字节数）。
+
+| name                             | type    |
+|----------------------------------|---------|
+| disk.num_blocks_written          | counter |
+| disk.num_blocks_read             | counter |
+
+从磁盘写入和读取的总块数。一个块为 16 kiB。`num_blocks_written` 和 `num_blocks_read`。
+
+| name                             | type    |
+|----------------------------------|---------|
+| disk.num_blocks_hashed           | counter |
+
+通过 SHA-1 哈希处理的总块数。
+
+| name                             | type    |
+|----------------------------------|---------|
+| disk.num_write_ops               | counter |
+| disk.num_read_ops                | counter |
+
+磁盘 I/O 操作的读写次数。一个磁盘操作可能传输多个块。
+
+| name                             | type    |
+|----------------------------------|---------|
+| disk.num_read_back               | counter |
+
+为了哈希分块（在验证分块哈希时）而必须从磁盘重新读取的块数。
+
+| name                             | type    |
+|----------------------------------|---------|
+| disk.disk_read_time              | counter |
+| disk.disk_write_time             | counter |
+| disk.disk_hash_time              | counter |
+| disk.disk_job_time               | counter |
+
+在各种磁盘作业中花费的累计时间，以及所有磁盘作业的总时间。以微秒为单位。
+
+| name                             | type  |
+|----------------------------------|-------|
+| disk.num_fenced_read             | gauge |
+| disk.num_fenced_write            | gauge |
+| disk.num_fenced_hash             | gauge |
+| disk.num_fenced_move_storage     | gauge |
+| disk.num_fenced_release_files    | gauge |
+| disk.num_fenced_delete_files     | gauge |
+| disk.num_fenced_check_fastresume | gauge |
+| disk.num_fenced_save_resume_data | gauge |
+| disk.num_fenced_rename_file      | gauge |
+| disk.num_fenced_stop_torrent     | gauge |
+| disk.num_fenced_flush_piece      | gauge |
+| disk.num_fenced_flush_hashed     | gauge |
+| disk.num_fenced_flush_storage    | gauge |
+| disk.num_fenced_file_priority    | gauge |
+| disk.num_fenced_load_torrent     | gauge |
+| disk.num_fenced_clear_piece      | gauge |
+| disk.num_fenced_tick_storage     | gauge |
+
+对于每种类型的磁盘作业，当前被磁盘栅栏阻塞的作业数量。
+
+| name                             | type  |
+|----------------------------------|-------|
+| dht.dht_nodes                    | gauge |
+
+DHT 路由表中的节点数。
+
+| name                             | type  |
+|----------------------------------|-------|
+| dht.dht_node_cache               | gauge |
+
+DHT 路由表中的替换节点数。
+
+| name                             | type  |
+|----------------------------------|-------|
+| dht.dht_torrents                 | gauge |
+
+当前由我们的 DHT 节点跟踪的 torrent 数量。
+
+| name                             | type  |
+|----------------------------------|-------|
+| dht.dht_peers                    | gauge |
+
+当前由我们的 DHT 节点跟踪的 peer 数量。
+
+| name                             | type  |
+|----------------------------------|-------|
+| dht.dht_immutable_data           | gauge |
+
+由我们的 DHT 节点跟踪的不可变数据项数量。
+
+| name                             | type  |
+|----------------------------------|-------|
+| dht.dht_mutable_data             | gauge |
+
+由我们的 DHT 节点跟踪的可变数据项数量。
+
+| name                             | type  |
+|----------------------------------|-------|
+| dht.dht_allocated_observers      | gauge |
+
+当前分配的 RPC 观察者数量。
+
+| name                 | type    |
+|----------------------|---------|
+| dht.dht_messages_in  | counter |
+| dht.dht_messages_out | counter |
+
+DHT 发送和接收的消息总数。
+
+| name                        | type    |
+|-----------------------------|---------|
+| dht.dht_messages_in_dropped | counter |
+
+被丢弃的传入 DHT 请求数量。传入的 DHT 数据包可能被丢弃的原因有以下几种：
+
+1. 没有足够的发送配额来响应它们。
+2. 拒绝服务逻辑启动，阻止了 peer。
+3. 启用了 `ignore_dark_internet`，并且数据包来自非公共 IP 地址。
+4. 消息的 bencoding 无效。
+
+| name                         | type    |
+|------------------------------|---------|
+| dht.dht_messages_out_dropped | counter |
+
+未能发送的传出消息数量。
+
+| name              | type    |
+|-------------------|---------|
+| dht.dht_bytes_in  | counter |
+| dht.dht_bytes_out | counter |
+
+DHT 发送和接收的总字节数。
+
+| name                          | type    |
+|-------------------------------|---------|
+| dht.dht_ping_in               | counter |
+| dht.dht_ping_out              | counter |
+| dht.dht_find_node_in          | counter |
+| dht.dht_find_node_out         | counter |
+| dht.dht_get_peers_in          | counter |
+| dht.dht_get_peers_out         | counter |
+| dht.dht_announce_peer_in      | counter |
+| dht.dht_announce_peer_out     | counter |
+| dht.dht_get_in                | counter |
+| dht.dht_get_out               | counter |
+| dht.dht_put_in                | counter |
+| dht.dht_put_out               | counter |
+| dht.dht_sample_infohashes_in  | counter |
+| dht.dht_sample_infohashes_out | counter |
+
+按类型统计的 DHT 消息发送和接收数量。
+
+| name                              | type    |
+|-----------------------------------|---------|
+| dht.dht_invalid_announce          | counter |
+| dht.dht_invalid_get_peers         | counter |
+| dht.dht_invalid_find_node         | counter |
+| dht.dht_invalid_put               | counter |
+| dht.dht_invalid_get               | counter |
+| dht.dht_invalid_sample_infohashes | counter |
+
+按请求类型统计的失败传入 DHT 请求数量。
+
+| name                | type    |
+|---------------------|---------|
+| utp.utp_packet_loss | counter |
+
+丢失的数据包被解释为拥塞的次数，导致拥塞窗口减半。某些丢失的数据包不会被解释为拥塞，特别是 MTU 探测包。
+
+| name            | type    |
+|-----------------|---------|
+| utp.utp_timeout | counter |
+
+超时次数。当连接在滑动平均 RTT + 2 倍平均偏差（大约）内未收到对方的响应时，会发生超时。
+实际超时时间是可配置的，并且还取决于 socket 的状态。
+
+| name                | type    |
+|---------------------|---------|
+| utp.utp_packets_in  | counter |
+| utp.utp_packets_out | counter |
+
+发送和接收的总数据包数。
+
+| name                    | type    |
+|-------------------------|---------|
+| utp.utp_fast_retransmit | counter |
+
+丢失但通过快速重传逻辑重新发送的数据包数量。该逻辑在收到 3 个重复 ACK 后触发。
+
+| name                  | type    |
+|-----------------------|---------|
+| utp.utp_packet_resend | counter |
+
+由于各种原因重新发送的数据包数量。
+
+| name                         | type    |
+|------------------------------|---------|
+| utp.utp_samples_above_target | counter |
+| utp.utp_samples_below_target | counter |
+
+延迟样本高于和低于延迟目标的传入数据包数量。延迟目标是可配置的，并且是 LEDBAT 拥塞控制的参数。
+
+| name                     | type    |
+|--------------------------|---------|
+| utp.utp_payload_pkts_in  | counter |
+| utp.utp_payload_pkts_out | counter |
+
+接收和发送的有效载荷数据包总数。
+
+| name                    | type    |
+|-------------------------|---------|
+| utp.utp_invalid_pkts_in | counter |
+
+接收到的无效 uTP 数据包数量（但与 DHT 或 UDP 跟踪器数据包足够相似，因此未被视为这些类型的数据包）。
+
+| name                      | type    |
+|---------------------------|---------|
+| utp.utp_redundant_pkts_in | counter |
+
+接收到的重复有效载荷数据包数量。如果传出的 ACK 丢失，可能会发生这种情况。
+
+| name                   | type  |
+|------------------------|-------|
+| utp.num_utp_idle       | gauge |
+| utp.num_utp_syn_sent   | gauge |
+| utp.num_utp_connected  | gauge |
+| utp.num_utp_fin_sent   | gauge |
+| utp.num_utp_close_wait | gauge |
+| utp.num_utp_deleted    | gauge |
+
+处于各自状态的 uTP socket 数量。
+
+| name                         | type    |
+|------------------------------|---------|
+| sock_bufs.socket_send_size3  | counter |
+| sock_bufs.socket_send_size4  | counter |
+| sock_bufs.socket_send_size5  | counter |
+| sock_bufs.socket_send_size6  | counter |
+| sock_bufs.socket_send_size7  | counter |
+| sock_bufs.socket_send_size8  | counter |
+| sock_bufs.socket_send_size9  | counter |
+| sock_bufs.socket_send_size10 | counter |
+| sock_bufs.socket_send_size11 | counter |
+| sock_bufs.socket_send_size12 | counter |
+| sock_bufs.socket_send_size13 | counter |
+| sock_bufs.socket_send_size14 | counter |
+| sock_bufs.socket_send_size15 | counter |
+| sock_bufs.socket_send_size16 | counter |
+| sock_bufs.socket_send_size17 | counter |
+| sock_bufs.socket_send_size18 | counter |
+| sock_bufs.socket_send_size19 | counter |
+| sock_bufs.socket_send_size20 | counter |
+| sock_bufs.socket_recv_size3  | counter |
+| sock_bufs.socket_recv_size4  | counter |
+| sock_bufs.socket_recv_size5  | counter |
+| sock_bufs.socket_recv_size6  | counter |
+| sock_bufs.socket_recv_size7  | counter |
+| sock_bufs.socket_recv_size8  | counter |
+| sock_bufs.socket_recv_size9  | counter |
+| sock_bufs.socket_recv_size10 | counter |
+| sock_bufs.socket_recv_size11 | counter |
+| sock_bufs.socket_recv_size12 | counter |
+| sock_bufs.socket_recv_size13 | counter |
+| sock_bufs.socket_recv_size14 | counter |
+| sock_bufs.socket_recv_size15 | counter |
+| sock_bufs.socket_recv_size16 | counter |
+| sock_bufs.socket_recv_size17 | counter |
+| sock_bufs.socket_recv_size18 | counter |
+| sock_bufs.socket_recv_size19 | counter |
+| sock_bufs.socket_recv_size20 | counter |
+
+socket 发送和接收调用接受的缓冲区大小。缓冲区越大，效率越高，因为每个字节所需的系统调用更少。
+大小为 `1 << n`，其中 `n` 是计数器名称末尾的数字。
+例如，8、16、32、64、128、256、512、1024、2048、4096、8192、16384、32768、65536、131072、262144、524288、1048576 字节。
+
+| name                                 | type  |
+|--------------------------------------|-------|
+| tracker.num_queued_tracker_announces | gauge |
+
+如果达到未完成的跟踪器公告限制，跟踪器公告将被排队，以便在公告槽位可用时发出。此值衡量当前队列中的跟踪器公告数量。
+
+## 术语表
+
+libtorrent 文档使用了一些 BitTorrent 术语。本节定义了其中一些术语。
+有关 BitTorrent 的概述及其工作原理，请参阅这些 [幻灯片](https://www.libtorrent.org/bittorrent.pdf) 。
+有关 BitTorrent DHT 的介绍，请参阅 [此演示](https://vimeo.com/56044595)。
+
+- **announce（公告）**  
+  向 tracker 或 DHT 网络告知自身存在的行为，通过指定监听的端口，其他 peer 可以连接。
+
+- **block（块）**  
+  piece 的子集。几乎总是 16 KiB 的有效载荷，除非 piece 大小更小。这是从网络上的 peer 请求文件有效载荷的粒度。
+
+- **DHT（分布式哈希表）**  
+  一个跨 swarm、全球范围的 BitTorrent peer 网络。它是松散连接的，实现了 Kademlia 协议。其目的是充当 tracker。peer 可以向 DHT 上的节点公告自己的存在，其他 peer 可以发现它们以加入 swarm。
+
+- **HTTP tracker**  
+  使用 HTTP 协议进行公告的 tracker。
+
+- **info dictionary（信息字典）**  
+  torrent 文件中描述 piece 哈希和文件名的部分。这是加入 torrent 的 swarm（peer 网络）所必需的唯一强制部分。
+
+- **info hash（信息哈希）**  
+  信息字典的哈希值。它唯一标识一个 torrent，并用于确保协议中相互通信的 peer 确认它们参与的是同一个 swarm。有时拼写为 info-hash。
+
+- **leecher（下载者）**  
+  仍然有兴趣下载更多 piece 的 peer。它不是种子。
+
+- **magnet link（磁力链接）**  
+  包含 torrent 信息哈希的 URI，允许 peer 加入其 swarm。可能包含显示名称、tracker 和 web seed。通常，磁力链接依赖于 peer 通过 DHT 加入 swarm。
+
+- **metadata（元数据）**  
+  与 torrent 文件同义。
+
+- **peer（对等节点）**  
+  运行 BitTorrent 客户端软件的计算机，参与特定 torrent/文件集的网络。
+
+- **piece（分片）**  
+  下载时可以验证的最小字节数（在 BitTorrent V2 中不再如此）。可以向其他 peer 广告的文件的最小部分。piece 的大小由 torrent 文件中的信息字典决定。
+
+- **seed（种子）**  
+  运行 BitTorrent 客户端软件的计算机，拥有特定 torrent 的完整文件，能够与网络中的其他 peer 共享该文件的任何 piece。
+
+- **swarm（群）**  
+  参与共享和下载特定 torrent 的 peer 网络。
+
+- **torrent（种子文件或群）**  
+  可能指 torrent 文件或围绕 torrent 文件创建的 swarm（peer 网络）。
+
+- **torrent file（种子文件）**  
+  以 .torrent 结尾的文件，描述一组文件的内容（但不包含内容）。重要的是，它包含所有文件的哈希值，分割成 piece。
+  它可能包含对 tracker 和 DHT 网络节点的引用，以帮助 peer 加入共享这些文件的 peer 网络。
+
+- **tracker（追踪器）**  
+  peer 可以公告并接收属于同一 swarm 的其他 peer 的服务器。tracker 用于在 swarm 内引入 peer。在公告时，包含 torrent 的信息哈希。
+  tracker 可以为任何指定的信息哈希引入 peer，前提是其他 peer 也使用相同的 tracker。一些 tracker 根据白名单限制它们支持的信息哈希。
+
+- **UDP tracker**  
+  使用基于 UDP 的协议进行公告的 tracker。
+
+- **web seed（网络种子）**  
+  充当种子的 Web 服务器，通过 HTTP 提供对所有文件的所有 piece 的访问。这是一个扩展，客户端软件可能支持也可能不支持。
