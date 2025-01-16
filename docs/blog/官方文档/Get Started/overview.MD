@@ -985,11 +985,11 @@ libtorrent 中的 **对等节点类型（peer classes）** 功能，允许客户
 - **local peers**：本地网络上的所有对等节点属于此类。
 - **TCP peers**：所有通过 TCP 连接的对等节点属于此类。
 
-TCP 对等节点类用于 uTP/TCP 平衡逻辑（如果启用），以限制 TCP 对等节点的速率。全局类和本地类用于调整全局速率限制。
+`TCP peers` 类型用于 uTP/TCP 平衡逻辑（如果启用），以限制 TCP 对等节点的速率。全局类和本地类用于调整全局速率限制。
 
-当为特定种子调整速率限制时，会隐式地为该种子创建一个类。
+当为特定种子调整速率限制时，会隐式地为该种子创建一个类型。
 
-默认的对等节点类 ID 在 `session` 类中定义为枚举：
+默认的对等节点类型 ID 在 `session` 类中定义为枚举：
 
 ```cpp
 enum {
@@ -997,3 +997,42 @@ enum {
     tcp_peer_class_id,
     local_peer_class_id
 };
+```
+
+默认的对等节点类型在 [session](https://www.libtorrent.org/reference-Session.html#session) 启动时自动创建，并配置为适用于各自的连接类型。
+客户端可以重新配置对等节点类的 IP 和类型过滤器，以禁用或自定义它们适用的对等节点。
+有关详细信息，请参阅 [set_peer_class_filter()](https://www.libtorrent.org/reference-Session.html#set_peer_class_filter())
+和 [set_peer_class_type_filter()](https://www.libtorrent.org/reference-Session.html#set_peer_class_type_filter())。
+
+对等节点类型可以被视为某些客户端中标签的更通用形式。然而，对等节点类型不仅适用于种子，最终还适用于对等节点。
+
+可以调用 `session` 对象的 [create_peer_class()](https://www.libtorrent.org/reference-Session.html#create_peer_class()) 创建对等节点类型，
+并通过 [delete_peer_class()](https://www.libtorrent.org/reference-Session.html#delete_peer_class()) 删除对等节点类。
+
+对等节点类通过调用 [set_peer_class()](https://www.libtorrent.org/reference-Session.html#set_peer_class()) 
+和 [get_peer_class()](https://www.libtorrent.org/reference-Session.html#get_peer_class()) 进行配置。
+
+可以根据对等节点的 IP 地址或使用的传输协议类型分配自定义对等节点类型。
+有关更多信息，请参阅 [set_peer_class_filter()](https://www.libtorrent.org/reference-Session.html#set_peer_class_filter())
+和 [set_peer_class_type_filter()](https://www.libtorrent.org/reference-Session.html#set_peer_class_type_filter()) 。
+
+### peer class examples（对等节点类示例）
+
+以下是一些常见的对等节点类操作示例。
+
+为了使全局速率限制也适用于本地对等节点，可以更新基于 IP 过滤器的对等节点类分配：
+
+```cpp
+std::uint32_t const mask = 1 << lt::session::global_peer_class_id;
+ip_filter f;
+
+// for every IPv4 address, assign the global peer class
+f.add_rule(make_address("0.0.0.0"), make_address("255.255.255.255"), mask);
+
+// for every IPv6 address, assign the global peer class
+f.add_rule(make_address("::")
+        , make_address("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
+        , mask);
+ses.set_peer_class_filter(f);
+```
+
