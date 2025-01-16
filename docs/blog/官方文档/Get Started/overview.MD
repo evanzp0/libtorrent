@@ -623,7 +623,318 @@ httpseeds:
     </tr>
     <tr>
       <td><code>allocation</code></td>
-      <td>存储的分配模式。可以是 <code>allocate</code>（预分配磁盘空间） 或 <code>sparse</code>（按需分配磁盘空间）。</td>
+      <td>存储的分配模式。可以是 <code>allocate</code>（完全分配，预分配） 或 <code>sparse</code>（稀疏分配）。</td>
     </tr>
   </tbody>
 </table>
+
+## storage allocation（存储分配模式）
+
+在 libtorrent 中，存储（磁盘上的文件）分配有两种模式：
+
+- 传统的完全分配模式（Full Allocation Mode）：
+
+    在下载一个文件中任何内容之前，该文件的整个内容会先被 0 填充。
+    各个文件是按需分配的，即第一次写入数据时才会为该文件分配空间。
+    这种模式的主要优点是避免创建严重碎片化的文件。
+
+- 稀疏分配模式（Sparse Allocation Mode）：
+
+    使用稀疏文件（sparse files），下载的数据块直接写入其所属的位置。
+    这是推荐的模式，也是默认模式。
+
+### Sparse Allocation Mode（稀疏分配模式）
+
+在支持稀疏文件（sparse files）的文件系统上，这种分配模式只会占用已下载数据所需的磁盘空间。
+
+- 这种模式的缺点是可能会导致文件严重碎片化。
+- 这种模式的优点是在启动时不需要进行空间预分配。
+
+
+### Full Allocation Mode（完全分配模式）
+
+当以完全分配模式启动一个 `torrent`(种子) 任务时，磁盘 I/O 线程会确保整个存储空间被分配，并用零填充任何空白区域。当然，它仍然会检查已有的数据块和快速恢复数据。
+
+这种模式的主要缺点包括：
+
+- 启动时间较长：因为需要用零填充文件，所以启动种子任务可能需要更长时间。这种延迟与下载文件的大小成正比。
+- 可能占用不必要的磁盘空间：在下载会话之间，可能会占用不必要的磁盘空间。
+- 磁盘缓存性能较差：磁盘缓存通常对大型文件的随机访问性能较差，可能会降低下载速度。
+
+这种模式的优点包括：
+
+- 下载的数据块直接写入文件的最终位置，磁盘操作的总数会减少，可能也更适合文件系统的空间分配策略，从而减少文件碎片化。
+- 一旦所有文件创建完成，下载过程中不会因为磁盘空间不足而失败。
+
+## HTTP Seeding（HTTP 做种）
+
+HTTP 做种有两种类型：一种假设客户端是智能（且友好）的，另一种假设服务器是智能的。
+这两种类型分别在 [BEP 19](https://www.bittorrent.org/beps/bep_0019.html) 和 [BEP 17](https://www.bittorrent.org/beps/bep_0017.html) 中定义。
+
+libtorrent 支持这两种类型。在 libtorrent 的源代码和 API 中，`BEP 19` 的 URL 通常被称为 `url seeds`，而 `BEP 17` 的 URL 通常被称为 `HTTP seeds`。
+
+libtorrent 对 `BEP 19` 的实现假定，如果 URL 以斜杠（/）结尾，则应将文件名附加到 URL 后面，以便从该文件中请求数据块。具体来说：
+- 如果种子是单文件种子，则只附加该文件名。
+- 如果种子是多文件种子，则附加 种子的名称 + "/" + 文件名（即 种子名称/文件名）。这与 libtorrent 下载种子文件时的目录结构相同。
+
+libtorrent 对 HTTP 重定向的支持有限。如果某些文件被重定向到不同的主机，这些文件必须按数据块对齐，或者通过填充使其按数据块对齐。
+
+> *译注:*
+>
+> 种子名称：MyTorrent
+> 
+> URL：http://example.com/files/
+>
+> 单文件种子：MyTorrent/file1.txt
+> 
+> 多文件种子：
+> ```
+> MyTorrent/
+> ├── file1.txt
+> ├── folder1/
+> │   └── file2.txt
+> └── folder2/
+>     └── file3.txt
+>```
+> 单文件种子, 构造的 HTTP 请求：
+> 
+> http://example.com/files/file1.txt
+>
+> 多文件种子, 构造的 HTTP 请求：
+> 
+> http://example.com/files/MyTorrent/folder1/file2.txt 
+>
+> http://example.com/files/MyTorrent/folder2/file3.txt
+
+## Piece Picker（片段选择器）
+
+Piece Picker 具有以下功能：
+
+- Rarest First（最稀有优先）
+
+  优先选择在 swarm（种子网络）中最稀有的片段，以帮助提高种子的健康度和下载效率。
+
+- Sequential Download（顺序下载）
+
+  按文件顺序下载片段，适用于流媒体播放等需要顺序读取数据的场景。
+
+- Random Pick（随机选择）
+
+  随机选择片段下载，通常用于初始阶段以快速获取数据。
+
+- Reverse Order Picking（逆序选择）
+
+  从文件的末尾开始选择片段下载。
+
+- Parole Mode（假释模式）
+  
+  对表现不佳的 peer（对等节点）进行限制，只允许它们下载特定的片段。
+
+- Prioritize Partial Pieces（优先部分片段）
+
+  优先下载已经部分完成的片段，以减少片段碎片化。
+
+- Prefer Whole Pieces（优先完整片段）
+  
+  优先下载完整的片段，而不是部分片段。
+
+- Piece Affinity by Speed Category（按速度类别分配片段亲和性）
+
+  根据 peer 的速度类别（如快速、慢速）分配片段下载任务，以优化下载效率。
+
+- Piece Priorities（片段优先级）
+
+  允许为不同的片段设置优先级，高优先级的片段会优先下载。
+
+### internal representation（内部表示/数据结构和算法）
+
+该优化方式是通过始终维护一个按稀有度排序的片段列表，并在每个稀有度类别内随机打乱顺序。
+这个列表在内存中被组织为一个连续的向量（vector），以实现最佳的内存局部性，并在更新片段稀有度时避免堆内存的分配和释放。
+
+对于高开销的事件（例如一个 peer 加入或离开），采用惰性评估的方式处理，因为重建整个列表比更新列表中的每个片段更节省资源。
+这意味着，只要没有选择任何数据块，peer 的加入或离开的开销不会比单个 peer 的加入或离开更高。
+当然，对于拥有全部片段或没有任何片段的 peer 的特殊情况，也进行了优化，以避免重建列表的需求(*译注:* 意思就是全有和全无的 peer , 加入和退出时不需要更新稀有度列表的)。
+
+> *译注：*
+>
+> 稀有度类别: 是将片段按照稀有度分组的方式。所有具有相同稀有度（即被相同数量的 peer 拥有）的片段会被归为同一个稀有度类别。
+> 例如：
+> 稀有度为 1 的片段（只有 1 个 peer 拥有）属于一个类别。
+> 稀有度为 2 的片段（有 2 个 peer 拥有）属于另一个类别。
+> 以此类推。
+> 
+> **下面举个例子**
+> 
+> 假设有一个 swarm，其中有 5 个片段和 4 个 peer。每个 peer 拥有的片段如下：
+> 
+> | Peer  | 拥有的片段        |
+> |-------|------------------|
+> | Peer1 | Piece1, Piece2   |
+> | Peer2 | Piece2, Piece3   |
+> | Peer3 | Piece3, Piece4   |
+> | Peer4 | Piece4, Piece5   |
+> 
+> - **计算每个片段的稀有度**：
+>   - Piece1：只有 Peer1 拥有 → 稀有度 = 1
+>   - Piece2：Peer1 和 Peer2 拥有 → 稀有度 = 2
+>   - Piece3：Peer2 和 Peer3 拥有 → 稀有度 = 2
+>   - Piece4：Peer3 和 Peer4 拥有 → 稀有度 = 2
+>   - Piece5：只有 Peer4 拥有 → 稀有度 = 1
+> 
+> - **稀有度类别**：
+>   - 稀有度 1 的类别：Piece1, Piece5
+>   - 稀有度 2 的类别：Piece2, Piece3, Piece4
+> 
+> - **片段选择**：
+>   - libtorrent 会优先选择稀有度较高的类别（即稀有度 1 的类别）中的片段（Piece1 或 Piece5）。
+>   - 在每个类别内，**片段的顺序是随机打乱的**。例如：
+>     - 稀有度 1 的类别可能被随机排序为 [Piece5, Piece1]。
+>     - 稀有度 2 的类别可能被随机排序为 [Piece3, Piece2, Piece4]。
+
+### picker strategy（选择策略）
+
+Picker 的默认模式当然是 `rarest first`（最稀有优先），这意味着拥有较少 peer 的片段会优先被下载，而不是那些拥有较多 peer 的片段。
+这是 BitTorrent 性能基础的核心算法。然而，用户也可以将 Piece Picker 设置为 Sequential Download Mode（顺序下载模式）。
+在这种模式下，Picker 会按顺序选择片段，总是优先选择索引较低的片段。
+
+当 Torrent 刚开始下载时，选择最稀有的片段意味着片段可能无法尽早完成（因为只有少数 peer 可以提供这些片段），从而导致延迟，无法向其他 peer 提供任何片段。
+这种缺乏可用于交换的片段的情况，会延迟客户端进入 BitTorrent 的正常 Tit-for-Tat（以牙还牙） 模式，从而导致较长的启动时间。
+为了缓解这个问题，采用了一种启发式方法：在最初的几个片段中，选择随机片段而不是稀有片段。
+离开这种初始选择模式的阈值由 [settings_pack::initial_picker_threshold](https://www.libtorrent.org/reference-Settings.html#initial_picker_threshold) 参数决定。
+
+### reverse order（逆序选择）
+
+一个独立的设置是 `reverse order`（逆序选择），它用于处理 `snubbed peers`（冷门节点）。
+Snubbed Peers 是指那些表现非常缓慢，甚至可能已经超时未响应片段请求的 peer。
+这种设置的目的是尽可能的向 `snubbed peers` 请求同一个片段来下载数据块，从而将向这些慢速 peer 发出的请求集中在尽可能少的片段上。
+`reverse order` 意味着选择最常见的片段，而不是最稀有的片段（或者在顺序下载模式下，选择最后的片段，而不是最前面的片段），这样可以减少在 `snubbed peers` 上浪费的资源。
+
+> *译注：*
+> 
+> 1. 初始化
+> 
+>     客户端维护一个片段列表，按稀有度排序（Rarest First）。
+>     在每个稀有度类别内，随机打乱片段的顺序，以避免多个 peer 同时请求相同的片段。
+>     客户端初始化 Snubbed Peers 列表，用于记录表现不佳的 peer。
+>
+> 2. 客户端根据 peer 的表现决定使用哪种策略：
+> 
+>     正常 peer：使用 Rarest First 策略，从该 peer 上优先下载最稀有的片段。
+> 
+>     Snubbed Peers：使用 Reverse Order 策略，从该 peer 上优先下载最常见的片段。
+
+### Parole Mode（假释模式）
+
+参与过哈希校验失败的片段的 peer 可能会被置于 Parole Mode（假释模式）。
+这意味着我们更倾向于从该 peer 下载完整的片段，以便区分是哪个 peer 发送了损坏的数据。
+是否启用此功能由 [settings_pack::use_parole_mode](https://www.libtorrent.org/reference-Settings.html#use_parole_mode) 控制。
+
+在假释模式下，Piece Picker 会优先为给定的 peer 一次选择一个完整的片段，避免选择任何其他 peer 贡献过数据块的片段（因为这会违背假释模式的目的）。
+
+### prioritize partial pieces（优先处理部分片段）
+
+此设置决定了是否应始终优先处理部分下载或请求的片段，而不是其他片段。这样做的好处是可以最小化部分片段的数量（从而减少下载一个区块直到可以上传给其他人的周转时间）。
+同时，它也能减轻磁盘缓存的压力，因为需要保留在缓存中的部分片段更少。
+是否启用此功能由 [setting_pack::prioritize_partial_pieces](https://www.libtorrent.org/reference-Settings.html#prioritize_partial_pieces) 控制。
+
+不优先处理部分片段的主要好处是，能够让“最稀有优先”算法在选择数据块时发挥更大的影响力。选择器更有可能真正选择最稀有的片段，从而提高整个群体的性能。
+
+当片段选择器中的部分片段数量超过我们连接的对等节点数量的1.5倍时，此设置会自动启用。这是为了将部分片段的浪费降至最低，同时仍然优先选择最稀有的片段。
+
+### prefer whole pieces（优先选择完整片段）
+
+`prefer whole pieces` 设置使片段选择器倾向于一次选择整个片段。此功能用于网络连接（包括 `http seeding` 标准），以便能够将较小的 BitTorrent 请求合并为较大的HTTP请求。
+这在通过HTTP下载时显著提高了性能。
+
+此设置也适用于下载速度超过特定阈值的对等节点。主要优势在于，这些对等节点通过从同一对等节点请求一个片段中的所有块，能够更好地利用其他节点的磁盘缓存。
+
+此阈值由 [settings_pack::whole_pieces_threshold](https://www.libtorrent.org/reference-Settings.html#whole_pieces_threshold) 设置控制。
+
+TODO: piece priorities
+
+## Multi-homed hosts（多宿主主机）
+
+[settings_pack::listen_interfaces](https://www.libtorrent.org/reference-Settings.html#listen_interfaces) 设置用于指定监听哪些接口/IP地址，并接受传入的连接。
+
+`listen_interfaces` 中的每一项都是一个IP地址或设备名称，后跟一个监听端口号。每一项（称为 `listen_socket_t`）将关联以下对象：
+
+- 一个用于接受传入 TCP 连接的监听套接字
+- 一个 UDP 套接字，用于：
+  1. 接受传入的 uTP 连接
+  2. 运行 DHT 实例
+  3. 用于向 UDP trackers 宣告
+  4. 一个 SOCKS5 UDP 隧道（如果适用）
+- 一个监听地址和网络掩码，描述套接字绑定的网络
+- 一个本地服务发现对象，向指定的子网广播
+- 一个 NAT-PMP/PCP 端口映射器（如果适用），用于在网关上为指定子网映射端口
+- 一个 UPnP 端口映射器（如果适用），用于在指定本地子网上找到的任何Internet网关设备上映射端口
+
+`listen_socket_t` 项可以指定为仅用于本地网络（带有 `l` 后缀）。此类监听套接字仅用于与同一本地网络内的对等节点和跟踪器通信。定义网络的网络掩码通过枚举网络接口从操作系统中查询。
+
+被视为“本地网络”的项不会用于向该网络之外的跟踪器宣告。例如，`10.0.0.2:6881l` 被标记为“本地网络”，只有在跟踪器也在同一本地网络内（例如 `10.0.0.0/8`）时，才会将其用作宣告的源地址。
+
+NAT-PMP/PCP 和 UPnP 端口映射器对象仅为预期可外部访问的网络（即非“本地网络”）创建。如果有多个子网连接到互联网，它们将具有独立的端口映射。
+
+### expanding device names（解析设备名称）
+
+如果指定了设备名称，libtorrent 会将其解析为与该设备关联的 IP 地址，同时保留设备名称，以便尝试将监听套接字绑定到该特定设备。
+
+### expanding unspecified addresses（解析未指定地址）
+
+如果 IP 地址是未指定地址（即 `0.0.0.0` 或 `::`），libtorrent 会将其解析为具体的 IP 地址。此解析将枚举其能够找到的对应地址族的所有地址。
+如果满足以下任一条件，解析后的 IP 地址将被视为“本地网络”：
+
+- IP 地址位于已知的 `link-local` 范围内(*译注：*同一个网关内)
+- IP 地址位于已知的 `loopback` 范围内
+- 解析 IP 地址的原始项被标记为本地（`l`）
+- 网络接口设置了`loopback` 标志
+- 同时，以下条件均**不满足**：
+  1. IP 地址位于全局可访问的 IP 地址范围内
+  2. 网络接口设置了 `point-to-point` 标志
+  3. 路由表中包含至少一个全局互联网地址（例如默认路由 0.0.0.0/0）的路由，该路由指向解析 IP 地址的网络接口，且地址族与解析 IP 地址的地址族一致。
+
+### routing (路由)
+
+如果满足以下条件中的任何一个，则认为 `listen_socket_t` 项能够路由到目标地址：
+
+- 目标地址位于其子网内（即接口地址与网络掩码的按位与结果，与目标地址与网络掩码的按位与结果相同）。
+- `listen_socket_t` 未设置“本地网络”标志，并且地址族与目标地址的地址族匹配。
+
+在确定是否从 `listen_socket_t` 向追踪器（tracker）宣告，以及是否为 `listen_socket_t` 打开 SOCKS5 UDP 隧道时，会使用“路由到某个地址”的能力。
+
+需要注意的是，此机制不考虑实际的 IP 栈路由表（*译注：* 不看操作系统路由表，只看 listen_socket_t 地址的配置）。该机制的目的是“确定应向 tracker 宣告哪些 IP 地址”。
+
+### tracker announces（跟踪器宣告）
+
+所有监听传入连接的网络接口都会用于向跟踪器宣告。然而，无法用于访问跟踪器的接口（例如 loopback ）不会被用作宣告的源地址。
+能够路由到至少一个跟踪器 IP 地址的 `listen_socket_t` 项将被用作宣告的源地址。
+每个这样的项在跟踪器列表中还会关联一个 [announce_endpoint](https://www.libtorrent.org/reference-Trackers.html#announce_endpoint) 项。
+
+如果可以通过 loopback 地址访问跟踪器，则 loopback 将用于向该跟踪器宣告。但在正常情况下，loopback 不会用于向跟踪器宣告。
+
+更多详细信息，请参阅 [BEP 7](https://www.bittorrent.org/beps/bep_0007.html)。
+
+### SOCKS5 UDP tunnels （SOCKS5 UDP 通道）
+
+当使用 SOCKS5 代理时，每个能够路由到 SOCKS5 代理地址之一的(网络设备)接口都将使用该代理打开 UDP 通道。
+例如，如果客户端同时具有 IPv4 和 IPv6 连接，但 SOCKS5 代理仅解析为 IPv4 地址，则只有 IPv4 地址会拥有 UDP 通道。
+在这种情况下，IPv6 连接将不会被使用，因为它无法通过代理进行通信。
+
+## rate based choking（基于速率的阻塞算法）
+
+libtorrent 支持一种阻塞算法，该算法根据对等节点的上传速率自动确定上传槽（非阻塞槽）的数量。
+此算法由 [settings_pack::choking_algorithm](https://www.libtorrent.org/reference-Settings.html#choking_algorithm) 设置控制。
+在此模式下，[settings_pack::unchoke_slots_limit](https://www.libtorrent.org/reference-Settings.html#unchoke_slots_limit) 设置将被忽略。
+
+该算法旨在保持稳定，避免上传槽数量的波动。
+
+初始速率阈值设置为 [settings_pack::rate_choker_initial_threshold](https://www.libtorrent.org/reference-Settings.html#rate_choker_initial_threshold)。
+
+算法步骤如下：
+1. 根据我们向对等节点的上传速率对所有对等节点进行排序。
+2. 将最快的对等节点与初始阈值进行比较。
+3. 将阈值增加 2 kiB/s。
+4. 将下一个最快的对等节点与阈值进行比较。如果该对等节点的速率高于阈值，则跳转到步骤 2。
+5. 终止。访问的对等节点数量即为非阻塞槽的数量，但永远不会少于 2 个。
+
+换句话说，上传槽越多，最慢的非阻塞对等节点的上传速率需要越高，才能打开另一个槽。
