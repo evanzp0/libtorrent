@@ -992,10 +992,11 @@ libtorrent 中的 **对等节点类型（peer classes）** 功能，允许客户
 默认的对等节点类型 ID 在 `session` 类中定义为枚举：
 
 ```cpp
+// mask 上哪一位设为 1，就是对应的 peer 类型
 enum {
-    global_peer_class_id,
-    tcp_peer_class_id,
-    local_peer_class_id
+    global_peer_class_id, // 0 位设为 1
+    tcp_peer_class_id,    // 1 位设为 1
+    local_peer_class_id   // 2 位设为 1
 };
 ```
 
@@ -1016,15 +1017,18 @@ enum {
 有关更多信息，请参阅 [set_peer_class_filter()](https://www.libtorrent.org/reference-Session.html#set_peer_class_filter())
 和 [set_peer_class_type_filter()](https://www.libtorrent.org/reference-Session.html#set_peer_class_type_filter()) 。
 
-### peer class examples（对等节点类示例）
+### peer class examples（对等节点类型示例）
 
-以下是一些常见的对等节点类操作示例。
+以下是一些常见的对等节点类型操作示例。
 
-为了使全局速率限制也适用于本地对等节点，可以更新基于 IP 过滤器的对等节点类分配：
+为了使全局速率限制也适用于本地对等节点，可以更新基于 IP-filter 的对等节点类型分配：
 
 ```cpp
 std::uint32_t const mask = 1 << lt::session::global_peer_class_id;
 ip_filter f;
+
+// 同时适用于全局和 TCP 对等节点类
+// std::uint32_t flags = (1 << global_peer_class_id) | (1 << tcp_peer_class_id); // flags = 3
 
 // for every IPv4 address, assign the global peer class
 f.add_rule(make_address("0.0.0.0"), make_address("255.255.255.255"), mask);
@@ -1036,3 +1040,196 @@ f.add_rule(make_address("::")
 ses.set_peer_class_filter(f);
 ```
 
+add_rule() 说明:
+
+- 每个对等节点类的 ID 是一个整数（如 global_peer_class_id = 0）。
+- 通过 1 << peer_class_id 可以生成对应类的位掩码。
+  - 全局对等节点类的位掩码：1 << global_peer_class_id（即 1）。
+  - TCP 对等节点类的位掩码：1 << tcp_peer_class_id（即 2）。
+  - 本地对等节点类的位掩码：1 << local_peer_class_id（即 4）。
+
+使 uTP 套接字不受速率限制：
+
+```cpp
+peer_class_type_filter flt = ses.get_peer_class_type_filter();
+// filter out the global and local peer class for uTP sockets, if these
+// classes are set by the IP filter
+// disallow() 的作用是在特定的 socket 类型上禁用一个特定的 peer 类型
+flt.disallow(peer_class_type_filter::utp_socket, session::global_peer_class_id);
+flt.disallow(peer_class_type_filter::utp_socket, session::local_peer_class_id);
+
+// this filter should not add the global or local peer class to utp sockets
+flt.remove(peer_class_type_filter::utp_socket, session::global_peer_class_id);
+flt.remove(peer_class_type_filter::utp_socket, session::local_peer_class_id);
+
+ses.set_peer_class_type_filter(flt);
+```
+
+使内部网络上的所有对等节点不受限速限制：
+
+```cpp
+std::uint32_t const mask = 1 << lt::session::global_peer_class_id;
+ip_filter f;
+
+// for every IPv4 address, assign the global peer class
+f.add_rule(make_address("0.0.0.0"), make_address("255.255.255.255"), mask);
+
+// for every address on the local metwork, set the mask to 0
+// 0 代表不应用任何对等节点类型
+f.add_rule(make_address("10.0.0.0"), make_address("10.255.255.255"), 0);
+ses.set_peer_class_filter(f);
+```
+
+## SSL torrents (SSL 种子)
+
+种子文件中可能嵌入了 **SSL 根证书（CA 证书）**。这类种子被称为 **SSL torrents(SSL 种子)**。
+SSL 种子通过 SSL 与所有 BitTorrent 对等节点通信。协议的分层结构如下：
+
+![UTP 协议栈](../res/utp_stack.png)
+
+在 SSL 握手过程中，双方对等节点需要通过提供由 `.torrent` 文件中的 CA 证书签名的证书来进行身份验证。
+这些对等节点证书通常需要通过 BitTorrent 之外的其他方式提供。通常，对等节点会生成一个证书请求，发送给种子的发布者，发布者返回一个签名的证书。
+
+在 libtorrent 中，[torrent_handle](https://www.libtorrent.org/reference-Torrent_Handle.html#torrent_handle) 
+中的 [set_ssl_certificate()](https://www.libtorrent.org/reference-Torrent_Handle.html#set_ssl_certificate()) 用于告诉 libtorrent 在哪里找到对等节点证书及其私钥。
+当加载 SSL 种子时，会发布 [torrent_need_cert_alert](https://www.libtorrent.org/reference-Alerts.html#torrent_need_cert_alert) 提醒用户提供证书。
+
+连接到 SSL 种子的对等节点必须提供 SNI TLS 扩展（服务器名称指示）。服务器名称是目标种子信息哈希的十六进制编码。这是为了让接受连接的客户端知道应该提供哪个证书。
+
+> *译注: 举个例子*
+> 1. 准备工作
+>   - SSL 种子：种子文件中嵌入了 SSL 根证书（CA 证书）。
+>   - 对等节点证书：每个对等节点需要有自己的证书和私钥，这些证书必须由种子中的 CA 证书签名。
+>     - Peer A 和 Peer B 分别生成证书请求（CSR，用各自的私钥生成的空白证书），并发送给种子发布者。
+>     - 种子发布者用 CA 根证书，给 CSR 签名生成 CRT，为 Peer A 和 Peer B 签发证书。
+> 2. 发起连接：Peer A 提供 SNI 扩展，指定目标种子的 info-hash ，发起 SSL 连接（可以是 * 号证书，也可以是该种子的节点证书）。
+> 3. 接受连接：Peer B 根据 SNI 扩展选择合适的证书（可以是 * 号证书，也可以是该种子的节点证书），完成 SSL 握手。
+> 4. 建立连接：Peer A 和 Peer B 验证证书后，建立加密的 SSL 连接。
+> 5. 数据传输：Peer A 和 Peer B 通过 SSL 加密通道传输数据。
+> 6. 断开连接：数据传输完成后，关闭连接。
+
+SSL 连接是在单独的套接字上进行接收，与普通的 BitTorrent 连接分开。
+要启用对 SSL 种子的支持，请在 `settings_pack::listen_interfaces` 设置中添加一个带有 `s` 后缀的监听接口。例如：
+
+```
+0.0.0.0:6881,0.0.0.0:6882s
+```
+
+这将在端口 `6881` 上监听普通的 BitTorrent 连接，并在端口 `6882` 上监听 SSL 种子连接。
+
+此功能仅在 libtorrent 启用了 `TORRENT_SSL_PEERS`（SSL 种子支持）时可用，并且需要至少 OpenSSL 1.0 版本，因为它需要 SNI（服务器名称指示）支持。
+
+对等节点证书必须至少包含一个类型为 `DNSName` 的 `SubjectAltName` 字段。至少有一个字段必须与种子的名称完全匹配。
+这是逐字节的比较，UTF-8 编码必须完全相同（即不进行 Unicode 规范化）。
+这是根据 [RFC 2818](https://www.ietf.org/rfc/rfc2818.txt) 推荐的 HTTPS 服务器证书验证方式。
+需要注意的是，对于种子，仅考虑 `DNSName` 字段（不考虑 IP 地址字段）。如果没有匹配的 `SubjectAltName`，则还会考虑最具体（即最后一个）的 `Common Name` 字段。
+
+如果这些字段中的任何一个包含单个星号（`"*"`），则该证书被视为适用于任何种子，允许其重复用于任何种子。
+
+将种子名称与对等节点证书中的字段匹配的目的是：允许发布者为所有分发的种子使用一个根证书，并为每个种子颁发单独的对等节点证书。
+接收证书的对等节点不一定能够访问由该根证书发布的所有种子（除非它拥有“星号证书”）。
+
+> ### 示例流程
+> 
+> #### 发布者创建 CA 根证书
+> 
+> 1. **生成 CA 根证书**：
+>    - 发布者生成 CA 根证书，并将其嵌入 `.torrent` 文件。
+>    - 示例命令：
+>      ```bash
+>      openssl req -x509 -newkey rsa:2048 -keyout ca.key -out ca.crt -days 365
+>      ```
+> 
+> #### 用户加载 .torrent 文件
+> 
+> 2. **加载 .torrent 文件**：
+>    - 用户加载 `.torrent` 文件，获取 CA 根证书。
+> 
+> #### 用户获取节点证书
+> 
+> 3. **生成 CSR**：
+>    - 用户生成证书签名请求（CSR）：
+>      ```bash
+>      openssl req -new -newkey rsa:2048 -nodes -keyout client.key -out client.csr
+>      ```
+> 
+> 4. **发送 CSR 给发布者**：
+>    - 用户将 `client.csr` 发送给发布者（例如通过 HTTP 或电子邮件）。
+> 
+> 5. **发布者签名 CSR**：
+>    - 发布者使用 CA 根证书签名 CSR，生成节点证书：
+>      ```bash
+>      openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out client.crt -days 365
+>      ```
+> 
+> 6. **分发节点证书**：
+>    - 发布者将签名的节点证书（`client.crt`）分发给用户。
+> 
+> #### 用户设置节点证书
+> 
+> 7. **设置节点证书**：
+>    - 用户使用 `torrent_handle.set_ssl_certificate()` 设置节点证书和私钥：
+>      ```cpp
+>      torrent_handle.set_ssl_certificate("client.crt", "client.key");
+>      ```
+> 
+> #### 连接和验证
+> 
+> 8. **连接到其他对等节点**：
+>    - 用户连接到其他对等节点，双方使用 CA 根证书验证对方的节点证书。
+> 
+> 9. **验证通过**：
+>    - 如果验证通过，建立 SSL 连接。
+
+### test （测试 SSL 证书）
+
+要测试 SSL 种子的传入 SSL 连接，可以使用以下 `openssl` 命令：
+
+```bash
+openssl s_client -cert <peer-certificate>.pem -key <peer-private-key>.pem -CAfile \
+   <torrent-cert>.pem -debug -connect 127.0.0.1:4433 -tls1 -servername <info-hash>
+```
+
+在创建根证书时，BitTorrent 对等节点不会考虑 `Distinguished Name` (DN)。
+你仍然需要指定一些内容，但从 libtorrent 的角度来看，具体内容并不重要。libtorrent 只会确保对等节点证书由正确的根证书签名。
+
+一种创建证书的方法是使用 `openssl` 自带的 `CA.sh` 脚本，如下所示（不要忘记为证书输入一个 Common Name）：
+
+```
+CA.sh -newca
+CA.sh -newreq
+CA.sh -sign
+```
+
+种子证书位于 `./demoCA/private/demoCA/cacert.pem`，这是要包含在 `.torrent` 文件中的 `.pem` 文件(CA 根证书)。
+
+对等节点证书 位于 `./newcert.pem`，证书的私钥位于 `./newkey.pem`。
+
+## session statistics（session 统计）
+
+libtorrent 提供了一种机制，用于从其内部查询性能和统计计数器。
+
+统计信息由两种基本类型组成：**计数器（counters）** 和 **测量器（gauges）**。
+
+- **计数器** 是一个单调递增的值，每次发生某个事件时都会增加。例如，每次网络线程因为套接字变为可读而唤醒时，计数器会增加。另一个例子是，每次套接字接收到 n 个字节时，计数器会增加 n。
+
+  计数器是最灵活的指标类型。它允许程序以任意间隔采样计数器，并计算计数器的平均增量率。
+  某些事件可能很少发生，需要较长的采样周期才能获得有用的速率，而其他事件可能更频繁且均匀分布，频繁采样可以获得有用的值。
+  计数器还提供了准确的总计数。例如，将下载速率的样本转换为总传输计数是不准确的，并且需要更多样本。而将递增的计数器转换为速率则简单且灵活。
+
+- **测量器** 测量某种瞬时状态。这用于那些不计数事件或流量的指标，而是用于可以波动的状态。例如，当前正在下载的种子数量。
+
+了解一个值是 [counters](https://www.libtorrent.org/reference-Stats.html#counters) 还是 `gauges` 对于正确解释它非常重要。为了查询 libtorrent 中可用的 `counters` 和 `gauges`，
+可以调用 [session_stats_metrics()](https://www.libtorrent.org/reference-Stats.html#session_stats_metrics())。
+这将返回 libtorrent 中可检查的值的元数据。它包括一个值是 `counters` 还是 `gauges`。`key information` 是用于提取特定 `counters` 或实际 `gauges` 的索引。
+
+为了获取样本，可以在 `session` 对象中调用 [post_session_stats()](https://www.libtorrent.org/reference-Session.html#post_session_stats())。
+这将导致发布一个 [session_stats_alert](https://www.libtorrent.org/reference-Alerts.html#session_stats_alert)。
+在此 [alert](https://www.libtorrent.org/reference-Alerts.html#alert) 对象中，有一个值数组，这些值构成了样本。统计指标中的值索引，指示了该指标的值存储在数组中的哪个位置。
+
+指标与值之间的映射在 libtorrent 的不同版本之间是不稳定的。
+在解释 [session_stats_alert](https://www.libtorrent.org/reference-Alerts.html#session_stats_alert) 中的值数组之前，始终先查询指标，以找出值存储的索引。
+不过，映射在进程运行期间不会改变，它与特定的 libtorrent 版本绑定。
+你只需在启动时（或每次动态加载 `libtorrent.so` 时）查询一次映射即可。
+
+可用的统计指标包括：
