@@ -1233,3 +1233,11 @@ libtorrent 提供了一种机制，用于从其内部查询性能和统计计数
 你只需在启动时（或每次动态加载 `libtorrent.so` 时）查询一次映射即可。
 
 可用的统计指标包括：
+
+| name                    | type    |
+|-------------------------|---------|
+| peer.error_peers        | counter |
+| peer.disconnected_peers | counter |
+
+`error_peers` 是由于错误导致的对等节点断开连接的总数（不是由本客户端发起的断开），以及由本客户端发起的断开连接（`disconnected_peers`）。
+
