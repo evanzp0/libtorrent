@@ -158,6 +158,13 @@ namespace {
 
 	// path is supposed to include the name of the torrent itself.
 	// or an absolute path, to move a file outside of the download directory
+	//
+	// 更新 file_entry 的 path_index 字段，它有 3 种取值：
+	// 1. file_entry::path_is_absolute，表明 path 是一个绝对路径，
+	// 2. file_entry::no_path，表明单个文件, path 就是文件名
+	// 3. 其他值，表明该值是一个索引，指向 m_paths 中的一个路径。
+	// 
+	// @param set_name 是否 path 字段包含了文件名
 	void file_storage::update_path_index(aux::file_entry& e
 		, std::string const& path, bool const set_name)
 	{
@@ -179,6 +186,7 @@ namespace {
 
 		if (branch_path.empty())
 		{
+			// 如果 path 包含文件名，则 leaf 就是该文件名
 			if (set_name) e.set_name(leaf);
 			e.path_index = aux::file_entry::no_path;
 			return;
@@ -186,6 +194,8 @@ namespace {
 
 		// if the path *does* contain the name of the torrent (as we expect)
 		// strip it before adding it to m_paths
+		//
+		// 规范化 branch_path
 		if (lsplit_path(branch_path).first == m_name)
 		{
 			branch_path = lsplit_path(branch_path).second;
@@ -207,6 +217,9 @@ namespace {
 		if (set_name) e.set_name(leaf);
 	}
 
+	/** 
+	 * 在 m_paths 中查找或添加 path，返回 path 在 m_paths 中的索引
+	*/
 	aux::path_index_t file_storage::get_or_add_path(string_view const path)
 	{
 		// do we already have this path in the path list?
@@ -645,6 +658,9 @@ namespace aux {
 			, symlink_path, root_hash);
 	}
 
+	/** 
+	 * 将文件加入到 m_files 中
+	*/
 	void file_storage::add_file_borrow(error_code& ec, string_view filename
 		, std::string const& path, std::int64_t const file_size
 		, file_flags_t const file_flags, char const* filehash
@@ -697,6 +713,8 @@ namespace aux {
 
 		// files without a root_hash are assumed to be v1, except symlinks. They
 		// don't have a root hash and can be either v1 or v2
+		//
+		// 这个 if 如果 true ，说明当前是一个真实的文件
 		if (symlink_path.empty() && file_size > 0)
 		{
 			bool const v2 = (root_hash != nullptr);
@@ -704,6 +722,8 @@ namespace aux {
 			// symlinks. i.e. this is the first "real" file we're adding.
 			// or if m_total_size == 0, all files we've added so far have been
 			// empty (which also are are v1/v2-ambigous)
+			//
+			// 这里的判断作用是：如果是第一次处理真实文件，那么 root_hash 如果存在，则 m_v2 就是 true（当前种子是 v2）
 			if (m_files.size() == m_symlinks.size() || m_total_size == 0)
 			{
 				m_v2 = v2;
@@ -718,6 +738,8 @@ namespace aux {
 			}
 		}
 
+		// 下面两行是在 m_files 这个 list 末尾添加一个空 item，
+		// 然后通过 m_files.back() 返回这个 item 的引用，这样之后可以填充这个 item 。
 		m_files.emplace_back();
 		aux::file_entry& e = m_files.back();
 
@@ -726,6 +748,8 @@ namespace aux {
 		// if filename is empty, we should copy it. If it isn't, we're borrowing
 		// it and we can save the copy by setting it after this call to
 		// update_path_index().
+		//
+		// 更新 e.path_index 字段
 		update_path_index(e, path, filename.empty());
 
 		// filename is allowed to be empty, in which case we just use path
@@ -767,6 +791,11 @@ namespace aux {
 		// ensure it ends on a piece boundary.
 		// we do this at the end of files rather in-front of files to conform to
 		// the BEP52 reference implementation
+		// 根据 BEP52 中升级参考的描述，混合种子的文件如果没有对齐块边界，就会在末尾添加 .pad 文件。
+		//
+		// 估计是因为支持 v1 和 v2 的应用，对用同一个混合种子，要建两个不同的下载 群，
+		// 当一个 piece 从 v1 群里去请求了，就不用从 v2 群里去请求了，
+		// 如果 v1 中的文件没对齐，可能会产生一个 piece 跨两个文件的情况，那么这个 piece 是无法在 v2 群中进行请求的。 
 		if (m_v2 && (m_total_size % piece_length()) != 0)
 		{
 			auto const pad_size = piece_length() - (m_total_size % piece_length());

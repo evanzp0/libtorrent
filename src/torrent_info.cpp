@@ -353,6 +353,9 @@ namespace {
 		return ret + len;
 	}
 
+	/**
+	 * 提取叶子节点文件信息
+	 */
 	bool extract_single_file2(bdecode_node const& dict, file_storage& files
 		, std::string const& path, string_view const name
 		, std::ptrdiff_t const info_offset, char const* info_buffer
@@ -360,6 +363,7 @@ namespace {
 	{
 		if (dict.type() != bdecode_node::dict_t) return false;
 
+		// 根据 BEP47 规范，获取文件的 "attr" 字段
 		file_flags_t file_flags = get_file_attributes(dict);
 
 		if (file_flags & file_storage::flag_pad_file)
@@ -384,6 +388,7 @@ namespace {
 			return false;
 		}
 
+		// "mtime" 这个字段是 libtorrent 自定义的，表示文件的修改时间
 		std::time_t const mtime = std::time_t(dict.dict_find_int_value("mtime", 0));
 
 		char const* pieces_root = nullptr;
@@ -404,6 +409,7 @@ namespace {
 			}
 		}
 
+		// 如果是真实文件，则获取 "pieces root" 字段
 		if (symlink_path.empty() && file_size > 0)
 		{
 			bdecode_node const root = dict.dict_find_string("pieces root");
