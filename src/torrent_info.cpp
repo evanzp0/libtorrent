@@ -355,6 +355,9 @@ namespace {
 
 	/**
 	 * 提取叶子节点文件信息
+	 * 
+	 * @param path 文件路径，包含了目录和文件名的完整路径
+	 * @param name 当前文件名
 	 */
 	bool extract_single_file2(bdecode_node const& dict, file_storage& files
 		, std::string const& path, string_view const name
@@ -392,7 +395,8 @@ namespace {
 		std::time_t const mtime = std::time_t(dict.dict_find_int_value("mtime", 0));
 
 		char const* pieces_root = nullptr;
-
+		
+		// 获取 "symlink path" 字段
 		std::string symlink_path;
 		if (file_flags & file_storage::flag_symlink)
 		{
@@ -613,26 +617,38 @@ namespace {
 				return false;
 			}
 
+			// (e.first.string_offset() - info_offset), 是在 torrent 整个 buffer 中的 e.first 的 offset 位置 - info 的 offset 算出距离，
+			// 然后 info_buffer + 距离，计算出在 info_buffer 中该文件名的位置。
+			// filename 如果非叶子节点，则为当前目录名（不包含 parent path）；如果是叶子节点则为当前文件名。
 			string_view filename = { info_buffer + (e.first.string_offset() - info_offset)
 				, static_cast<size_t>(e.first.string_length()) };
+			// 移除 filename 中所有的 "\" 前缀
 			while (!filename.empty() && filename.front() == TORRENT_SEPARATOR)
 				filename.remove_prefix(1);
 
+			// 根据 e.second 是否是 ""：{...} 模式，判断出当前 tree node 是否为叶子节点。 
 			bool const leaf_node = e.second.dict_size() == 1 && e.second.dict_at(0).first.empty();
 			bool const single_file = leaf_node && !has_files && tree.dict_size() == 1;
 
+			// 如果是单文件，path 就是该文件名；如果是多文件 path 就是 root_dir (根目录名)
 			std::string path = single_file ? std::string() : root_dir;
+			// 将当前目录（或文件）名，添加到 path 上, 所以 path 是包含当前目录或文件名的
 			aux::sanitize_append_path_element(path, filename);
 
 			if (leaf_node)
 			{
+				// 叶子节点，意味着 filename 就是文件名；path 此时包含了完整目录和文件名
+
+				// 确保 filename 是 path 的一部分，否则，清空 filename
 				if (filename.size() > path.length()
 					|| path.substr(path.size() - filename.size()) != filename)
 				{
 					// if the filename was sanitized and differ, clear it to just use path
 					filename = {};
 				}
-
+				
+				// 这里 path （是完整目录，包含文件名） 作为 root_dir 传给了 extract_single_file2 函数；
+				// filename 就是文件名，不含目录。
 				if (!extract_single_file2(e.second.dict_at(0).second, target
 					, path, filename, info_offset, info_buffer, ec))
 				{
@@ -641,6 +657,7 @@ namespace {
 				continue;
 			}
 
+			// 这里 path （包含当前文件名或目录名） 作为 root_dir 传给了 extract_files2 函数；
 			if (!extract_files2(e.second, target, path, info_offset, info_buffer
 				, true, depth + 1, ec))
 			{
@@ -754,12 +771,16 @@ TORRENT_VERSION_NAMESPACE_3
 
 		// insert all directories first, to make sure no files
 		// are allowed to collied with them
+		// 将所有 path 的哈希值插入到 files 集合中
 		m_files.all_path_hashes(files);
 		for (auto const i : m_files.file_range())
 		{
 			// as long as this file already exists
 			// increase the counter
+			// 计算当前文件的哈希值
 			std::uint32_t const h = m_files.file_path_hash(i, empty_str);
+			// 尝试将 h 插入到 files 集合中。如果 h 已经存在于集合中（即文件名重复），
+			// insert 方法会返回 false，表示插入失败。
 			if (!files.insert(h).second)
 			{
 				// This filename appears to already exist!
@@ -1197,6 +1218,7 @@ namespace {
 		}
 
 		std::string name;
+		// 对 name （也就是 path）中的 "/", "." 等进行规范化处理
 		aux::sanitize_append_path_element(name, name_ent.string_value());
 		if (name.empty())
 		{
@@ -1218,6 +1240,10 @@ namespace {
 		bdecode_node file_tree_node = info.dict_find_dict("file tree");
 		if (version >= 2 && file_tree_node)
 		{
+			// v2 获取 "file tree" 字段信息 
+
+			// name 是 torrent 的 name，这里用作 root_dir
+			// 注意：extract_files2() 调用后 terrent_info.files 被建立，其中每一个 file_entry.name 是一个文件名(不含目录)
 			if (!extract_files2(file_tree_node, files, name, info_offset
 				, m_info_section.get(), bool(files_node), 0, ec))
 			{

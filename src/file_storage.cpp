@@ -355,6 +355,12 @@ namespace aux {
 	// point to it.
 	// if borrow_string is false, n will be copied and owned by the
 	// file_entry.
+	/**
+	 *  给 file_entry 的 name 属性赋值
+	 * 
+	 * @param n – 当前文件名或目录名（不含上级目录）
+	 * @param borrow_string – 是否借用 n 的内存。如果为 true, 则 n 不会被拷贝；如果为 false, n 会被拷贝。
+	 */
 	void file_entry::set_name(string_view n, bool const borrow_string)
 	{
 		// free the current string, before assigning the new one
@@ -660,6 +666,9 @@ namespace aux {
 
 	/** 
 	 * 将文件加入到 m_files 中
+	 * 
+	 * @param filename 当前文件名，不含目录名
+	 * @param path 文件路径，包含了目录和文件名的完整路径
 	*/
 	void file_storage::add_file_borrow(error_code& ec, string_view filename
 		, std::string const& path, std::int64_t const file_size
@@ -753,6 +762,7 @@ namespace aux {
 		update_path_index(e, path, filename.empty());
 
 		// filename is allowed to be empty, in which case we just use path
+		// filename 不为空，则将 filename (文件名，不含目录名)赋值为 file_entry.name。
 		if (!filename.empty())
 			e.set_name(filename, true);
 
@@ -946,6 +956,9 @@ namespace {
 			process_path_lowercase(table, crc, p);
 	}
 
+	/**
+	 * 根据文件的路径信息生成一个 CRC32 校验值，用于唯一标识文件的路径
+	 */
 	std::uint32_t file_storage::file_path_hash(file_index_t const index
 		, std::string const& save_path) const
 	{
@@ -964,6 +977,7 @@ namespace {
 			{
 				process_string_lowercase(crc, save_path);
 				TORRENT_ASSERT(save_path[save_path.size() - 1] != TORRENT_SEPARATOR);
+				// 不含文件的 path，末尾加 "/"
 				crc.process_byte(TORRENT_SEPARATOR);
 			}
 			process_string_lowercase(crc, fe.filename());
@@ -1053,6 +1067,9 @@ namespace {
 		return ret;
 	}
 
+	/**
+	 * 根据 index ，从 m_files 中取出对应的 torrent 内部文件路径（含文件名，不含 root_dir）
+	 */
 	std::string file_storage::internal_file_path(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t(0) && index < end_file());
@@ -1361,33 +1378,52 @@ namespace {
 		m_total_size = off;
 	}
 
+	/**
+	 * 清理和验证符号链接（symlink）
+	 * 
+	 * 注意：符号链接本身有个 file_path，它的值指向的是 torrent 中存在的另一个文件的 file_path。
+	 * 
+	 * 作用：
+	 * - 确保符号链接的目标路径是合法的
+	 * - 不会指向 torrent 文件之外的位置
+	 * - 不会导致无限循环或其他问题
+	 * 
+	 * 如果符号链接的目标路径不合法，则将其修改为指向自身
+	 */
 	void file_storage::sanitize_symlinks()
 	{
 		// symlinks are unusual, this function is optimized assuming there are no
 		// symbolic links in the torrent. If we find one symbolic link, we'll
 		// build the hash table of files it's allowed to refer to, but don't pay
 		// that price up-front.
+		// 用于存储 torrent 文件中所有文件的路径和索引，只有在发现符号链接时才会初始化。
 		std::unordered_map<std::string, file_index_t> file_map;
 		bool file_map_initialized = false;
 
 		// lazily instantiated set of all valid directories a symlink may point to
 		// TODO: in C++17 this could be string_view
+		// 用于存储 torrent 文件中所有目录的路径，只有在需要时才会初始化。
 		std::unordered_set<std::string> dir_map;
 		bool dir_map_initialized = false;
 
 		// symbolic links that points to directories
+		// 用于存储符号链接的目标路径（如果目标是目录）。
 		std::unordered_map<std::string, std::string> dir_links;
 
 		// we validate symlinks in (potentially) 2 passes over the files.
 		// remaining symlinks to validate after the first pass
+		// 用于存储需要进一步验证的符号链接。
 		std::vector<file_index_t> symlinks_to_validate;
 
+		// 迭代处理在 file_storage 中的所有文件
 		for (auto const i : file_range())
 		{
+			// 过滤掉非符号链接文件
 			if (!(file_flags(i) & file_storage::flag_symlink)) continue;
 
 			if (!file_map_initialized)
 			{
+				// 发现符号链接，初始化 file_map，将所有文件的路径和索引，添加到 file_map 中
 				for (auto const j : file_range())
 					file_map.insert({internal_file_path(j), j});
 				file_map_initialized = true;
@@ -1396,28 +1432,39 @@ namespace {
 			aux::file_entry const& fe = m_files[i];
 			TORRENT_ASSERT(fe.symlink_index < int(m_symlinks.size()));
 
+			// 检查符号链接的目标路径是否合法----------------------
+
 			// symlink targets are only allowed to point to files or directories in
 			// this torrent.
+			// 符号链接的目标仅允许指向此种子文件中的文件或目录。
 			{
+				// target：符号链接的目标路径
 				std::string target = m_symlinks[fe.symlink_index];
 
+				// 如果目标是绝对路径，则在 m_symlinks 中将其修改为指向自身
 				if (is_complete(target))
 				{
 					// a symlink target is not allowed to be an absolute path, ever
 					// this symlink is invalid, make it point to itself
+					// 符号链接的目标不允许是绝对路径，即使这个符号链接是无效的，也应该让它指向自己。
 					m_symlinks[fe.symlink_index] = internal_file_path(i);
 					continue;
 				}
 
+				// 如果 target 指向 torrent 文件中的某个文件，则在 m_symlinks 中保留该 target 路径
+				// iter 是连接文件指向的内部文件路径
 				auto const iter = file_map.find(target);
 				if (iter != file_map.end())
 				{
 					m_symlinks[fe.symlink_index] = target;
 					if (file_flags(iter->second) & file_storage::flag_symlink)
 					{
+						// 如果被链接文件指向的torrent 内部文件还是一个链接文件，就先存放在 dir_links 中。
+
 						// we don't know whether this symlink is a file or a
 						// directory, so make the conservative assumption that it's a
 						// directory
+						// 我们不知道这个符号链接是指向文件还是目录，所以做出保守假设，认为它是指向目录的
 						dir_links[internal_file_path(i)] = target;
 					}
 					continue;
@@ -1425,18 +1472,25 @@ namespace {
 
 				// it may point to a directory that doesn't have any files (but only
 				// other directories), in which case it won't show up in m_paths
+				// 它可能指向一个没有任何文件（但只包含其他目录）的目录，在这种情况下，它不会出现在 m_paths 中。
 				if (!dir_map_initialized)
 				{
+					// 初始化 dir_map，即存储所有有效目录路径的集合。
+					// dir_map 的作用是帮助验证符号链接的目标路径是否指向 torrent 文件中的有效目录。
+
 					for (auto const& p : m_paths)
 						for (string_view pv = p; !pv.empty(); pv = rsplit_path(pv).first)
 							dir_map.insert(pv.to_string());
 					dir_map_initialized = true;
 				}
 
+				// 如果链接文件的目标指向 torrent 文件中的某个目录，则在 m_symlinks 和 dir_links 中保留该目标路径。
 				if (dir_map.count(target))
 				{
 					// it points to a sub directory within the torrent, that's OK
 					m_symlinks[fe.symlink_index] = target;
+					// internal_file_path(i) 就是链接文件的内部路径，target 是链接文件指向的目标路径。
+					// 在 dir_links 中映射 key = 链接文件, 指向的 val=目录路径。
 					dir_links[internal_file_path(i)] = target;
 					continue;
 				}
@@ -1445,10 +1499,14 @@ namespace {
 
 			// for backwards compatibility, allow paths relative to the link as
 			// well
+			// 如果符号链接的目标路径是相对路径，则将其解析为绝对路径并验证
 			if (fe.path_index < aux::file_entry::path_is_absolute)
 			{
 				std::string target = m_paths[fe.path_index];
-				append_path(target, m_symlinks[fe.symlink_index]);
+				append_path(target, m_symlinks[fe.symlink_index]); // 为何这两者可以进行拼接?
+
+				// 验证目标路径是否合法 ----------
+
 				// if it points to a directory, that's OK
 				auto const it = std::find(m_paths.begin(), m_paths.end(), target);
 				if (it != m_paths.end())
@@ -1485,12 +1543,19 @@ namespace {
 			// directory, so make the conservative assumption that it's a
 			// directory
 			dir_links[internal_file_path(i)] = m_symlinks[fe.symlink_index];
+			// 留后观察
 			symlinks_to_validate.push_back(i);
 		}
+
+
+		// 处理复杂符号链接 ---------
 
 		// in case there were some "complex" symlinks, we nee a second pass to
 		// validate those. For example, symlinks whose target rely on other
 		// symlinks
+		// 
+		// 以防存在一些“复杂”的符号链接，我们需要再次遍历以验证它们。例如，那些目标依赖于其他符号链接的符号链接。
+		// 通过多次遍历和验证，确保符号链接的目标路径指向一个有效的文件或目录，并避免无限循环。
 		for (auto const i : symlinks_to_validate)
 		{
 			aux::file_entry const& fe = m_files[i];
@@ -1500,44 +1565,60 @@ namespace {
 
 			// to avoid getting stuck in an infinite loop, we only allow traversing
 			// a symlink once
+			// traversed 用来记录已经遍历过的路径（为了避免陷入无限循环，我们只允许遍历一次符号链接。）
 			std::set<std::string> traversed;
 
 			// this is where we check every path element for existence. If it's not
 			// among the concrete paths, it may be a symlink, which is also OK
 			// note that we won't iterate through this for the last step, where the
 			// filename is included. The filename is validated after the loop
+			//
+			// 在这里，我们检查每个路径元素是否存在。如果它不在具体路径之中，那么它可能是一个符号链接，这也没问题。
+			// 注意，我们在最后一步（包含文件名的那一步）不会对此进行迭代。文件名的验证是在循环之后进行的。
+			//
+			// 通过 lsplit_path 函数逐步解析目标路径 target 的每一部分（即路径的每个分支）
 			for (string_view branch = lsplit_path(target).first;
 				branch.size() < target.size();
 				branch = lsplit_path(target, branch.size() + 1).first)
 			{
 				auto branch_temp = branch.to_string();
 				// this is a concrete directory
+				// 对于每个路径分支，检查它是否是一个具体的目录（即是否存在于 dir_map 中）。如果是，则继续检查下一个分支。
 				if (dir_map.count(branch_temp)) continue;
 
+				 // 如果当前路径分支不是一个具体目录，检查它是否是一个符号链接
 				auto const iter = dir_links.find(branch_temp);
-				if (iter == dir_links.end()) goto failed;
-				if (traversed.count(branch_temp)) goto failed;
+				if (iter == dir_links.end()) goto failed; 		// 如果不是符号链接，跳转到 failed 标签
+				if (traversed.count(branch_temp)) goto failed;	// 如果路径已经遍历过，跳转到 failed 标签
+				
+				// 将当前路径分支标记为已遍历
 				traversed.insert(std::move(branch_temp));
 
 				// this path element is a symlink. substitute the branch so far by
 				// the link target
+				// 如果当前路径分支是一个符号链接，将其目标路径替换到当前路径中
 				target = combine_path(iter->second, target.substr(branch.size() + 1));
 
 				// start over with the new (concrete) path
+				// 重置路径分支，重新开始解析新的路径
 				branch = {};
 			}
 
 			// the final (resolved) target must be a valid file
 			// or directory
+			// 验证最终的目标路径是否是一个有效的文件或目录
 			if (file_map.count(target) == 0
 				&& dir_map.count(target) == 0) goto failed;
 
 			// this is OK
+			// 如果符号链接有效，继续验证下一个符号链接
 			continue;
 
+// 处理无效符号链接
 failed:
 
 			// this symlink is invalid, make it point to itself
+			// 如果符号链接无效，将其目标路径设置为指向自身，以避免进一步的问题
 			m_symlinks[fe.symlink_index] = internal_file_path(i);
 		}
 	}

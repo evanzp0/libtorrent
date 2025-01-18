@@ -932,6 +932,9 @@ namespace {
 		return combine_path(current_working_directory(), f);
 	}
 
+	/**
+	 * 判断 f 是否为绝对路径
+	 */
 	bool is_complete(string_view f)
 	{
 		if (f.empty()) return false;

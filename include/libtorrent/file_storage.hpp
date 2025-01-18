@@ -172,6 +172,7 @@ namespace aux {
 	private:
 		// This string is not necessarily 0-terminated!
 		// that's why it's private, to keep people away from it
+		// 如果不为空，则为文件名
 		char const* name = nullptr;
 	public:
 		// the SHA-256 root of the merkle tree for this file
@@ -701,6 +702,11 @@ namespace aux {
 		// name for multi-file torrents. The m_name field need to be
 		// prepended to these paths, and the filename of a specific file
 		// entry appended, to form full file paths
+		//
+		// torrent 中所有文件使用的去重后的路径列表。
+		// aux::file_entry::path_index 指向此数组。
+		// 对于包含多个文件的种子文件，路径中不包括根目录名称。
+		// 需要在这些路径前加上 m_name 字段，并附上特定 file_entry 的 filename，以形成完整的文件路径。
 		aux::vector<std::string, aux::path_index_t> m_paths;
 
 		// name of torrent. For multi-file torrents
