@@ -916,7 +916,7 @@ namespace {
 		else if (p.front() == '/') p.remove_prefix(1);
 #endif
 #if defined(TORRENT_WINDOWS) || defined(TORRENT_OS2)
-		// 在 Windows 或 OS/2 系统上，路径分隔符可以是 '/' 或 '\'
+		// 在 Windows 或 OS/2 系统上，找到路径分隔符('/' 或 '\') 的位置
 		auto const sep = p.find_first_of("/\\");
 #else
 		auto const sep = p.find_first_of(TORRENT_SEPARATOR_CHAR);
@@ -926,24 +926,42 @@ namespace {
 	}
 	
 	/**
-	 * 在 p 的 pos 位置，分割 p 字符串。
+	 * 将路径字符串从指定位置开始分割为两部分，第一部分是第一个路径分支（目录或文件名），第二部分是剩余的路径
+	 * 
+	 * @param - p: 输入的路径字符串
+	 * @param - pos: 从指定位置开始查找路径分隔符
+	 * @return std::pair<string_view, string_view>: 第一个元素是路径的第一个分支，第二个元素是剩余的路径
+	 *
 	 */
 	std::pair<string_view, string_view> lsplit_path(string_view p, std::size_t pos)
 	{
+		// 如果路径为空，直接返回两个空字符串
 		if (p.empty()) return {{}, {}};
+
 		// for absolute paths, skip the initial "/"
+		// 如果路径是绝对路径（以 '/' 或 Windows 下的 '/' 开头），跳过开头的 '/'
 		if (p.front() == TORRENT_SEPARATOR_CHAR
 #if defined(TORRENT_WINDOWS) || defined(TORRENT_OS2)
 			|| p.front() == '/'
 #endif
 		)
-		{ p.remove_prefix(1); if (pos > 0) --pos; }
+		{ 
+			p.remove_prefix(1); // 跳过开头的 '/'
+			if (pos > 0) --pos; // 如果 pos > 0，需要调整 pos 的值，因为跳过了开头的 '/'
+		}
 #if defined(TORRENT_WINDOWS) || defined(TORRENT_OS2)
+		// 在 Windows 或 OS/2 系统上，找到路径分隔符('/' 或 '\') 的位置
 		auto const sep = find_first_of(p, "/\\", std::string::size_type(pos));
 #else
+		// 在其他系统上，路径分隔符是 TORRENT_SEPARATOR_CHAR（通常是 '/'）
 		auto const sep = find_first_of(p, TORRENT_SEPARATOR_CHAR, std::string::size_type(pos));
 #endif
+		// 如果没有找到路径分隔符，说明整个路径是一个单一的分支（目录或文件名）
 		if (sep == string_view::npos) return {p, {}};
+
+		// 返回分割后的两部分：
+		// 1. 第一个路径分支（从开头到分隔符之前的部分）
+		// 2. 剩余的路径（从分隔符之后的部分）
 		return { p.substr(0, sep), p.substr(sep + 1) };
 	}
 
