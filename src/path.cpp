@@ -909,7 +909,7 @@ namespace {
 		if (p.empty()) return {{}, {}};
 
 		// for absolute paths, skip the initial "/"
-		// 如果路径是绝对路径（以 '/' 开头），跳过开头的 '/'
+		// 如果路径是绝对路径（以 '/' 开头），跳过开头的 '/' 路径分隔符
 		if (p.front() == TORRENT_SEPARATOR_CHAR) p.remove_prefix(1);
 #if defined(TORRENT_WINDOWS) || defined(TORRENT_OS2)
 		// 在 Windows 或 OS/2 系统上，路径也可能以 '/' 开头，同样需要跳过
