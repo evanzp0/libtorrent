@@ -888,15 +888,35 @@ namespace {
 		return { p.substr(0, sep), p.substr(sep + 1) };
 	}
 
+	/**
+	 * 将路径字符串分割为两部分，第一部分是第一个路径分支（目录或文件名），第二部分是剩余的路径
+	 * 
+     * @param - p: 输入的路径字符串（string_view 类型）
+     * @return std::pair<string_view, string_view>: 第一个元素是路径的第一个分支，第二个元素是剩余的路径
+	 * 
+	 * @example
+	 * 
+	 * ```
+	 * p = "/home/user/file.txt";
+	 * rst = lsplit_path(p);
+	 * rst.first : "home"
+	 * rst.second : "user/file.txt
+	 * ```
+	 */
 	std::pair<string_view, string_view> lsplit_path(string_view p)
 	{
+		// 如果路径为空，直接返回两个空字符串
 		if (p.empty()) return {{}, {}};
+
 		// for absolute paths, skip the initial "/"
+		// 如果路径是绝对路径（以 '/' 开头），跳过开头的 '/'
 		if (p.front() == TORRENT_SEPARATOR_CHAR) p.remove_prefix(1);
 #if defined(TORRENT_WINDOWS) || defined(TORRENT_OS2)
+		// 在 Windows 或 OS/2 系统上，路径也可能以 '/' 开头，同样需要跳过
 		else if (p.front() == '/') p.remove_prefix(1);
 #endif
 #if defined(TORRENT_WINDOWS) || defined(TORRENT_OS2)
+		// 在 Windows 或 OS/2 系统上，路径分隔符可以是 '/' 或 '\'
 		auto const sep = p.find_first_of("/\\");
 #else
 		auto const sep = p.find_first_of(TORRENT_SEPARATOR_CHAR);
@@ -904,7 +924,10 @@ namespace {
 		if (sep == string_view::npos) return {p, {}};
 		return { p.substr(0, sep), p.substr(sep + 1) };
 	}
-
+	
+	/**
+	 * 在 p 的 pos 位置，分割 p 字符串。
+	 */
 	std::pair<string_view, string_view> lsplit_path(string_view p, std::size_t pos)
 	{
 		if (p.empty()) return {{}, {}};
@@ -924,6 +947,9 @@ namespace {
 		return { p.substr(0, sep), p.substr(sep + 1) };
 	}
 
+	/**
+	 * 将相对路径 f 转换为绝对路径。
+	 */
 	std::string complete(string_view f)
 	{
 		if (is_complete(f)) return f.to_string();

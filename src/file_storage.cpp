@@ -1545,7 +1545,7 @@ namespace {
 			dir_links[internal_file_path(i)] = m_symlinks[fe.symlink_index];
 			// 留后观察
 			symlinks_to_validate.push_back(i);
-		}
+		} // end for
 
 
 		// 处理复杂符号链接 ---------
