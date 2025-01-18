@@ -1478,9 +1478,24 @@ namespace {
 					// 初始化 dir_map，即存储所有有效目录路径的集合。
 					// dir_map 的作用是帮助验证符号链接的目标路径是否指向 torrent 文件中的有效目录。
 
-					for (auto const& p : m_paths)
-						for (string_view pv = p; !pv.empty(); pv = rsplit_path(pv).first)
-							dir_map.insert(pv.to_string());
+					for (auto const& p : m_paths)	 // 遍历 m_paths 中的每个路径
+						for (string_view pv = p; !pv.empty();  // 将当前路径 p 转换为 string_view pv，并开始循环
+								pv = rsplit_path(pv).first)	   // 每次循环将 pv 更新为其父目录
+							dir_map.insert(pv.to_string());	   // 将当前 pv 插入到 dir_map 中
+					/*
+					* example:
+					* m_paths = ["/home/user/subdir/", "/home/tmp/"]
+                    * 
+                    * 运行 for 后：
+					* dir_map = {
+                    *    "/home/tmp",
+                    *    "/",
+                    *    "/home",
+                    *    "/home/user",         //第 2 次 insert
+                    *    "/home/user/subdir",  //第 1 次 insert
+					*  }
+					*/
+							
 					dir_map_initialized = true;
 				}
 
@@ -1577,10 +1592,9 @@ namespace {
 			// 注意，我们在最后一步（包含文件名的那一步）不会对此进行迭代。文件名的验证是在循环之后进行的。
 			//
 			// 通过 lsplit_path 函数逐步解析目标路径 target 的每一部分（即路径的每个分支）
-			// lsplit_path(target).first 是获取第一部分的分支目录(不包含最开始的目录分隔符)
-			for (string_view branch = lsplit_path(target).first;
+			for (string_view branch = lsplit_path(target).first;  // 获取第一部分的分支目录(不包含最开始的目录分隔符)
 				branch.size() < target.size();
-				branch = lsplit_path(target, branch.size() + 1).first)
+				branch = lsplit_path(target, branch.size() + 1).first) // 从头取下一个分支目录
 			{
 				auto branch_temp = branch.to_string();
 				// this is a concrete directory
@@ -1592,18 +1606,42 @@ namespace {
 				if (iter == dir_links.end()) goto failed; 		// 如果不是符号链接，跳转到 failed 标签
 				if (traversed.count(branch_temp)) goto failed;	// 如果路径已经遍历过，跳转到 failed 标签
 				
+                // branch 是符号链接，且未遍历过 ------------
+
 				// 将当前路径分支标记为已遍历
 				traversed.insert(std::move(branch_temp));
 
 				// this path element is a symlink. substitute the branch so far by
 				// the link target
 				// 如果当前路径分支是一个符号链接，将其目标路径替换到当前路径中
+                //（也就是说，将 target 中当前分支中，指向目录的符号链接，用具体的目录替换掉）
 				target = combine_path(iter->second, target.substr(branch.size() + 1));
 
 				// start over with the new (concrete) path
 				// 重置路径分支，重新开始解析新的路径
 				branch = {};
 			}
+
+            /*
+                对上面的 for 循环的示例：
+
+                # 初始路径：target = "/home/user/file.txt"。
+                # 符号链接：dir_links = { {"home", "/var"} }（home 是一个符号链接，指向 /var）。
+
+                # 执行过程：
+                - 第一次循环：
+                    branch = "home"。
+                    branch 不是具体目录，是一个符号链接。
+                    替换目标路径为 /var/user/file.txt。
+                    重置 branch，重新开始解析。
+                - 第二次循环：
+                    branch = "var"。
+                    branch 是具体目录（假设 dir_map 包含 "/var"），跳过。
+                - 第三次循环：
+                    branch = "user"。
+                    branch 是具体目录（假设 dir_map 包含 "/var/user"），跳过。
+                - 最终目标路径为 /var/user/file.txt。
+            */
 
 			// the final (resolved) target must be a valid file
 			// or directory

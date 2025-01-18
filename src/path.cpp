@@ -891,7 +891,7 @@ namespace {
 	/**
 	 * 将路径字符串分割为两部分，第一部分是第一个路径分支（目录或文件名），第二部分是剩余的路径
 	 * 
-     * @param - p: 输入的路径字符串（string_view 类型）
+     * @param p: 输入的路径字符串（string_view 类型）
      * @return std::pair<string_view, string_view>: 第一个元素是路径的第一个分支，第二个元素是剩余的路径
 	 * 
 	 * @example
@@ -928,8 +928,8 @@ namespace {
 	/**
 	 * 将路径字符串从指定位置开始分割为两部分，第一部分是第一个路径分支（目录或文件名），第二部分是剩余的路径
 	 * 
-	 * @param - p: 输入的路径字符串
-	 * @param - pos: 从指定位置开始查找路径分隔符
+	 * @param p: 输入的路径字符串
+	 * @param pos: 从指定位置开始查找路径分隔符
 	 * @return std::pair<string_view, string_view>: 第一个元素是路径的第一个分支，第二个元素是剩余的路径
 	 *
 	 * @example
