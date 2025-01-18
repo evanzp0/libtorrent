@@ -1577,6 +1577,7 @@ namespace {
 			// 注意，我们在最后一步（包含文件名的那一步）不会对此进行迭代。文件名的验证是在循环之后进行的。
 			//
 			// 通过 lsplit_path 函数逐步解析目标路径 target 的每一部分（即路径的每个分支）
+			// lsplit_path(target).first 是获取第一部分的分支目录(不包含最开始的目录分隔符)
 			for (string_view branch = lsplit_path(target).first;
 				branch.size() < target.size();
 				branch = lsplit_path(target, branch.size() + 1).first)

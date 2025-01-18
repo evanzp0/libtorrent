@@ -932,6 +932,15 @@ namespace {
 	 * @param - pos: 从指定位置开始查找路径分隔符
 	 * @return std::pair<string_view, string_view>: 第一个元素是路径的第一个分支，第二个元素是剩余的路径
 	 *
+	 * @example
+	 * 
+	 * ```
+	 * p = "/home/user/file.txt";
+	 * pos = 6;
+	 * rst = lsplit_path(p, pos);
+	 * rst.first : "home/user"
+	 * rst.second : "file.txt
+	 * ```
 	 */
 	std::pair<string_view, string_view> lsplit_path(string_view p, std::size_t pos)
 	{
@@ -950,7 +959,7 @@ namespace {
 			if (pos > 0) --pos; // 如果 pos > 0，需要调整 pos 的值，因为跳过了开头的 '/'
 		}
 #if defined(TORRENT_WINDOWS) || defined(TORRENT_OS2)
-		// 在 Windows 或 OS/2 系统上，找到路径分隔符('/' 或 '\') 的位置
+		// 在 Windows 或 OS/2 系统上，找到 pos 位置之后的路径分隔符('/' 或 '\') 的位置
 		auto const sep = find_first_of(p, "/\\", std::string::size_type(pos));
 #else
 		// 在其他系统上，路径分隔符是 TORRENT_SEPARATOR_CHAR（通常是 '/'）
