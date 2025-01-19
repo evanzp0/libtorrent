@@ -1284,7 +1284,7 @@ namespace {
 			// 验证和修复符号链接，无效的符号链接被指向自身的 path
 			files.sanitize_symlinks();
 
-			// 用 m_flags 标记 multifile 标志位，表明 torrent 是多文件/单文件
+			// 用 m_flags 标记 multifile 标志位为 1/0，表明 torrent 是多文件/单文件
 			if (files.num_files() > 1)
 				m_flags |= multifile;
 			else
@@ -1313,12 +1313,19 @@ namespace {
 
 		if (!files_node)
 		{
+			// 没有 "files" 字段，则种子可能是纯v2 种子；或者是v1/混合种子，但只有一个文件。
+
 			// if this is a v2 torrent it is ok for the length key to be missing
 			// that means it is a v2 only torrent
 			if (version < 2 || info.dict_find("length"))
 			{
+				// 如果 version < 2，那就是纯 v1 种子，由于没有 "files"， 所以只有一个文件，并且必有 "length" 字段;
+				// 如果 version >= 2 存在且 "length" ，则为混合种子，且只有一个文件。
+
 				// if there's no list of files, there has to be a length
 				// field.
+
+				// 提取单个文件的信息，如果是混合种子(version == 2)，则将这些信息记录再 v1_files 中; 如果是 v1 种子则记录在 files 中。
 				if (!extract_single_file(info, version == 2 ? v1_files : files, ""
 					, info_offset, m_info_section.get(), true, ec))
 				{
@@ -1327,16 +1334,20 @@ namespace {
 					return false;
 				}
 
+				// 用 m_flags 标记 multifile 标志位为 0，表明 torrent 是单文件
 				m_flags &= ~multifile;
 			}
 			else
 			{
+				// v2_only 种子，清空 m_info_hash.v1 的值 
+
 				// this is a v2 only torrent so clear the v1 info hash to make sure no one uses it
 				m_info_hash.v1.clear();
 			}
 		}
-		else
+		else // torrent 有 "files" 字段，说明是 v1 或者混合种子，并且有多个文件
 		{
+			// 提取所有文件的信息，如果是混合种子(version == 2)，则将这些信息记录再 v1_files 中; 如果是 v1 种子则记录在 files 中。
 			if (!extract_files(files_node, version == 2 ? v1_files : files, name
 				, info_offset, m_info_section.get(), ec))
 			{
@@ -1344,8 +1355,14 @@ namespace {
 				m_files.set_piece_length(0);
 				return false;
 			}
+
+			// 用 m_flags 标记 multifile 标志位为 1，表明 torrent 是多文件
 			m_flags |= multifile;
 		}
+
+		// file_storage 有效性检查 ---------------------
+
+		// 检查 file_storage 是否存在文件
 		if (files.num_files() == 0)
 		{
 			ec = errors::no_files_in_torrent;
@@ -1353,6 +1370,8 @@ namespace {
 			m_files.set_piece_length(0);
 			return false;
 		}
+
+		// 检查 file_storage 是 m_name 是否为空
 		if (files.name().empty())
 		{
 			ec = errors::torrent_missing_name;
@@ -1362,15 +1381,18 @@ namespace {
 		}
 
 		// ensure hybrid torrents have compatible v1 and v2 file storages
+		// 检查混合种子的 file_storage 是否同时兼容 v1 和 v2 结构
 		if (version >= 2 && v1_files.num_files() > 0)
 		{
 			// previous versions of libtorrent did not not create hybrid
 			// torrents with "tail-padding". When loading, accept both.
+			// 兼容 libtorrent 老版本处理 v2 种子的方法
 			if (files.num_files() == v1_files.num_files() + 1)
 			{
 				files.remove_tail_padding();
 			}
 
+			// 检查 v2 和 v1 的 file_storage 是否兼容
 			if (!aux::files_compatible(files, v1_files))
 			{
 				// mark the torrent as invalid

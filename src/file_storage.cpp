@@ -784,7 +784,7 @@ namespace aux {
 			e.set_name(filename, true);
 
 		e.size = aux::numeric_cast<std::uint64_t>(file_size);
-		e.offset = aux::numeric_cast<std::uint64_t>(m_total_size);
+		e.offset = aux::numeric_cast<std::uint64_t>(m_total_size); // 添加第一个文件时，m_total_size 为 0。
 		e.pad_file = bool(file_flags & file_storage::flag_pad_file);
 		e.hidden_attribute = bool(file_flags & file_storage::flag_hidden);
 		e.executable_attribute = bool(file_flags & file_storage::flag_executable);
@@ -814,7 +814,7 @@ namespace aux {
 			m_mtime[last_file()] = std::time_t(mtime);
 		}
 
-		m_total_size += e.size;
+		m_total_size += e.size; // 更新 m_total_size，下一个 file_entry 的 offset 就是当前 m_total_size 的大小。
 
 		// when making v2 torrents, pad the end of each file (if necessary) to
 		// ensure it ends on a piece boundary.
@@ -1684,6 +1684,9 @@ failed:
 
 namespace aux {
 
+	/**
+	 * 检测 lhs 和 rhs 的 file_storage 是否兼容。
+	 */
 	bool files_compatible(file_storage const& lhs, file_storage const& rhs)
 	{
 		if (lhs.num_files() != rhs.num_files())
@@ -1697,18 +1700,29 @@ namespace aux {
 
 		// for compatibility, only non-empty and non-pad files matter.
 		// those files all need to match in index, name, size and offset
+		//
+		// 遍历所有文件，检查非空文件和非填充文件是否匹配
 		for (file_index_t i : lhs.file_range())
 		{
+			// 获取文件相关性，即当前文件是否为非填充文件且非空文件
 			bool const lhs_relevant = !lhs.pad_file_at(i) && lhs.file_size(i) > 0;
 			bool const rhs_relevant = !rhs.pad_file_at(i) && rhs.file_size(i) > 0;
 
+			 // 如果两个文件的相关性不一致（一个相关，一个不相关），返回 false
 			if (lhs_relevant != rhs_relevant)
 				return false;
 
+			 // 如果当前文件不相关（是填充文件或空文件），跳过检查
 			if (!lhs_relevant) continue;
 
 			// we deliberately ignore file attributes like "hidden",
 			// "executable" and mtime here. It's not critical they match
+			//
+			// 检查文件的以下属性是否匹配：
+			// 1. 是否为填充文件
+			// 2. 文件大小
+			// 3. 文件路径
+			// 4. 文件偏移量(在 torrent 中，文件的顺序排列后，根据每个文件的大小计算出来的 offset)
 			if (lhs.pad_file_at(i) != rhs.pad_file_at(i)
 				|| lhs.file_size(i) != rhs.file_size(i)
 				|| lhs.file_path(i) != rhs.file_path(i)
@@ -1717,6 +1731,7 @@ namespace aux {
 				return false;
 			}
 
+			// 如果文件是符号链接，检查符号链接的目标路径是否匹配
 			if ((lhs.file_flags(i) & file_storage::flag_symlink)
 				&& lhs.symlink(i) != rhs.symlink(i))
 			{
