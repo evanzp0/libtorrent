@@ -356,6 +356,7 @@ namespace {
 	/**
 	 * 提取叶子节点文件信息
 	 * 
+	 * @param files 用于存储解析的 v2 格式的文件信息
 	 * @param path 文件路径，包含了目录和文件名的完整路径
 	 * @param name 当前文件名
 	 */
@@ -396,7 +397,7 @@ namespace {
 
 		char const* pieces_root = nullptr;
 		
-		// 获取 "symlink path" 字段
+		// 获取 "symlink path" 字段，bep47
 		std::string symlink_path;
 		if (file_flags & file_storage::flag_symlink)
 		{
@@ -413,7 +414,7 @@ namespace {
 			}
 		}
 
-		// 如果是真实文件，则获取 "pieces root" 字段
+		// 如果是真实文件，则获取 "pieces root" 字段, v2
 		if (symlink_path.empty() && file_size > 0)
 		{
 			bdecode_node const root = dict.dict_find_string("pieces root");
@@ -587,6 +588,17 @@ namespace {
 		return !ec;
 	}
 
+	/**
+	 * 提取 v2 中的 "file tree" 字段信息
+	 * 
+	 * @param tree 包含了 "file tree" 的 bdecode_node
+	 * @param target 用于存储解析的 v2 格式的文件信息
+	 * @param root_dir 根目录名, 初次迭代时 root_dir 是 torrent 的 "name" 字段值；再次迭代时代表 parent path (是torrent内部文件的完整路径)
+	 * 				   v2 即使单个文件，也会在 file tree 中有自己的 file 叶子节点，其中就有文件名
+	 * @param info_offset info 字段在 torrent buffer 中的 offset
+	 * @param info_buffer 指向 m_info_section （它是 info 的数据副本）
+	 * @param has_files 是否存在 "files" 字段（v1 和 混合种子中可能有该字段）
+	 */
 	bool extract_files2(bdecode_node const& tree, file_storage& target
 		, std::string const& root_dir, ptrdiff_t const info_offset
 		, char const* info_buffer
@@ -1163,9 +1175,12 @@ namespace {
 		// we need this because we copy just the info dictionary buffer and pull
 		// out parsed data (strings) from the bdecode_node and need to make them
 		// point into our copy of the buffer.
+		// 
+		// 获取 info 字段在 buf 中的偏移量
 		std::ptrdiff_t const info_offset = info.data_offset();
 
 		// check for a version key
+		// 提取  "meta version" 字段, v2
 		int const version = int(info.dict_find_int_value("meta version", -1));
 		if (version > 0)
 		{
@@ -1191,6 +1206,7 @@ namespace {
 		}
 
 		// extract piece length
+		// 提取 "piece length" 字段，v1 + v2
 		std::int64_t const piece_length = info.dict_find_int_value("piece length", -1);
 		if (piece_length <= 0 || piece_length > file_storage::max_piece_size)
 		{
@@ -1199,6 +1215,7 @@ namespace {
 		}
 
 		// according to BEP 52: "It must be a power of two and at least 16KiB."
+		// piece_length & (piece_length - 1) == 0 表示 piece_length 是 2 的幂次方
 		if (version > 1 && (piece_length < default_block_size
 			|| (piece_length & (piece_length - 1)) != 0))
 		{
@@ -1206,10 +1223,12 @@ namespace {
 			return false;
 		}
 
+		// files 存放从 v2 的 "file tree" 解析出的数据
 		file_storage files;
 		files.set_piece_length(static_cast<int>(piece_length));
 
 		// extract file name (or the directory name if it's a multi file libtorrent)
+		// 提取 "name" 字段，v1 + v2
 		bdecode_node name_ent = info.dict_find_string("name.utf-8");
 		if (!name_ent) name_ent = info.dict_find_string("name");
 		if (!name_ent)
@@ -1221,7 +1240,7 @@ namespace {
 		}
 
 		std::string name;
-		// 对 name （也就是 path）中的 "/", "." 等进行规范化处理
+		// 对 name 中的 "/", "." 等进行规范化处理，使它可以在路径中使用
 		aux::sanitize_append_path_element(name, name_ent.string_value());
 		if (name.empty())
 		{
@@ -1241,10 +1260,10 @@ namespace {
 		bdecode_node const files_node = info.dict_find_list("files");
 
 		bdecode_node file_tree_node = info.dict_find_dict("file tree");
+
+		// 提取 v2 的 "file tree" 字段中的数据
 		if (version >= 2 && file_tree_node)
 		{
-			// v2 获取 "file tree" 字段信息 
-
 			// name 是 torrent 的 name，这里用作 root_dir
 			// 注意：extract_files2() 调用后 terrent_info.files 被建立，其中每一个 file_entry.name 是一个文件名(不含目录)
 			if (!extract_files2(file_tree_node, files, name, info_offset

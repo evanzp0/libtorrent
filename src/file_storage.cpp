@@ -158,13 +158,14 @@ namespace {
 
 	// path is supposed to include the name of the torrent itself.
 	// or an absolute path, to move a file outside of the download directory
-	//
-	// 更新 file_entry 的 path_index 字段，它有 3 种取值：
-	// 1. file_entry::path_is_absolute，表明 path 是一个绝对路径，
-	// 2. file_entry::no_path，表明单个文件, path 就是文件名
-	// 3. 其他值，表明该值是一个索引，指向 m_paths 中的一个路径。
-	// 
-	// @param set_name 是否 path 字段包含了文件名
+	/**
+	 * 更新 file_entry 的 path_index 字段，它有 3 种取值：
+	 * 1. file_entry::path_is_absolute，表明 path 是一个绝对路径，
+	 * 2. file_entry::no_path，表明单个文件, path 就是文件名
+	 * 3. 其他值，表明该值是一个索引，指向 m_paths 中的一个路径。
+	 * 
+	 * @param set_name 是否 path 字段包含了文件名
+	 */
 	void file_storage::update_path_index(aux::file_entry& e
 		, std::string const& path, bool const set_name)
 	{
