@@ -796,6 +796,7 @@ namespace aux {
 			if (m_file_hashes.size() < m_files.size()) m_file_hashes.resize(m_files.size());
 			m_file_hashes[last_file()] = filehash;
 		}
+
 		if (!symlink_path.empty()
 			&& m_symlinks.size() < aux::file_entry::not_a_symlink - 1)
 		{
@@ -806,6 +807,7 @@ namespace aux {
 		{
 			e.symlink_attribute = false;
 		}
+
 		if (mtime)
 		{
 			if (m_mtime.size() < m_files.size()) m_mtime.resize(m_files.size());
@@ -818,9 +820,10 @@ namespace aux {
 		// ensure it ends on a piece boundary.
 		// we do this at the end of files rather in-front of files to conform to
 		// the BEP52 reference implementation
+		//
 		// 根据 BEP52 中升级参考的描述，混合种子的文件如果没有对齐块边界，就会在末尾添加 .pad 文件。
 		//
-		// 估计是因为支持 v1 和 v2 的应用，对用同一个混合种子，要建两个不同的下载 群，
+		// 这样处理估计是因为支持 v1 和 v2 的应用，对用同一个混合种子，要建两个不同的下载 群，
 		// 当一个 piece 从 v1 群里去请求了，就不用从 v2 群里去请求了，
 		// 如果 v1 中的文件没对齐，可能会产生一个 piece 跨两个文件的情况，那么这个 piece 是无法在 v2 群中进行请求的。 
 		if (m_v2 && (m_total_size % piece_length()) != 0)
