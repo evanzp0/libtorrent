@@ -711,6 +711,7 @@ namespace aux {
 
 		// name of torrent. For multi-file torrents
 		// this is always the root directory
+		// torrent 的名字。对于多个文件（或者单文件，但是文件 path 有目录名的）来说，它是根目录名。
 		std::string m_name;
 
 		// the sum of all file sizes

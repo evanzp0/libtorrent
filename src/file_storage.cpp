@@ -669,7 +669,9 @@ namespace aux {
 	 * 将文件加入到 file_storage::m_files 属性中 (v1，v2 )
 	 * 
 	 * @param filename 当前文件名，不含目录名
-	 * @param path 文件路径，包含了目录和文件名的完整路径
+	 * @param path 文件路径，包含了目录和文件名的完整路径。
+	 * 			   如果 torrent 内是单文件（文件路径中不能含有目录名），则 path 为文件名；
+	 * 			   如果 torrent 内是多文件，则 path 为 torrent_name + file_tree 中各级目录 + 文件名。
 	 * @param file_size 文件大小, 对应该文件的 "length" 字段
 	 * @param file_flags 文件属性，对应该文件的 "attr" 字段(bep47)
 	 * @param filehash v2 该值为 nullptr; v1 该值对应该文件的 sha1 字段? (bep47)
@@ -712,8 +714,13 @@ namespace aux {
 			return;
 		}
 
-		if (!has_parent_path(path))
+		// 文件的 path 中没有目录名，说明整个 torrent 内只有一个文件（如果是多文件的话，path 中至少有一个 torrent_name 作为目录）。
+		// 注意：设定 m_name 的值，一旦设定就不会修改了
+		if (!has_parent_path(path)) 
 		{
+			// torrent 内只有一个文件，且第一次调用 add_file_borrow 时，则将 m_name 设为 path（一个文件名）。
+			// 否则断言就会失败，因为第二次调用，如果能进这个分支 m_files.empty() 为 false。
+
 			// you have already added at least one file with a
 			// path to the file (branch_path), which means that
 			// all the other files need to be in the same top
@@ -723,9 +730,12 @@ namespace aux {
 		}
 		else
 		{
-			if (m_files.empty())
+			// torrent 有多个文件，且第一次调用 add_file_borrow 时，将 m_name 设为 path 的第一段目录名。
+			if (m_files.empty()) {
 				m_name = lsplit_path(path).first.to_string();
+			}
 		}
+		// 上面绕了半天，起始就是给 file_storage 对象的 m_name 属性设为 ".torrent" 文件的 "name" 字段值。
 
 		// files without a root_hash are assumed to be v1, except symlinks. They
 		// don't have a root hash and can be either v1 or v2

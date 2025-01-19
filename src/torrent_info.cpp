@@ -357,7 +357,9 @@ namespace {
 	 * 提取当前 dict 中的叶子节点文件信息(包括 "attr"、"length"、"mtime" 、"symlink path"、"pieces root")
 	 * 
 	 * @param files 用于存储解析的 v2 格式的文件信息
-	 * @param path 文件路径，包含了目录和文件名的完整路径
+	 * @param path 文件路径，包含了目录和文件名的完整路径。
+	 * 			   如果 torrent 内是单文件（文件路径中没有目录名），则 path 为文件名；
+	 * 			   如果 torrent 内是多文件（包括单文件但文件路径中含有目录名），则 path 为 torrent_name + file_tree 中各级目录 + 文件名。
 	 * @param name 当前文件名（不含目录）
 	 */
 	bool extract_single_file2(bdecode_node const& dict, file_storage& files
@@ -640,6 +642,8 @@ namespace {
 
 			// 根据 e.second 是否是 ""：{...} 模式，判断出当前 tree node 是否为叶子节点。 
 			bool const leaf_node = e.second.dict_size() == 1 && e.second.dict_at(0).first.empty();
+			// 注意：如果 torrent 中只有一个文件，但是该文件的路径本身包含目录名，处理同多文件，该文件会被加入到 ".torrent 文件" 中的 "files" 字段中
+			// 所以文件路径含有目录的单文件，single_file 为 false .
 			bool const single_file = leaf_node && !has_files && tree.dict_size() == 1;
 
 			// 如果是单文件，path 就是该文件名；如果是多文件 path 就是 root_dir (根目录名)
