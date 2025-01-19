@@ -1312,30 +1312,30 @@ libtorrent 提供了一种机制，用于从其内部查询性能和统计计数
 
 这些计数器细分为断开 peer 连接的原因。
 
-| name                             | type  |
-|----------------------------------|-------|
-| peer.num_tcp_peers               | gauge |
-| peer.num_socks5_peers            | gauge |
-| peer.num_http_proxy_peers        | gauge |
-| peer.num_utp_peers               | gauge |
-| peer.num_i2p_peers               | gauge |
-| peer.num_ssl_peers               | gauge |
-| peer.num_ssl_socks5_peers        | gauge |
-| peer.num_ssl_http_proxy_peers    | gauge |
-| peer.num_ssl_utp_peers           | gauge |
-| peer.num_peers_half_open         | gauge |
-| peer.num_peers_connected         | gauge |
-| peer.num_peers_up_interested     | gauge |
-| peer.num_peers_down_interested   | gauge |
-| peer.num_peers_up_unchoked_all   | gauge |
+| name                                  | type  |
+| ------------------------------------- | ----- |
+| peer.num_tcp_peers                    | gauge |
+| peer.num_socks5_peers                 | gauge |
+| peer.num_http_proxy_peers             | gauge |
+| peer.num_utp_peers                    | gauge |
+| peer.num_i2p_peers                    | gauge |
+| peer.num_ssl_peers                    | gauge |
+| peer.num_ssl_socks5_peers             | gauge |
+| peer.num_ssl_http_proxy_peers         | gauge |
+| peer.num_ssl_utp_peers                | gauge |
+| peer.num_peers_half_open              | gauge |
+| peer.num_peers_connected              | gauge |
+| peer.num_peers_up_interested          | gauge |
+| peer.num_peers_down_interested        | gauge |
+| peer.num_peers_up_unchoked_all        | gauge |
 | peer.num_peers_up_unchoked_optimistic | gauge |
-| peer.num_peers_up_unchoked       | gauge |
-| peer.num_peers_down_unchoked     | gauge |
-| peer.num_peers_up_requests       | gauge |
-| peer.num_peers_down_requests     | gauge |
-| peer.num_peers_end_game          | gauge |
-| peer.num_peers_up_disk           | gauge |
-| peer.num_peers_down_disk         | gauge |
+| peer.num_peers_up_unchoked            | gauge |
+| peer.num_peers_down_unchoked          | gauge |
+| peer.num_peers_up_requests            | gauge |
+| peer.num_peers_down_requests          | gauge |
+| peer.num_peers_end_game               | gauge |
+| peer.num_peers_up_disk                | gauge |
+| peer.num_peers_down_disk              | gauge |
 
 每种类型 socket 的 peer 连接数。
 - `num_peers_half_open` 计算半开（正在连接）的 peer，其他计数不包括这些 peer。
@@ -1494,16 +1494,16 @@ BitTorrent 消息计数器。每当从或向 BitTorrent peer 发送或接收相�
 
 由于浪费字节的原因而浪费的下载字节数。
 
-| name                             | type    |
-|----------------------------------|---------|
-| picker.piece_picker_partial_loops | counter |
-| picker.piece_picker_suggest_loops | counter |
-| picker.piece_picker_sequential_loops | counter |
+| name                                   | type    |
+| -------------------------------------- | ------- |
+| picker.piece_picker_partial_loops      | counter |
+| picker.piece_picker_suggest_loops      | counter |
+| picker.piece_picker_sequential_loops   | counter |
 | picker.piece_picker_reverse_rare_loops | counter |
-| picker.piece_picker_rare_loops   | counter |
-| picker.piece_picker_rand_start_loops | counter |
-| picker.piece_picker_rand_loops   | counter |
-| picker.piece_picker_busy_loops   | counter |
+| picker.piece_picker_rare_loops         | counter |
+| picker.piece_picker_rand_start_loops   | counter |
+| picker.piece_picker_rand_loops         | counter |
+| picker.piece_picker_busy_loops         | counter |
 
 在选择分块时考虑的分块数量。
 
