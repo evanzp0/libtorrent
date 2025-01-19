@@ -666,10 +666,16 @@ namespace aux {
 	}
 
 	/** 
-	 * 将文件加入到 m_files 中
+	 * 将文件加入到 file_storage::m_files 属性中 (v1，v2 )
 	 * 
 	 * @param filename 当前文件名，不含目录名
 	 * @param path 文件路径，包含了目录和文件名的完整路径
+	 * @param file_size 文件大小, 对应该文件的 "length" 字段
+	 * @param file_flags 文件属性，对应该文件的 "attr" 字段(bep47)
+	 * @param filehash v2 该值为 nullptr; v1 该值对应该文件的 sha1 字段? (bep47)
+	 * @param mtime 文件修改时间，对应该文件的 "mtime" 字段(libtorrent 自定义字段)
+	 * @param symlink_path 符号链接指向的路径，对应对应该文件的 "symlink path" 字段(bep47)
+	 * @param root_hash 该文件的 merkle 根 hash，对应对应该文件的 "pieces root" 字段
 	*/
 	void file_storage::add_file_borrow(error_code& ec, string_view filename
 		, std::string const& path, std::int64_t const file_size

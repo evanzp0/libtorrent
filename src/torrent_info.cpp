@@ -354,11 +354,11 @@ namespace {
 	}
 
 	/**
-	 * 提取叶子节点文件信息
+	 * 提取当前 dict 中的叶子节点文件信息(包括 "attr"、"length"、"mtime" 、"symlink path"、"pieces root")
 	 * 
 	 * @param files 用于存储解析的 v2 格式的文件信息
 	 * @param path 文件路径，包含了目录和文件名的完整路径
-	 * @param name 当前文件名
+	 * @param name 当前文件名（不含目录）
 	 */
 	bool extract_single_file2(bdecode_node const& dict, file_storage& files
 		, std::string const& path, string_view const name
@@ -414,7 +414,7 @@ namespace {
 			}
 		}
 
-		// 如果是真实文件，则获取 "pieces root" 字段, v2
+		// 如果是真实文件，则获取 "pieces root" 字段
 		if (symlink_path.empty() && file_size > 0)
 		{
 			bdecode_node const root = dict.dict_find_string("pieces root");
@@ -591,7 +591,7 @@ namespace {
 	/**
 	 * 提取 v2 中的 "file tree" 字段信息
 	 * 
-	 * @param tree 包含了 "file tree" 的 bdecode_node
+	 * @param tree 包含了 "file tree" 的 bdecode_node， 初次迭代时 tree 是 "file tree" 的字段值；再次迭代时代表 "file tree" 内的某级节点
 	 * @param target 用于存储解析的 v2 格式的文件信息
 	 * @param root_dir 根目录名, 初次迭代时 root_dir 是 torrent 的 "name" 字段值；再次迭代时代表 parent path (是torrent内部文件的完整路径)
 	 * 				   v2 即使单个文件，也会在 file tree 中有自己的 file 叶子节点，其中就有文件名
@@ -659,7 +659,7 @@ namespace {
 					filename = {};
 				}
 				
-				// 这里 path （是完整目录，包含文件名） 作为 root_dir 传给了 extract_single_file2 函数；
+				// 这里 path（是完整目录，包含文件名）作为 root_dir 传给了 extract_single_file2 函数；
 				// filename 就是文件名，不含目录。
 				if (!extract_single_file2(e.second.dict_at(0).second, target
 					, path, filename, info_offset, info_buffer, ec))
@@ -1223,7 +1223,8 @@ namespace {
 			return false;
 		}
 
-		// files 存放从 v2 的 "file tree" 解析出的数据
+		// 如果 version >= 2, files 存放从 v2 的 "file tree" 解析出的数据; 另外 files 会赋值一份到 v1_files，存放 v1 的 "files" 解析出的数据。
+		// 如果 version < 2, 则 v1_files 不会被使用，files 用于存放 v1 的 "files" 解析出的数据。
 		file_storage files;
 		files.set_piece_length(static_cast<int>(piece_length));
 
@@ -1253,6 +1254,8 @@ namespace {
 		// extract file list
 
 		// save a copy so that we can extract both v1 and v2 files then compare the results
+		// 如果 version >= 2, 则 v1_files 和 v2 的 fiels 分别使用；
+		// 如果 version < 2, 则 v1_files 不会被单独赋值，而是 v1 直接使用 files 的内容。
 		file_storage v1_files;
 		if (version >= 2)
 			v1_files = files;
@@ -1295,6 +1298,8 @@ namespace {
 			ec = errors::torrent_missing_meta_version;
 			return false;
 		}
+
+		// 提取 v1 的 "files" 字段中的数据 ---------
 
 		if (!files_node)
 		{
