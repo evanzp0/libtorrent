@@ -749,7 +749,7 @@ namespace aux {
 			// or if m_total_size == 0, all files we've added so far have been
 			// empty (which also are are v1/v2-ambigous)
 			//
-			// 这里的判断作用是：如果是第一次处理真实文件，那么 root_hash 如果存在，则 m_v2 就是 true（当前种子是 v2）
+			// 这里的判断作用是：如果root_hash 存在, 且第一次处理真实文件，则 m_v2 就是 true（当前种子是 v2）
 			if (m_files.size() == m_symlinks.size() || m_total_size == 0)
 			{
 				m_v2 = v2;
