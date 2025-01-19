@@ -1258,7 +1258,7 @@ namespace {
 		// extract file list
 
 		// save a copy so that we can extract both v1 and v2 files then compare the results
-		// 如果 version >= 2, 则 v1_files 和 v2 的 fiels 分别使用；
+		// 如果 version >= 2, 则 v1_files 和 v2 的 files 分别使用；
 		// 如果 version < 2, 则 v1_files 不会被单独赋值，而是 v1 直接使用 files 的内容。
 		file_storage v1_files;
 		if (version >= 2)
@@ -1268,7 +1268,7 @@ namespace {
 
 		bdecode_node file_tree_node = info.dict_find_dict("file tree");
 
-		// 提取 v2 的 "file tree" 字段中的数据
+		// 提取 v2 的 "file tree" 字段中的数据到 files 变量中
 		if (version >= 2 && file_tree_node)
 		{
 			// name 是 torrent 的 name，这里用作 root_dir
@@ -1283,13 +1283,17 @@ namespace {
 			
 			// 验证和修复符号链接，无效的符号链接被指向自身的 path
 			files.sanitize_symlinks();
+
+			// 用 m_flags 标记 multifile 标志位，表明 torrent 是多文件/单文件
 			if (files.num_files() > 1)
 				m_flags |= multifile;
 			else
-				m_flags &= ~multifile;
+				m_flags &= ~multifile; // 将 multifile 标志位设为 0
 		}
 		else if (version >= 2)
 		{
+			// v2 版本，但是没有 "file tree" 字段，种子格式有误
+
 			// mark the torrent as invalid
 			m_files.set_piece_length(0);
 			ec = errors::torrent_missing_file_tree;
@@ -1297,6 +1301,8 @@ namespace {
 		}
 		else if (file_tree_node)
 		{
+			// 有 "file tree" 字段，但非 v2 以上版本，种子格式有误
+
 			// mark the torrent as invalid
 			m_files.set_piece_length(0);
 			ec = errors::torrent_missing_meta_version;
