@@ -1125,6 +1125,9 @@ namespace {
 	}
 #endif
 
+	/**
+	 * 解析 info 字段
+	 */
 	bool torrent_info::parse_info_section(bdecode_node const& info
 		, error_code& ec, int const max_pieces)
 	{
@@ -1251,7 +1254,8 @@ namespace {
 				m_files.set_piece_length(0);
 				return false;
 			}
-
+			
+			// 验证和修复符号链接，无效的符号链接被指向自身的 path
 			files.sanitize_symlinks();
 			if (files.num_files() > 1)
 				m_flags |= multifile;
