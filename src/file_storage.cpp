@@ -735,7 +735,7 @@ namespace aux {
 				m_name = lsplit_path(path).first.to_string();
 			}
 		}
-		// 上面绕了半天，起始就是给 file_storage 对象的 m_name 属性设为 ".torrent" 文件的 "name" 字段值。
+		// 上面绕了半天，其实就是将 ".torrent" 文件的 "name" 字段值，赋值给 file_storage 对象的 m_name 属性
 
 		// files without a root_hash are assumed to be v1, except symlinks. They
 		// don't have a root hash and can be either v1 or v2
