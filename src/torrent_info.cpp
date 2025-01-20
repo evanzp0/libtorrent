@@ -1476,23 +1476,25 @@ namespace {
 		m_flags |= (info.dict_find_int_value("private", 0) != 0)
 			? private_torrent : torrent_info_flags_t{};
 
-#ifndef TORRENT_DISABLE_MUTABLE_TORRENTS
-		// 提取 "similar" 和 "collections" 字段（BEP38），用于标识相似的种子和集合
+#ifndef TORRENT_DISABLE_MUTABLE_TORRENTS // BEP 46 （mutable torrent）
+		// 提取 "similar" 字段中的 info_hash 二进制字符串列表，用于标识相似的种子和集合，存放到 m_similar_torrents
 		bdecode_node const similar = info.dict_find_list("similar");
 		if (similar)
 		{
 			for (int i = 0; i < similar.list_size(); ++i)
 			{
+				// item 有效性校验
 				if (similar.list_at(i).type() != bdecode_node::string_t)
 					continue;
-
 				if (similar.list_at(i).string_length() != 20)
 					continue;
+
 				m_similar_torrents.push_back(static_cast<std::int32_t>(
 					similar.list_at(i).string_offset() - info_offset));
 			}
 		}
 
+		//  提取 "collections" 字段中的字符串标识符列表（BEP38），用于标识相似的种子和集合，存放到 m_collections
 		bdecode_node const collections = info.dict_find_list("collections");
 		if (collections)
 		{

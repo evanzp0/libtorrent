@@ -695,6 +695,7 @@ TORRENT_VERSION_NAMESPACE_3
 
 		// the info-hashes (20 bytes each) in the "similar" key. These are offsets
 		// into the info dict buffer.
+		// 存放的是一个相对于 info_section 的偏移量，它指向一个 similar 字段中的一个 info_hash item。
 		std::vector<std::int32_t> m_similar_torrents;
 
 		// these are similar torrents from outside of the info-dict. We can't
@@ -705,6 +706,7 @@ TORRENT_VERSION_NAMESPACE_3
 		// these or strings of the "collections" key from the torrent file. The
 		// first value is the offset into the metadata where the string is, the
 		// second value is the length of the string. Strings are not 0-terminated.
+		// // 存放的是一个相对于 info_section 的偏移量和其指向的字符串的长度，它指向一个 collections 字段中的一个 torrent name 的 item。
 		std::vector<std::pair<std::int32_t, int>> m_collections;
 
 		// these are the collections from outside of the info-dict. These are
