@@ -221,11 +221,14 @@ struct bdecode_token
 			, "we need to assert t >= 0 here");
 	}
 
+	/**
+	 * 返回 string 和 long_string 类型 token 的起始偏移量 offset。
+	 */
 	int start_offset() const
 	{
 		TORRENT_ASSERT(type == string || type == long_string);
 		if (type == string)
-			return int(header) + 2;
+			return int(header) + 2; // header 长度 + 2
 		else
 			return int(header) + 8 + 2;
 	}

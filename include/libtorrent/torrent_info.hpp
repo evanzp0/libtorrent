@@ -753,6 +753,7 @@ TORRENT_VERSION_NAMESPACE_3
 
 		// this is the offset into the m_info_section buffer to the first byte of
 		// the first SHA-1 hash
+		// 记录 piece_hashes 中的第一个 piece 字节相对于 m_info_section 的偏移量
 		std::int32_t m_piece_hashes = 0;
 
 		// the number of bytes in m_info_section

@@ -732,11 +732,19 @@ namespace aux {
 		return string_view(m_buffer + t.offset + t.start_offset(), size);
 	}
 
+	/**
+	 * 获取 当前 string 类型(bdecode_node) 节点的起始偏移量
+	 */
 	std::ptrdiff_t bdecode_node::string_offset() const
 	{
 		TORRENT_ASSERT(type() == string_t);
+
 		bdecode_token const& t = m_root_tokens[m_token_idx];
+
 		TORRENT_ASSERT(t.type == bdecode_token::string);
+
+		// t.token 是 t 这个token 在 整个 torrent buffer 中的偏移量
+		// t.token + t.start_offset() 是 t 这个 string 类型的 token 的字符串真正开始位置的偏移量
 		return t.offset + t.start_offset();
 	}
 

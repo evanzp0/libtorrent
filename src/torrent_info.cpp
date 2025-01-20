@@ -1405,6 +1405,8 @@ namespace {
 		// extract SHA-1 hashes for all pieces
 		// we want this division to round upwards, that's why we have the
 		// extra addition
+		// 提取所有分片（pieces）的 SHA-1 哈希值
+		// 我们希望这个除法操作向上取整，这就是为什么我们要额外加上 (piece_length - 1)
 
 		if (files.total_size() / files.piece_length() > file_storage::max_num_pieces)
 		{
@@ -1414,10 +1416,16 @@ namespace {
 			return false;
 		}
 
+		// 设置 file_storage 的 piece 数量
+
+		// 这里的 total_size + piece_length - 1 是为了确保除法结果向上取整，从而覆盖所有数据。
+		// 如果直接使用 total_size / piece_length，结果会向下取整，可能导致最后一个分片的数据未被完全覆盖。
 		files.set_num_pieces(int((files.total_size() + files.piece_length() - 1)
 			/ files.piece_length()));
 
 		// we expect the piece hashes to be < 2 GB in size
+		// 20 是因为 SHA1 的长度是 20 个字节，max_int / 20 = 2GB 的意思是 piece 的个数不能超过 2GB。
+		// 校验 num_pieces （piece 数量）的有效性 ( < 2 GB )
 		if (files.num_pieces() >= std::numeric_limits<int>::max() / 20
 			|| files.num_pieces() > max_pieces)
 		{
@@ -1427,9 +1435,11 @@ namespace {
 			return false;
 		}
 
+		// 提取 "pieces" 的 SHA-1 值，并存入 m_piece_hashes 中。
 		bdecode_node const pieces = info.dict_find_string("pieces");
 		if (!pieces)
 		{
+			// 版本校验
 			if (version < 2)
 			{
 				ec = errors::torrent_missing_pieces;
@@ -1440,6 +1450,7 @@ namespace {
 		}
 		else
 		{
+			// 通过长度校验 pieces 的有效性
 			if (pieces.string_length() != files.num_pieces() * 20)
 			{
 				ec = errors::torrent_invalid_hashes;
@@ -1448,14 +1459,20 @@ namespace {
 				return false;
 			}
 
+			// hash_offset 就是 pieces 字节串相对于 info_section 中的偏移量。
 			std::ptrdiff_t const hash_offset = pieces.string_offset() - info_offset;
+
 			TORRENT_ASSERT(hash_offset < std::numeric_limits<std::int32_t>::max());
 			TORRENT_ASSERT(hash_offset >= 0);
+
+			// 将 pieces 偏移量记录到 m_piece_hashes 中。
 			m_piece_hashes = static_cast<std::int32_t>(hash_offset);
+
 			TORRENT_ASSERT(m_piece_hashes > 0);
 			TORRENT_ASSERT(m_piece_hashes < m_info_section_size);
 		}
 
+		// 提取 "private" 字段（BEP27），用于标识种子是否为私有种子
 		m_flags |= (info.dict_find_int_value("private", 0) != 0)
 			? private_torrent : torrent_info_flags_t{};
 
