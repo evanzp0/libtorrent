@@ -1154,6 +1154,7 @@ namespace {
 		}
 
 		// hash the info-field to calculate info-hash
+		// 设置 m_info_hash v1 和 v2 
 		auto section = info.data_section();
 		m_info_hash.v1 = hasher(section).final();
 		m_info_hash.v2 = hasher256(section).final();
@@ -1510,6 +1511,8 @@ namespace {
 		}
 #endif // TORRENT_DISABLE_MUTABLE_TORRENTS
 
+		// 提取 "ssl-cert" 字段，该字段是 libtorrent 自定义的，在官方文档的 overview 中有介绍。
+		// 该字段用于存储与 HTTPS Tracker 或 WebSeed 相关的 SSL/TLS 证书信息 (相关规范：BEP-12, BEP-19, BEP-47)
 		if (info.dict_find_string("ssl-cert"))
 			m_flags |= ssl_torrent;
 
@@ -1527,7 +1530,7 @@ namespace {
 
 		TORRENT_ASSERT(m_info_hash.has_v2() == m_files.v2());
 		return true;
-	}
+	} // end parse_info_section()
 
 	bool torrent_info::parse_piece_layers(bdecode_node const& e, error_code& ec)
 	{
