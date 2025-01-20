@@ -1477,6 +1477,7 @@ namespace {
 			? private_torrent : torrent_info_flags_t{};
 
 #ifndef TORRENT_DISABLE_MUTABLE_TORRENTS
+		// 提取 "similar" 和 "collections" 字段（BEP38），用于标识相似的种子和集合
 		bdecode_node const similar = info.dict_find_list("similar");
 		if (similar)
 		{
