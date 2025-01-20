@@ -998,7 +998,20 @@ namespace {
 	/**
 	 * 获取所有路径的CRC32哈希值
 	 * 
-	 * @param table 用于存储所有路径的CRC32哈希值。
+	 * @param table 会存储所有路径及其子路径的CRC32哈希值
+	 * 
+	 * @example
+	 * 
+	 * 假设：
+	 * m_name = "usr"
+	 * TORRENT_SEPARATOR = '/'
+	 * m_paths = {"local/a", "bin/b"}
+	 * 
+	 * 则最终 table 中将包含以下CRC32哈希值：
+	 * CRC("usr/local")   （在遇到 / 时插入）。
+	 * CRC("usr/local/a") （遍历结束后插入）。
+	 * CRC("usr/bin")     （在遇到 / 时插入）。
+	 * CRC("usr/bin/b")   （遍历结束后插入）
 	 */
 	void file_storage::all_path_hashes(
 		std::unordered_set<std::uint32_t>& table) const
