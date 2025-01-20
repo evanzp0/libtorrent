@@ -1036,7 +1036,7 @@ namespace {
 	}
 
 	/**
-	 * 根据文件的路径信息生成一个 CRC32 校验值，用于唯一标识文件的路径
+	 * todo！()
 	 */
 	std::uint32_t file_storage::file_path_hash(file_index_t const index
 		, std::string const& save_path) const

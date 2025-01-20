@@ -788,14 +788,17 @@ TORRENT_VERSION_NAMESPACE_3
 
 		// insert all directories first, to make sure no files
 		// are allowed to collied with them
-		// 将所有 path 的哈希值插入到 files 集合中
+		//
+		// m_files 中所有路径及其子路径的CRC32哈希值存入 files 集合中
 		m_files.all_path_hashes(files);
 		for (auto const i : m_files.file_range())
 		{
 			// as long as this file already exists
 			// increase the counter
+			//
 			// 计算当前文件的哈希值
 			std::uint32_t const h = m_files.file_path_hash(i, empty_str);
+			
 			// 尝试将 h 插入到 files 集合中。如果 h 已经存在于集合中（即文件名重复），
 			// insert 方法会返回 false，表示插入失败。
 			if (!files.insert(h).second)
