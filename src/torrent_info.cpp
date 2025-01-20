@@ -1679,7 +1679,9 @@ namespace {
 			return false;
 		}
 
+		// 解析 "info" 字段，将结果存放在 m_files 和 m_info_hash 中。
 		if (!parse_info_section(info, ec, piece_limit)) return false;
+
 		resolve_duplicate_filenames();
 
 		if (m_info_hash.has_v2())
@@ -1859,7 +1861,7 @@ namespace {
 		aux::verify_encoding(m_created_by);
 
 		return true;
-	}
+	} // end of parse_torrent_file()
 
 	void torrent_info::add_tracker(std::string const& url, int const tier)
 	{

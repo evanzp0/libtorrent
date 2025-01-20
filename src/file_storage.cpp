@@ -159,11 +159,12 @@ namespace {
 	// path is supposed to include the name of the torrent itself.
 	// or an absolute path, to move a file outside of the download directory
 	/**
-	 * 更新 file_entry 的 path_index 字段，它有 3 种取值：
+	 * 生成 m_paths, 并更新 file_entry 的 path_index 字段，它有 3 种取值：
 	 * 1. file_entry::path_is_absolute，表明 path 是一个绝对路径，
 	 * 2. file_entry::no_path，表明单个文件, path 就是文件名
 	 * 3. 其他值，表明该值是一个索引，指向 m_paths 中的一个路径。
 	 * 
+	 * @param path 文件路径，可以是绝对路径或相对路径，相对路径不能以 "/" 开头。
 	 * @param set_name 是否 path 字段包含了文件名
 	 */
 	void file_storage::update_path_index(aux::file_entry& e
@@ -183,6 +184,8 @@ namespace {
 		// and the branch path
 		string_view leaf;
 		string_view branch_path;
+
+		// branch_path 不能是 "/" 开头
 		std::tie(branch_path, leaf) = rsplit_path(path);
 
 		if (branch_path.empty())
@@ -196,7 +199,7 @@ namespace {
 		// if the path *does* contain the name of the torrent (as we expect)
 		// strip it before adding it to m_paths
 		//
-		// 规范化 branch_path
+		// 规范化 branch_path，branch path 不能以 "/" 开头，如果有则移除。
 		if (lsplit_path(branch_path).first == m_name)
 		{
 			branch_path = lsplit_path(branch_path).second;
@@ -214,12 +217,15 @@ namespace {
 			e.no_root_dir = true;
 		}
 
+		// 查找或生成新的 item（不会以 "/" 开头） 并添加到 m_paths 中。
 		e.path_index = get_or_add_path(branch_path);
 		if (set_name) e.set_name(leaf);
 	}
 
 	/** 
 	 * 在 m_paths 中查找或添加 path，返回 path 在 m_paths 中的索引
+	 * 
+	 * @param path 路径，不能以 "/" 开头。
 	*/
 	aux::path_index_t file_storage::get_or_add_path(string_view const path)
 	{
@@ -230,8 +236,13 @@ namespace {
 		{
 			// no, we don't. add it
 			auto const ret = m_paths.end_index();
+
+			// 确保 path 不以 '/' 开头。
 			TORRENT_ASSERT(path.size() == 0 || path[0] != '/');
+
+			// 在 m_paths 中添加一个新的路径，并返回其索引。
 			m_paths.emplace_back(path.data(), path.size());
+
 			return ret;
 		}
 		else
@@ -937,13 +948,25 @@ namespace aux {
 
 namespace {
 
+		/**
+		 * 将字符串 str 中的每个字符转换为小写，并更新到 crc 计算器中。
+		 */
 		template <class CRC>
 		void process_string_lowercase(CRC& crc, string_view str)
 		{
 			for (char const c : str)
+				// 与 0xff 进行按位与操作，是为了确保只处理一个字节。
 				crc.process_byte(to_lower(c) & 0xff);
 		}
 
+		/**
+		 * 将 str 路径的每一部分（即路径中的每个目录或文件名）的CRC校验和单独作为一个 item 存储在 table 中。
+		 * table 是 Set 类型，存储时会自动去重。
+		 * 
+		 * @example
+		 * 
+		 * 如果 str 是 "path/to/file"，那么 table set 中将存放 crc("path")、crc("to") 和 crc("file") 这三个 item。
+		 */
 		template <class CRC>
 		void process_path_lowercase(
 			std::unordered_set<std::uint32_t>& table
@@ -952,14 +975,22 @@ namespace {
 			if (str.empty()) return;
 			for (char const c : str)
 			{
+				// 如果字符 c 是路径分隔符（TORRENT_SEPARATOR），则将当前的CRC校验和（通过 crc.checksum() 获取）插入到 table 中。
 				if (c == TORRENT_SEPARATOR)
 					table.insert(crc.checksum());
+
+				// 与 0xff 进行按位与操作，是为了确保只处理一个字节。
 				crc.process_byte(to_lower(c) & 0xff);
 			}
 			table.insert(crc.checksum());
 		}
 	}
 
+	/**
+	 * 获取所有路径的CRC32哈希值
+	 * 
+	 * @param table 用于存储所有路径的CRC32哈希值。
+	 */
 	void file_storage::all_path_hashes(
 		std::unordered_set<std::uint32_t>& table) const
 	{
@@ -967,13 +998,19 @@ namespace {
 
 		if (!m_name.empty())
 		{
+			// 将 m_name 字符串转换为小写，并更新到 crc 计算器中(这时还没计算校验码)。
 			process_string_lowercase(crc, m_name);
+
+			// 使用断言确保 m_name 的最后一个字符不是路径分隔符（TORRENT_SEPARATOR），避免路径格式错误
 			TORRENT_ASSERT(m_name[m_name.size() - 1] != TORRENT_SEPARATOR);
+			
+			// 在 CRC 计算中添加路径分隔符
 			crc.process_byte(TORRENT_SEPARATOR);
 		}
 
 		for (auto const& p : m_paths)
-			process_path_lowercase(table, crc, p);
+			// 注意：crc 是 copy 方式传入，所以每次调用时传入的都是 crc([m_name])，并且还没计算校验码
+			process_path_lowercase(table, crc, p); 
 	}
 
 	/**

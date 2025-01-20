@@ -703,15 +703,16 @@ namespace aux {
 		// prepended to these paths, and the filename of a specific file
 		// entry appended, to form full file paths
 		//
-		// torrent 中所有文件使用的去重后的路径列表。
+		// torrent 中所有文件使用的去重后的路径列表，注意，m_paths 中得路径的开头和结尾都不会是 "/" 。
 		// aux::file_entry::path_index 指向此数组。
-		// 对于包含多个文件的种子文件，路径中不包括根目录名称。
+		// 对于包含多个文件的种子文件，路径中不包括根目录名称和文件名。
 		// 需要在这些路径前加上 m_name 字段，并附上特定 file_entry 的 filename，以形成完整的文件路径。
+		// eg: [("path/to", 0), ("dir/a", 1)]
 		aux::vector<std::string, aux::path_index_t> m_paths;
 
 		// name of torrent. For multi-file torrents
 		// this is always the root directory
-		// torrent 的名字。对于多个文件（或者单文件，但是文件 path 有目录名的）来说，它是根目录名。
+		// torrent 的名字(不能以 "/" 开头)。对于多个文件（或者单文件，但是文件 path 有目录名的）来说，它是根目录名。
 		std::string m_name;
 
 		// the sum of all file sizes
