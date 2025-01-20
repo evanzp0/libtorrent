@@ -781,6 +781,7 @@ TORRENT_VERSION_NAMESPACE_3
 	{
 		INVARIANT_CHECK;
 
+		// 存放所有文件的哈希值集合，用于文件名去重。
 		std::unordered_set<std::uint32_t> files;
 
 		std::string const empty_str;

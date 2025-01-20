@@ -965,7 +965,13 @@ namespace {
 		 * 
 		 * @example
 		 * 
-		 * 如果 str 是 "path/to/file"，那么 table set 中将存放 crc("path")、crc("to") 和 crc("file") 这三个 item。
+		 * crc 初始值为 CRC("abc/")。
+		 * str = "def/ghi"，则：
+		 * 
+		 * 结束时 table 中将包含以下CRC值：
+		 * 
+		 * CRC("abc/def")（在遇到 / 时插入）。
+		 * CRC("abc/def/ghi")（遍历结束后插入）。
 		 */
 		template <class CRC>
 		void process_path_lowercase(
@@ -976,7 +982,10 @@ namespace {
 			for (char const c : str)
 			{
 				// 如果字符 c 是路径分隔符（TORRENT_SEPARATOR），则将当前的CRC校验和（通过 crc.checksum() 获取）插入到 table 中。
+				// 注意 第一次循环时，m_name 的最后一个字符，此时不应该插入 table 中。
+
 				if (c == TORRENT_SEPARATOR)
+					// 调用 crc.checksum() 会返回当前的CRC值，但通常不会重置CRC计算器的状态
 					table.insert(crc.checksum());
 
 				// 与 0xff 进行按位与操作，是为了确保只处理一个字节。
@@ -1004,7 +1013,7 @@ namespace {
 			// 使用断言确保 m_name 的最后一个字符不是路径分隔符（TORRENT_SEPARATOR），避免路径格式错误
 			TORRENT_ASSERT(m_name[m_name.size() - 1] != TORRENT_SEPARATOR);
 			
-			// 在 CRC 计算中添加路径分隔符
+			// 在 CRC 计算中添加路径分隔符，此时 crc(["{m_name}/"]])
 			crc.process_byte(TORRENT_SEPARATOR);
 		}
 
