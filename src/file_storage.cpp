@@ -399,7 +399,7 @@ namespace aux {
 	}
 
 	/**
-	 * 
+	 * 获取 file_entry 的文件名（不含目录）
 	*/
 	string_view file_entry::filename() const
 	{
@@ -1041,6 +1041,14 @@ namespace {
 	/**
 	 * 计算文件路径的 32 位 CRC 哈希值。
 	 * 
+	 * 文件路径分以下几种情况，file_entry 为：
+	 * 1. 绝对路径: crc(file_entry.filename())
+	 * 2. 无路径：crc(save_path + "/" + file_entry.filename())
+	 * 3. 无根目录：crc(save_path + "/" + m_path[file_entry.path_index] + "/" + file_entry.filename())
+	 * 4. 默认情况（非绝对路径，有路径，有根目录）：
+	 * 	  crc(save_path + "/" + m_name + "/" + m_paths[file_entry.path_index] + "/" + file_entry.filename())
+	 * 
+	 * @param save_path 保存路径？要么为空，要么为目录路径。非绝对路径时起始字符不可位 "/"。
 	 */
 	std::uint32_t file_storage::file_path_hash(file_index_t const index
 		, std::string const& save_path) const
@@ -1050,11 +1058,12 @@ namespace {
 
 		boost::crc_optimal<32, 0x1EDC6F41, 0xFFFFFFFF, 0xFFFFFFFF, true, true> crc;
 
-		if (fe.path_index == aux::file_entry::path_is_absolute)
+		if (fe.path_index == aux::file_entry::path_is_absolute) // 绝对路径
 		{
+			// 将 fe 的文件名（不含目录）全部转成 小写，并更新到 crc 计算器中。
 			process_string_lowercase(crc, fe.filename());
 		}
-		else if (fe.path_index == aux::file_entry::no_path)
+		else if (fe.path_index == aux::file_entry::no_path) // 无路径
 		{
 			if (!save_path.empty())
 			{
@@ -1065,7 +1074,7 @@ namespace {
 			}
 			process_string_lowercase(crc, fe.filename());
 		}
-		else if (fe.no_root_dir)
+		else if (fe.no_root_dir) // 无根目录
 		{
 			if (!save_path.empty())
 			{
@@ -1082,7 +1091,7 @@ namespace {
 			}
 			process_string_lowercase(crc, fe.filename());
 		}
-		else
+		else // 默认情况
 		{
 			if (!save_path.empty())
 			{

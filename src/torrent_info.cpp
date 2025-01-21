@@ -796,7 +796,7 @@ TORRENT_VERSION_NAMESPACE_3
 			// as long as this file already exists
 			// increase the counter
 			//
-			// 计算当前文件的哈希值
+			// 根据文件名，计算哈希值
 			std::uint32_t const h = m_files.file_path_hash(i, empty_str);
 			
 			// 尝试将 h 插入到 files 集合中。如果 h 已经存在于集合中（即文件名重复），
