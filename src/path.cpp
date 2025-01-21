@@ -461,6 +461,9 @@ namespace {
 		return false;
 	}
 
+	/**
+	 * 获取扩展名（包括 .）
+	 */
 	std::string extension(std::string const& f)
 	{
 		for (int i = int(f.size()) - 1; i >= 0; --i)
@@ -476,6 +479,9 @@ namespace {
 		return "";
 	}
 
+	/**
+	 * 移除扩展名（不包括 .）
+	 */
 	std::string remove_extension(std::string const& f)
 	{
 		char const* slash = std::strrchr(f.c_str(), '/');

@@ -806,7 +806,10 @@ TORRENT_VERSION_NAMESPACE_3
 				// This filename appears to already exist!
 				// If this happens, just start over and do it the slow way,
 				// comparing full file names and come up with new names
+				// 
+				// 当文件路径已存在时，逐个比较完整文件名，并生成新的文件名
 				resolve_duplicate_filenames_slow();
+
 				return;
 			}
 		}
@@ -828,15 +831,23 @@ namespace {
 	};
 }
 
+	/**
+	 * 解决 Torrent 文件中文件名冲突的问题。
+	 * 它会检查 Torrent 中的所有文件和目录，确保没有重复的文件名。
+	 * 如果发现冲突，函数会通过添加数字后缀（例如 .1, .2 等）来重命名文件，直到文件名唯一为止。
+	 */
 	void torrent_info::resolve_duplicate_filenames_slow()
 	{
 		INVARIANT_CHECK;
 
 		// maps filename hash to file index
 		// or, if the file_index is negative, maps into the paths vector
+		// 用 “重复键的多重映射表” 存放文件名哈希值到文件索引的映射，如果文件索引为负数，表示该 item 是指向了 paths 中的某个路径。
 		std::unordered_multimap<std::uint32_t, name_entry> files;
 
+		// 获取 torrent 中所有文件的路径（不含根目录和文件名）。
 		std::vector<std::string> const& paths = m_files.paths();
+
 		files.reserve(paths.size() + aux::numeric_cast<std::size_t>(m_files.num_files()));
 
 		// insert all directories first, to make sure no files
@@ -847,23 +858,53 @@ namespace {
 			{
 				process_string_lowercase(crc, m_files.name());
 			}
+
+			//  处理目录 ----------
 			file_index_t path_index{-1};
 			for (auto const& path : paths)
 			{
 				auto local_crc = crc;
-				if (!path.empty()) local_crc.process_byte(TORRENT_SEPARATOR);
+				if (!path.empty()) local_crc.process_byte(TORRENT_SEPARATOR); // = local_crc("{fs.m_name}/")
 				int count = 0;
+				
+				// files 种，一个 crc32 key 可能有多个对应的 name_entry，每个 name_entry 对应一个路径片段。其中短路径片段是长路径片段的子路径。
+				/**
+				 * eg.
+				 * files : {
+				 * 		"x1": [{
+				 * 			{idx: 0, length: 1},
+				 * 			{idx: -1, length: 2}, // "ab/"
+				 * 			{idx: -1, length: 5}, // "ab/cd"
+				 * 			...
+				 * 		}]}]
+				 * }
+				 */
 				for (char const c : path)
 				{
-					if (c == TORRENT_SEPARATOR)
-						files.insert({local_crc.checksum(), {path_index, count}});
+					if (c == TORRENT_SEPARATOR) // path 不会以 "/" 开头
+						// 注意：这里把 paths 中第 0 个元素，映射的 name_entry.idx 为 -1，以此类推。
+						// 后面通过 (-name_entry.idx) - 1 可以得到 paths 中对应的路径的 index。
+						files.insert({local_crc.checksum(), {path_index, count}}); // 第一次循环 local_crc("{fs.m_name}/{branch_1}")
+
 					local_crc.process_byte(to_lower(c) & 0xff);
 					++count;
 				}
+
+				// 注意：这里把 paths 中第 0 个元素，映射的 name_entry.idx 为 -1，以此类推。
+				// 后面通过 (-name_entry.idx) - 1 可以得到 paths 中对应的路径的 index。
 				files.insert({local_crc.checksum(), {path_index, int(path.size())}});
 				--path_index;
 			}
 		}
+
+		//  处理文件 ----------
+
+		/**
+		 * 遍历 Torrent 中的所有文件，计算每个文件的路径哈希值。
+		 * 检查哈希值是否已存在于 files 映射中：
+		 * - 如果不存在，直接插入映射。
+		 * - 如果存在，说明文件名冲突，需要重命名文件
+		 */
 
 		// keep track of the total number of name collisions. If there are too
 		// many, it's probably a malicious torrent and we should just fail
@@ -872,16 +913,24 @@ namespace {
 		{
 			// as long as this file already exists
 			// increase the counter
-			std::uint32_t const hash = m_files.file_path_hash(i, "");
+			std::uint32_t const hash = m_files.file_path_hash(i, ""); // crc(torrent_name + "/" + path + "/" + file_name)
+
+			// 查找相同哈希值的所有条目
 			auto range = files.equal_range(hash);
+
+			// 遍历候选条目进行精确匹配
 			auto const match = std::find_if(range.first, range.second, [&](std::pair<std::uint32_t, name_entry> const& o)
 			{
-				std::string const other_name = o.second.idx < file_index_t{}
+				std::string const other_name = o.second.idx < file_index_t{} // idx 为 负数，代表指向目录
 					? combine_path(m_files.name(), paths[std::size_t(-static_cast<int>(o.second.idx)-1)].substr(0, std::size_t(o.second.length)))
 					: m_files.file_path(o.second.idx);
+
+				// 不区分大小写比较路径字符串
 				return string_equal_no_case(other_name, m_files.file_path(i));
 			});
 
+			// match: 是通过 std::find_if 查找的结果; range.second: 是 files.equal_range(hash) 返回的迭代器范围的上界。
+			// 检查哈希值是否已存在于 files 映射中, 如果不存在，直接插入映射。
 			if (match == range.second)
 			{
 				files.insert({hash, {i, 0}});
@@ -890,6 +939,8 @@ namespace {
 
 			// pad files are allowed to collide with each-other, as long as they have
 			// the same size.
+			// 
+			// 如果两个 Pad 文件名发生冲突，且它们的大小相同，则允许它们使用相同的文件名，无需重命名。
 			file_index_t const other_idx = match->second.idx;
 			if (other_idx >= file_index_t{}
 				&& (m_files.file_flags(i) & file_storage::flag_pad_file)
@@ -897,6 +948,7 @@ namespace {
 				&& m_files.file_size(i) == m_files.file_size(other_idx))
 				continue;
 
+			// 如果检测到冲突，则重命名文件 ".%d.ext"
 			std::string filename = m_files.file_path(i);
 			std::string base = remove_extension(filename);
 			std::string ext = extension(filename);
@@ -911,6 +963,7 @@ namespace {
 				boost::crc_optimal<32, 0x1EDC6F41, 0xFFFFFFFF, 0xFFFFFFFF, true, true> crc;
 				process_string_lowercase(crc, filename);
 				std::uint32_t const new_hash = crc.checksum();
+				// files 种没找到 new_hash，说明解决文件名冲突了
 				if (files.find(new_hash) == files.end())
 				{
 					files.insert({new_hash, {i, 0}});
@@ -924,7 +977,9 @@ namespace {
 				}
 			}
 
+			// 创建 m_file 副本
 			copy_on_write();
+			// 重命名文件
 			m_files.rename_file(i, filename);
 		}
 	}
@@ -1093,6 +1148,9 @@ namespace {
 	sha1_hash torrent_info::hash_for_piece(piece_index_t const index) const
 	{ return sha1_hash(hash_for_piece_ptr(index)); }
 
+	/**
+	 * 将初次修改前的 m_files 保留到 m_orig_files
+	 */
 	void torrent_info::copy_on_write()
 	{
 		TORRENT_ASSERT(is_loaded());

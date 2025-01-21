@@ -572,6 +572,8 @@ namespace aux {
 		// located in one of these directories. This is not a tree, it's a flat
 		// list of all *leaf* directories. i.e. the union of the parent paths of
 		// all files.
+		//
+		// 返回 torrent 中所有文件的父目录路径。 这些是扁平的，不是树结构。
 		aux::vector<std::string, aux::path_index_t> const& paths() const { return m_paths; }
 
 		// returns a bitmask of flags from file_flags_t that apply

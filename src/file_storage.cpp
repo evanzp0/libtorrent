@@ -1043,10 +1043,10 @@ namespace {
 	 * 
 	 * 文件路径分以下几种情况，file_entry 为：
 	 * 1. 绝对路径: crc(file_entry.filename())
-	 * 2. 无路径：crc(save_path + "/" + file_entry.filename())
-	 * 3. 无根目录：crc(save_path + "/" + m_path[file_entry.path_index] + "/" + file_entry.filename())
+	 * 2. 无路径：crc((save_path + "/") + file_entry.filename())
+	 * 3. 无根目录：crc((save_path + "/") + m_path[file_entry.path_index] + "/" + file_entry.filename())
 	 * 4. 默认情况（非绝对路径，有路径，有根目录）：
-	 * 	  crc(save_path + "/" + m_name + "/" + m_paths[file_entry.path_index] + "/" + file_entry.filename())
+	 * 	  crc((save_path + "/") + m_name + "/" + m_paths[file_entry.path_index] + "/" + file_entry.filename())
 	 * 
 	 * @param save_path 保存路径？要么为空，要么为目录路径。非绝对路径时起始字符不可位 "/"。
 	 */
