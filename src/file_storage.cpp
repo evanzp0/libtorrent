@@ -370,7 +370,7 @@ namespace aux {
 	/**
 	 *  给 file_entry 的 name 属性赋值
 	 * 
-	 * @param n – 当前文件名或目录名（不含上级目录）
+	 * @param n – 当前文件名（不含目录）
 	 * @param borrow_string – 是否借用 n 的内存。如果为 true, 则 n 不会被拷贝；如果为 false, n 会被拷贝。
 	 */
 	void file_entry::set_name(string_view n, bool const borrow_string)
@@ -398,6 +398,9 @@ namespace aux {
 		}
 	}
 
+	/**
+	 * 
+	*/
 	string_view file_entry::filename() const
 	{
 		if (name_len != name_is_owned) return {name, std::size_t(name_len)};
@@ -1036,7 +1039,8 @@ namespace {
 	}
 
 	/**
-	 * todo！()
+	 * 计算文件路径的 32 位 CRC 哈希值。
+	 * 
 	 */
 	std::uint32_t file_storage::file_path_hash(file_index_t const index
 		, std::string const& save_path) const

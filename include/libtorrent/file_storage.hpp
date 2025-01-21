@@ -172,7 +172,7 @@ namespace aux {
 	private:
 		// This string is not necessarily 0-terminated!
 		// that's why it's private, to keep people away from it
-		// 如果不为空，则为文件名
+		// 如果不为空，则为文件名（不含目录名）
 		char const* name = nullptr;
 	public:
 		// the SHA-256 root of the merkle tree for this file
