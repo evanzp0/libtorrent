@@ -1081,6 +1081,7 @@ namespace {
 			, cfg.max_decode_tokens);
 		if (ec) aux::throw_ex<system_error>(ec);
 
+		// 解析 .torrent 文件
 		if (!parse_torrent_file(e, ec, cfg.max_pieces))
 			aux::throw_ex<system_error>(ec);
 
