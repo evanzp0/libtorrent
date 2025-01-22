@@ -58,6 +58,10 @@ namespace libtorrent {
 	// internal
 	inline bool is_digit(char c)
 	{ return c >= '0' && c <= '9'; }
+
+	/**
+	 * 确保 url 以 '/' 结尾。如果 url 为空，则添加一个 '/'。
+	 */
 	inline void ensure_trailing_slash(std::string& url)
 	{
 		if (url.empty() || url[url.size() - 1] != '/')

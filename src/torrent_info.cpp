@@ -777,11 +777,15 @@ TORRENT_VERSION_NAMESPACE_3
 	torrent_info::torrent_info(torrent_info const&) = default;
 	torrent_info& torrent_info::operator=(torrent_info&&) = default;
 
+	/**
+	 * 解决 Torrent 文件中文件名冲突的问题。
+	 * 冲突的文件名会被重命名，直到文件名唯一为止。
+	 */
 	void torrent_info::resolve_duplicate_filenames()
 	{
 		INVARIANT_CHECK;
 
-		// 存放所有文件的哈希值集合，用于文件名去重。
+		// 存放所有文件的哈希值集合，用于文件名是否重复判定。
 		std::unordered_set<std::uint32_t> files;
 
 		std::string const empty_str;
@@ -1744,6 +1748,7 @@ namespace {
 		// 解析 "info" 字段，将结果存放在 m_files 和 m_info_hash 中。
 		if (!parse_info_section(info, ec, piece_limit)) return false;
 
+		// 有重复的文件名，会被重新命名，以避免冲突。
 		resolve_duplicate_filenames();
 
 		if (m_info_hash.has_v2())
@@ -1751,9 +1756,14 @@ namespace {
 			// allow torrent files without piece layers, just like we allow magnet
 			// links. However, if there are piece layers, make sure they're
 			// valid
+			// 对于 v2 的种子，"piece layers" 字段也是可选的，因为：
+			// 1. 对于某些场景（例如单文件种子或小型种子, 小于一个 piece 的大小），piece layers 并不是必需的。
+			// 2. 允许没有 piece layers 的 v2 种子文件类似于磁力链接的设计理念。
+			//    客户端可以先下载种子文件的基本信息（如文件列表和目录结构），然后在需要时动态获取 piece layers 或其他元数据。
 			bdecode_node const& e = torrent_file.dict_find_dict("piece layers");
 			if (e && !parse_piece_layers(e, ec))
 			{
+				// piece layers 字段存在，但是 解析该字段失败，则认为种子文件无效。
 				TORRENT_ASSERT(ec);
 				// mark the torrent as invalid
 				m_files.set_piece_length(0);
@@ -1761,8 +1771,11 @@ namespace {
 			}
 		}
 
-#ifndef TORRENT_DISABLE_MUTABLE_TORRENTS
-		bdecode_node const similar = torrent_file.dict_find_list("similar");
+#ifndef TORRENT_DISABLE_MUTABLE_TORRENTS // mutable torrents 定义在 BEP46，对于的 DHT 改动定义在 BEP44
+
+		// 提取 "similar" 的列表，并将其添加到 m_owned_similar_torrents 中。
+		// 列表中的每一项都是一个 20-byte 的字符串，表示相似种子（similar torrent）的 info_hash。
+		bdecode_node const similar = torrent_file.dict_find_list("similar"); // BEP47
 		if (similar)
 		{
 			for (int i = 0; i < similar.list_size(); ++i)
@@ -1778,7 +1791,9 @@ namespace {
 			}
 		}
 
-		bdecode_node const collections = torrent_file.dict_find_list("collections");
+		// 提取 "collections" 的列表，并将其添加到 m_owned_collections 中。
+		// 列表中的每一项都是一个字符串，表示种子所属的集合（collection）的标识符。
+		bdecode_node const collections = torrent_file.dict_find_list("collections"); // BEP47
 		if (collections)
 		{
 			for (int i = 0; i < collections.list_size(); ++i)
@@ -1794,6 +1809,15 @@ namespace {
 #endif // TORRENT_DISABLE_MUTABLE_TORRENTS
 
 		// extract the url of the tracker
+		/** 
+		 * 提取 Tracker URL，并按层级存储和排序，同时通过随机化实现负载均衡
+		 * 
+		 * announce-list 的结构如下：
+		 * [ // 第一维是层级列表
+		 *   ["http://tracker1.com", "http://tracker2.com"], 
+		 *   ["http://tracker3.com"]
+		 * ]
+		 */
 		bdecode_node const announce_node = torrent_file.dict_find_list("announce-list");
 		if (announce_node)
 		{
@@ -1811,6 +1835,8 @@ namespace {
 					e.fail_limit = 0;
 					e.source = announce_entry::source_torrent;
 #if TORRENT_USE_I2P
+					// 这个标志可能用于通知 BitTorrent 客户端，当前种子需要通过 I2P 网络访问 Tracker。
+					// I2P 网络通过加密和分布式路由来隐藏用户的身份和通信内容
 					if (is_i2p_url(e.url)) m_flags |= i2p;
 #endif
 					m_urls.push_back(e);
@@ -1820,13 +1846,16 @@ namespace {
 			if (!m_urls.empty())
 			{
 				// shuffle each tier
-				aux::random_shuffle(m_urls);
+				//第一维度（层级, e.tier）保持不变，仅在每个层级内部的数组进行随机化。
+				aux::random_shuffle(m_urls); // 先所有 item 随机化
+				// 再按层级排序
 				std::stable_sort(m_urls.begin(), m_urls.end()
 					, [](announce_entry const& lhs, announce_entry const& rhs)
 					{ return lhs.tier < rhs.tier; });
 			}
 		}
 
+		// m_urls 为空的化，则提取 "announce" 字段，并将其封装为一个 announce_entry 对象。
 		if (m_urls.empty())
 		{
 			announce_entry e(torrent_file.dict_find_string_value("announce"));
@@ -1839,7 +1868,17 @@ namespace {
 			if (!e.url.empty()) m_urls.push_back(e);
 		}
 
-		bdecode_node const nodes = torrent_file.dict_find_list("nodes");
+		// 提取 "nodes" 字段 [ [ip, port] ]，并将其添加到 m_nodes 中。
+		/**
+		 * nodes 字段示例：
+		 * [
+		 *   ["192.168.1.1", 6881],
+		 *   ["10.0.0.2", 6882],
+		 * 	 ["invalid_node", "not_a_number"],  // 无效节点，会被跳过
+		 *   ["172.16.0.1", 6883]
+		 * ]
+		 */
+		bdecode_node const nodes = torrent_file.dict_find_list("nodes"); // BEP5 中有 nodes 字段的定义，libtorrent 自定义的种子，使用了该字段。
 		if (nodes)
 		{
 			for (int i = 0, end(nodes.list_size()); i < end; ++i)
@@ -1857,6 +1896,7 @@ namespace {
 		}
 
 		// extract creation date
+		// 提取 "creation date" 字段，并存入 m_creation_date 。
 		std::int64_t const cd = torrent_file.dict_find_int_value("creation date", -1);
 		if (cd >= 0)
 		{
@@ -1864,16 +1904,26 @@ namespace {
 		}
 
 		// if there are any url-seeds, extract them
-		bdecode_node const url_seeds = torrent_file.dict_find("url-list");
+		// 提取 "url-list" 字段，并存入 m_web_seeds 。
+		bdecode_node const url_seeds = torrent_file.dict_find("url-list"); // BEP19
+
+		//  处理单个 URL SEED（字符串）
 		if (url_seeds && url_seeds.type() == bdecode_node::string_t
 			&& url_seeds.string_length() > 0)
 		{
+			// 对 url 需要先进行 http url encoding
 			web_seed_entry ent(maybe_url_encode(url_seeds.string_value().to_string())
 				, web_seed_entry::url_seed);
+			
+			// 如果 torrent 中是多文件，则调用 ensure_trailing_slash 函数确保URL以斜杠（/）结尾，
+			// 因为 多文件的 web seed 指向的是一个目录，例如：http://example.com/files/
+			// 如果是单文件，则 url 不需要以斜杠结尾，例如：http://example.com/file.zip
 			if ((m_flags & multifile) && num_files() > 1)
 				ensure_trailing_slash(ent.url);
+
 			m_web_seeds.push_back(std::move(ent));
 		}
+		// 处理多个 URL SEED（列表）
 		else if (url_seeds && url_seeds.type() == bdecode_node::list_t)
 		{
 			// only add a URL once
@@ -1883,23 +1933,33 @@ namespace {
 				bdecode_node const url = url_seeds.list_at(i);
 				if (url.type() != bdecode_node::string_t) continue;
 				if (url.string_length() == 0) continue;
+
 				web_seed_entry ent(maybe_url_encode(url.string_value().to_string())
 					, web_seed_entry::url_seed);
+
+				// .torrent 是多文件，则 web seed 应该以斜杠（/）结尾，指向目录。
 				if ((m_flags & multifile) && num_files() > 1)
 					ensure_trailing_slash(ent.url);
+
+				// 去重
 				if (!unique.insert(ent.url).second) continue;
+
 				m_web_seeds.push_back(std::move(ent));
 			}
 		}
 
 		// if there are any http-seeds, extract them
-		bdecode_node const http_seeds = torrent_file.dict_find("httpseeds");
+		// 提取 "httpseeds" 字段，并将其存储到一个容器（m_web_seeds）中。HTTP种子是用于加速下载的URL列表，通常指向包含文件内容的服务器。
+		bdecode_node const http_seeds = torrent_file.dict_find("httpseeds"); //BEP19
+
+		// 处理单个 HTTP SEED（字符串）
 		if (http_seeds && http_seeds.type() == bdecode_node::string_t
 			&& http_seeds.string_length() > 0)
 		{
 			m_web_seeds.emplace_back(maybe_url_encode(http_seeds.string_value().to_string())
 				, web_seed_entry::http_seed);
 		}
+		// 处理多个 HTTP SEED（列表）
 		else if (http_seeds && http_seeds.type() == bdecode_node::list_t)
 		{
 			// only add a URL once
@@ -1910,14 +1970,17 @@ namespace {
 				if (url.type() != bdecode_node::string_t || url.string_length() == 0) continue;
 				std::string u = maybe_url_encode(url.string_value().to_string());
 				if (!unique.insert(u).second) continue;
+
 				m_web_seeds.emplace_back(std::move(u), web_seed_entry::http_seed);
 			}
 		}
 
+		// 提取 "comment.utf-8" 存入 m_comment 。
 		m_comment = torrent_file.dict_find_string_value("comment.utf-8").to_string();
 		if (m_comment.empty()) m_comment = torrent_file.dict_find_string_value("comment").to_string();
 		aux::verify_encoding(m_comment);
 
+		// "created by.utf-8" 字段，存入 m_created_by 。
 		m_created_by = torrent_file.dict_find_string_value("created by.utf-8").to_string();
 		if (m_created_by.empty()) m_created_by = torrent_file.dict_find_string_value("created by").to_string();
 		aux::verify_encoding(m_created_by);

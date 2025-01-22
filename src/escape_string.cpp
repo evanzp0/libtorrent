@@ -207,6 +207,9 @@ namespace libtorrent {
 		return ret;
 	}
 
+	/**
+	 * 对 URL 的路径部分进行编码（如果需要的话），并返回完整的 URL
+	 */
 	std::string maybe_url_encode(std::string const& url)
 	{
 		std::string protocol, host, auth, path;
