@@ -265,6 +265,15 @@ namespace aux {
 
 } // anonymous aux
 
+	/**
+	 * 添加文件到种子文件中
+	 * 
+	 * @param fs 文件存储对象，用于添加文件信息
+	 * @param file 父目录路径
+	 * @param p 过滤函数，如果结果返回 true，则该文件将被添加到种子文件中。
+	 * 			如果 file 是 文件，则直接对其应用过滤函数；如果是目录，则递归遍历其子目录
+	 * @param flags 创建种子文件的标志，例如是否包含符号链接等
+	 */
 	void add_files(file_storage& fs, std::string const& file
 		, std::function<bool(std::string)> p, create_flags_t const flags)
 	{
