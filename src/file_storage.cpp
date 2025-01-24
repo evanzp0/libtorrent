@@ -902,6 +902,9 @@ namespace aux {
 		return sha1_hash(m_file_hashes[index]);
 	}
 
+	/** 
+	 * 获取 m_files 中第 index 文件的根哈希。
+	*/
 	sha256_hash file_storage::root(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t{} && index < end_file());
