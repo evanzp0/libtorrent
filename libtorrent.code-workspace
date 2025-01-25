@@ -91,6 +91,7 @@
 			"xtree": "cpp",
 			"xutility": "cpp"
 		},
-		"commentTranslate.source": "renping.deepseek-comment-translate-deepseek"
+		"commentTranslate.source": "renping.deepseek-comment-translate-deepseek",
+		"liveServer.settings.multiRootWorkspaceName": "bittorrent.org"
 	}
 }
