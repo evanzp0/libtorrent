@@ -99,21 +99,74 @@ namespace aux {
 
 		filter_impl();
 		bool empty() const;
+		 /**
+		 * @brief 添加一个地址范围规则到过滤器中。
+		 *
+		 * @param first 范围的起始地址。
+		 * @param last  范围的结束地址（包含）。
+		 * @param flags 规则的标志位，用于定义访问权限等附加信息。
+		 */
 		void add_rule(Addr first, Addr last, std::uint32_t flags);
+
+		/**
+		 * @brief 查询指定地址的访问权限。
+		 *
+		 * @param addr 需要查询的地址。
+		 * @return 返回该地址对应的访问权限值。
+		 */
 		std::uint32_t access(Addr const& addr) const;
+
+		/**
+		 * @brief 导出过滤器中的所有规则为指定类型的IP范围列表。
+		 *
+		 * @tparam ExternalAddressType 外部地址类型，通常为IPv4或IPv6。
+		 * @return 返回一个包含所有规则的IP范围列表。
+		 */
 		template <typename ExternalAddressType>
 		std::vector<ip_range<ExternalAddressType>> export_filter() const;
 
 	private:
-
+		/**
+		 * @brief 表示一个地址范围及其访问权限。
+		 */
 		struct range
 		{
+			/**
+			 * @brief 构造函数，初始化地址范围。
+			 *
+			 * @param addr 范围的起始地址。
+			 * @param a    访问权限，默认为0。
+			 */
 			range(Addr addr, std::uint32_t a = 0) : start(addr), access(a) {} // NOLINT
+			/**
+			 * @brief 比较两个范围对象，按起始地址比较。
+			 *
+			 * @param r 另一个范围对象。
+			 * @return 如果当前范围的起始地址小于另一个范围，则返回 true。
+			 */
 			bool operator<(range const& r) const { return start < r.start; }
+			/**
+			 * @brief 比较范围对象与单个地址，按起始地址比较。
+			 *
+			 * @param a 单个地址。
+			 * @return 如果当前范围的起始地址小于给定地址，则返回 true。
+			 */
 			bool operator<(Addr const& a) const { return start < a; }
+
+			 /**
+			 * @brief 范围的起始地址。
+			 */
 			Addr start;
+
 			// the end of the range is implicit
 			// and given by the next entry in the set
+			//
+			// 该范围的结束是隐含的，
+			// 并由集合中的下一个条目来确定。
+
+			/**
+			 * @brief 访问权限，表示该范围内的地址可以如何访问。
+			 */
 			std::uint32_t access;
 			friend bool operator==(range const& lhs, range const& rhs)
 			{ return lhs.start == rhs.start && lhs.access == rhs.access; }
@@ -138,6 +191,12 @@ namespace aux {
 // IPv6 range).
 //
 // A default constructed ip_filter does not filter any address.
+//
+// “ip_filter” 类是一组规则，这些规则能唯一地将所有 IP 地址归类为允许或不允许的。
+// 默认构造函数会创建一条单一规则，
+// 该规则允许所有地址（对于 IPv4 地址范围是 0.0.0.0 到 255.255.255.255，对于 IPv6 地址范围则是涵盖所有地址的等效范围）。
+//
+// 一个通过默认方式构造的 “ip_filter” 不会过滤任何地址。
 struct TORRENT_EXPORT ip_filter
 {
 	ip_filter();
@@ -171,6 +230,17 @@ struct TORRENT_EXPORT ip_filter
 	//
 	// This means that in a case of overlapping ranges, the last one applied takes
 	// precedence.
+	//
+	// 向过滤器添加一条规则。“first” 和 “last” 定义了一个 IP 地址范围，该范围内的 IP 地址将被标记上给定的标志。
+	// 当前，“flags” 可以为 0，这表示允许；或者为 “ip_filter::blocked”，这表示不允许。
+	//
+	// 前置条件：
+	// “first.is_v4() == last.is_v4() && first.is_v6() == last.is_v6()”
+	//
+	// 后置条件：
+	// 对于范围 [“first”，“last”] 内的每个 “x”，“access(x) == flags”
+	//
+	// 这意味着，在存在范围重叠的情况下，最后应用的那条规则具有优先权。 
 	void add_rule(address const& first, address const& last, std::uint32_t flags);
 
 	// Returns the access permissions for the given address (``addr``). The permission
@@ -189,6 +259,11 @@ struct TORRENT_EXPORT ip_filter
 	//
 	// The return value is a tuple containing two range-lists. One for IPv4 addresses
 	// and one for IPv6 addresses.
+	//
+	// 此函数将以尽可能少的范围数量返回过滤器的当前状态。这些范围按照从低地址范围到高地址范围进行排序。
+	// 返回的向量中的每个条目都是一个范围，其 “flags” 字段中指定了访问控制权限。
+	//
+	// 返回值是一个包含两个范围列表的元组。一个用于 IPv4 地址，另一个用于 IPv6 地址。
 	filter_tuple_t export_filter() const;
 
 private:
