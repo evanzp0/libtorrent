@@ -197,7 +197,7 @@ libtorrent 会跟踪每个 torrent 的状态变化，包括下载进度、上传
 
 如果添加的 `torrent` 没有提供恢复数据， libtorrent 将默认采用第 1 种方式。
 
-要保存恢复的数据，请在 `torrent_handle` 对象上调用 [save_resume_data()](https://www.libtorrent.org/reference-Torrent_Handle.html#save_resume_data()) 函数。这将请求 libtorrent 生成恢复数据，并在一个 [save_resume_data_alert](https://www.libtorrent.org/reference-Alerts.html#save_resume_data_alert) 中将其返回。如果出于任何原因生成恢复数据失败，则会发布一个 [save_resume_data_failed_alert](https://www.libtorrent.org/reference-Alerts.html#save_resume_data_failed_alert) 。
+要保存恢复的数据，请在 `torrent_handle` 对象上调用 [save_resume_data()](https://www.libtorrent.org/reference-Torrent_Handle.html#save_resume_data()) 函数。这将请求 libtorrent 生成恢复数据(填充 DTO)，并在一个 [save_resume_data_alert](https://www.libtorrent.org/reference-Alerts.html#save_resume_data_alert) 中将其返回。如果出于任何原因生成恢复数据失败，则会发布一个 [save_resume_data_failed_alert](https://www.libtorrent.org/reference-Alerts.html#save_resume_data_failed_alert) 。
 
 
 每当调用 [save_resume_data()](https://www.libtorrent.org/reference-Torrent_Handle.html#save_resume_data()) 函数时，都会准确地发布一个 `alert` 消息。这在关闭包含多个 `torrent` 的 `session` 时是一个重要的特性，因为在恢复关闭着的 `session` 之前，必须处理每一个 `resume alert` (译注：意思是没有在关闭 `session` 时保存好每一个 `resume alert` 的数据 ，那么之后就无法恢复整个 `session` 的 `torrent` ) 。任何 torrent 都可能无法保存恢复数据，因此客户端需要记录尚未保存的 resume 文件的数量，这个数量在收到 [save_resume_data_alert](https://www.libtorrent.org/reference-Alerts.html#save_resume_data_alert) 或 [save_resume_data_failed_alert](https://www.libtorrent.org/reference-Alerts.html#save_resume_data_failed_alert) 时都会相应减少（译注：等到该数量为 0  时，说明所有的 torrent resume data 都保存了，可以安全退出了）。
