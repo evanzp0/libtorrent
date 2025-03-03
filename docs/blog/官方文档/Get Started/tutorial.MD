@@ -209,7 +209,7 @@ struct save_resume_data_alert : torrent_alert
 {
         virtual std::string message() const;
 
-        // the resume data
+        // the resume data (DTO)
         add_torrent_params params;
 };
 ```
@@ -328,6 +328,7 @@ int main(int argc, char const* argv[]) try
       if (auto rd = lt::alert_cast<lt::save_resume_data_alert>(a)) {
         std::ofstream of(".resume_file", std::ios_base::binary);
         of.unsetf(std::ios_base::skipws);
+        // 将 rd-> params 这个 DTO 进行 bencoded 编码保存到 b 中
         auto const b = write_resume_data_buf(rd->params);
         of.write(b.data(), int(b.size()));
         if (done) goto done;
