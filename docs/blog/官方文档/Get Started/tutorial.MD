@@ -355,6 +355,7 @@ int main(int argc, char const* argv[]) try
 
     // ask the session to post a state_update_alert, to update our
     // state output for the torrent
+    // 注意：这条语句导致最终只有状态有变化的 torrent 才会被保存 resume_data。
     ses.post_torrent_updates();
 
     // save resume data once every 30 seconds
