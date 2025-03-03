@@ -329,6 +329,11 @@ TORRENT_VERSION_NAMESPACE_3
 		// chatter. This might be slightly smaller than the other rates, but if
 		// projected over a long time (e.g. when calculating ETA:s) the
 		// difference may be noticeable.
+		// 
+		// download_payload_rate 表示的是仅传输有效负载的数据速率，不包括协议相关的额外数据。
+		// 这种速率可能会略低于包括协议开销在内的总传输速率，但在长时间计算（例如估算剩余时间 ETA）时，这种差异可能会变得明显。
+		// 有效负载（payload）：指实际传输的数据内容。
+		// 协议开销（protocol chatter）：指在传输过程中用于协议控制和管理的额外数据，例如握手信息、确认信息等
 		int download_payload_rate = 0;
 		int upload_payload_rate = 0;
 

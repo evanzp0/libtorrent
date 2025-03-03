@@ -184,6 +184,7 @@ struct state_update_alert : alert
 >  - 状态变化的检测：
 libtorrent 会跟踪每个 torrent 的状态变化，包括下载进度、上传进度、连接数等。
 即使 torrent 的总体状态（如 downloading）没有变化，只要其内部状态（如 total_download）发生了变化，libtorrent 就会将其标记为“状态已更新”。
+（所以，可以设计成按固定的时间间隔，将改间隔的下载字节数保存到以时间为序列的 slot 中，然后就可以计算这个时间序列的速度，而不需要实时的每次有数据下载时就计算下载速度）
 
 可以通过查看 [torrent_status](https://www.libtorrent.org/reference-Torrent_Status.html#torrent_status) 对象中包含的更多信息，深入了解它的各个字段。其中，可能令人最感兴趣的字段包括 `total_payload_download` （总下载量）、 `total_payload_upload` （总上传量）、 `num_peers` （连接的 peers 对等体的数量）和 state（状态）。
 
