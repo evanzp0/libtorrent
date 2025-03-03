@@ -389,7 +389,7 @@ catch (std::exception& e)
 
 在销毁 `session` 对象之前，可以调用 [session::session_state()](https://www.libtorrent.org/reference-Session.html#session_state()) 方法来获取当前的状态，这个状态会以 [session_params](https://www.libtorrent.org/reference-Session.html#session_params) 对象的形式返回。
 
-你可以调用 [write_session_params()](https://www.libtorrent.org/reference-Session.html#write_session_params()) 函数或者 [write_session_params_buf()](https://www.libtorrent.org/reference-Session.html#write_session_params_buf()) 函数，来将 `session` 状态分别序列化为一个 `bencoded` 的 [entry] 对象，(https://www.libtorrent.org/reference-Bencoding.html#entry) 或者一个 flat buffer（std::vector<char>）中。
+你可以调用 [write_session_params()](https://www.libtorrent.org/reference-Session.html#write_session_params()) 函数或者 [write_session_params_buf()](https://www.libtorrent.org/reference-Session.html#write_session_params_buf()) 函数，来将 `session` 状态分别序列化为一个 `bencoded` 的 [entry](https://www.libtorrent.org/reference-Bencoding.html#entry) 对象，或者一个 flat buffer（std::vector<char>）中。
 
 > 译注：
 > --
