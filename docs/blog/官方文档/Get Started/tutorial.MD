@@ -179,7 +179,11 @@ struct state_update_alert : alert
 
 `status` 字段只包含自上次调用以来状态有更新的 `torrent` 的 `torrent_status` 。如果没有 `torrent` 更新其状态， `status` 字段可能为空。这个特性对于**提高可扩展性至关重要**。
 
-> **译者注：** “提高可扩展性至关重要”的意思应该指的是，如果每个 torrent 的状态变化都立即触发处理，那么可能会给系统带来很大的负担。而 state_update_alert 的这个特性允许系统批量处理只在一段时间内状态发生变化的 torrent，从而减轻了系统的负担，提高了整体的可扩展性和性能。
+> **译者注：** 
+>  - “提高可扩展性至关重要”的意思应该指的是，如果每个 torrent 的状态变化都立即触发处理，那么可能会给系统带来很大的负担。而 state_update_alert 的这个特性允许系统批量处理只在一段时间内状态发生变化的 torrent，从而减轻了系统的负担，提高了整体的可扩展性和性能。4
+>  - 状态变化的检测：
+libtorrent 会跟踪每个 torrent 的状态变化，包括下载进度、上传进度、连接数等。
+即使 torrent 的总体状态（如 downloading）没有变化，只要其内部状态（如 total_download）发生了变化，libtorrent 就会将其标记为“状态已更新”。
 
 可以通过查看 [torrent_status](https://www.libtorrent.org/reference-Torrent_Status.html#torrent_status) 对象中包含的更多信息，深入了解它的各个字段。其中，可能令人最感兴趣的字段包括 `total_payload_download` （总下载量）、 `total_payload_upload` （总上传量）、 `num_peers` （连接的 peers 对等体的数量）和 state（状态）。
 
