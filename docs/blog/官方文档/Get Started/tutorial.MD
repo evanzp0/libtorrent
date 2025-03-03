@@ -398,7 +398,7 @@ catch (std::exception& e)
 
 在启动时，构建会话对象之前，你可以从磁盘上加载缓冲区，并调用 [read_session_params()](https://www.libtorrent.org/reference-Session.html#read_session_params()) 函数来将其反序列化为 `session_params` 对象。在将这个对象传递给 session 构造函数之前，你有机会更新 settings_params 中的 settings 成员( [settings_pack](https://www.libtorrent.org/reference-Settings.html#settings_pack) 类型)，或者配置 disk_io_constructor (调用 disk_io_constructor(...) 方法 会生成一个 unique_ptr<disk_interface> 对象，来指定磁盘 I/O 的后端实现) 。
 
-> 译注： `session_params` 中的 `disk_io_constructor` 成员属性，其实是一个函数对象，调用它会生成一个 **用来指定磁盘 I/O 的后端实现** 的 `unique_ptr<disk_interface>` 对象，。
+> 译注： `session_params` 中的 `disk_io_constructor` 成员属性，其实是一个函数对象，调用它会生成一个 **用来指定磁盘 I/O 的后端实现** 的 `unique_ptr<disk_interface>` 对象。
 
 再次更新下之前的例子，加入以下内容：
 
