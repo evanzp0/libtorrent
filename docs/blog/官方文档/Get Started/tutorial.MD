@@ -218,7 +218,7 @@ struct save_resume_data_alert : torrent_alert
 
 > 译注：
 > 
-> 实际上 write_resume_data(atp) 方法是在 atp 基础上，添加了些内容，生成 libtorrent::entry 对象，这个 entry 对象就是 resume_data 对象，它并没有进行 bencoded 编码。
+> 实际上 write_resume_data(atp) 方法是在 atp 基础上，添加了些内容，生成用于 beconding 的 entry 对象，也就是 resume_data 对象，它还没进行 bencoded 编码。
 > write_resume_data_buf(entry) 才是用来对 entry 进行 bencoded 编码的。
 
 在例子基础上，更新了以下内容：
@@ -389,7 +389,7 @@ catch (std::exception& e)
 
 在销毁 `session` 对象之前，可以调用 [session::session_state()](https://www.libtorrent.org/reference-Session.html#session_state()) 方法来获取当前的状态，这个状态会以 [session_params](https://www.libtorrent.org/reference-Session.html#session_params) 对象的形式返回。
 
-你可以调用 [write_session_params()](https://www.libtorrent.org/reference-Session.html#write_session_params()) 函数或者 [write_session_params_buf()](https://www.libtorrent.org/reference-Session.html#write_session_params_buf()) 函数，来将 `session` 状态分别序列化为一个 `bencoded` 的 [entry](https://www.libtorrent.org/reference-Bencoding.html#entry) 或者一个 flat buffer（std::vector<char>）中。
+你可以调用 [write_session_params()](https://www.libtorrent.org/reference-Session.html#write_session_params()) 函数或者 [write_session_params_buf()](https://www.libtorrent.org/reference-Session.html#write_session_params_buf()) 函数，来将 `session` 状态分别序列化为一个 `bencoded` 的 [entry] 对象，(https://www.libtorrent.org/reference-Bencoding.html#entry) 或者一个 flat buffer（std::vector<char>）中。
 
 > 译注：
 > --
