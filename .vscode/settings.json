@@ -83,6 +83,7 @@
         "xutility": "cpp"
     },
     "markdown.styles": [
-        "https://use.fontawesome.com/releases/v5.7.1/css/all.css"
+        "https://use.fontawesome.com/releases/v5.7.1/css/all.css",
+        ".\\docs\\markdown-preview.css"
     ]
 }
