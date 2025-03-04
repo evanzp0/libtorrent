@@ -294,7 +294,7 @@ h.set_flags(torrent_flags::paused, torrent_flags::paused | torrent_flags::auto_m
 除了这一基本倾向外，`torrent` 的优先级还可以通过指定 `seed ratio`（上传与下载的比率）、`seed-time ratio`（下载时间与做种时间的比率）
 以及 `seed-time`（为一个 `torrent` 做种的绝对时间）来控制。在这些目标全部达成之前，该 `torrent` 将被优先考虑进行做种。
 
-在已经达到做种目标的 `torrent` 中(已经达到了上传的数据量或达到了预设的上传比例的 `torrent`)，那些我们不知道有其他做种者的 `torrent` 将严格优先。
+在已经达到做种目标的 `torrent` 中(已经达到了上传的数据量或达到了预设的上传比例的 `torrent`)，那些我们不知道有其他做种者的 `torrent` 将严格优先继续做种。
 
 为了避免频繁切换，那些启动时间不足30分钟的 `torrent` 也会优先保持做种状态。
 
