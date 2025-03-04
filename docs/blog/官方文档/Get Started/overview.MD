@@ -194,6 +194,11 @@ v2 协议引入了使用 `merkle hash tree`（默克尔哈希树）替代扁平�
 这两种 [torrent_handle](https://www.libtorrent.org/reference-Torrent_Handle.html#torrent_handle) 对象都会将被置于 `duplicate_torrent` 错误状态。
 在这种状态下，必须移除其中一个，另一个可以恢复，以便重新下载 `metadata` 。
 
+> *译注：*
+>
+> 混合种子文件同时包含 v1 和 v2 的元数据。例如，info 字典中既有 v1 的 pieces 字段（SHA-1 哈希列表），也有 v2 的 file tree 和 piece layers 字段（默克尔树结构）。
+> 这时，在解析时发现已经存在了已解析的混合 torrent 冲突时，把后解析的 torrent 直接移除就行。
+
 当两个 `torrent` 发生冲突时，会发布 [torrent_conflict_alert](https://www.libtorrent.org/reference-Alerts.html#torrent_conflict_alert)。
 该 alert 继承自 [torrent_alert](https://www.libtorrent.org/reference-Alerts.html#torrent_alert)，因此与一个 `torrent_handle` 相关联。
 它包含第二个 `torrent_handle`，指向冲突中的另一个种子，以及已下载的元数据。
