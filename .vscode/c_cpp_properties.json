@@ -10,7 +10,8 @@
             "defines": [
                 "_DEBUG",
                 "UNICODE",
-                "_UNICODE"
+                "_UNICODE",
+                "TORRENT_ABI_VERSION=2"
             ],
             "windowsSdkVersion": "10.0.22621.0",
             "compilerPath": "cl.exe",

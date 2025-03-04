@@ -47,6 +47,11 @@ libtorrent 的接口由几个类组成。主要的类是 [session](https://www.l
 每当一个 torrent 遇到致命错误时，它将被停止，`torrent_status::error` 会描述导致停止的错误。如果 torrent 是自动管理的，它会定期被清理，
 并根据每个 seed (种子, 指拥有完整文件的上传者‌‌) 对应的下载者数量来决定暂停或恢复。这将有效地为最需要种子的 torrent 提供种子。
 
+> *译注：*
+>
+> 通过 `torrent_status::error` 变量获取错误信息是 Libtorrent ABI V1 接口中的用法。
+> Libtorrent ABI V2 中，应该使用 `torrent_status::errc::message()` 来获取错误信息。
+
 如果一个 torrent 遇到磁盘写入错误，它将被设置为上传模式。这意味着它将不会下载任何内容，而只会进行上传。
 假设写入错误是由磁盘已满或写入权限错误引起的：
 如果 torrent 文件是自动管理的，它会定期退出上传模式，尝试再次将数据写入磁盘，（如果成功）这意味着如果问题得到解决，torrent 文件可以从某些磁盘错误中恢复；
