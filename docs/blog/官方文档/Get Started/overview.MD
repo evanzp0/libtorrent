@@ -207,12 +207,6 @@ v2 协议引入了使用 `merkle hash tree`（默克尔哈希树）替代扁平�
 当 v1-only 或 v2-only 的磁力链解析后发现其实是 `hybird torrent` 时，与该种子关联的 [info_hash_t](https://www.libtorrent.org/reference-Core.html#info_hash_t) 对象将被更新，以同时包含 v1 和 v2 的信息哈希。
 这适用于 [torrent_handle::info_hashes()](https://www.libtorrent.org/reference-Torrent_Handle.html#info_hashes()) 和 [torrent_info::info_hashes()](https://www.libtorrent.org/reference-Torrent_Info.html#info_hashes()) 。
 
-> *译注：*
-> 举个例子，你有一个 v1-only 磁力链，只包含 v1 的 info-hash（SHA-1）。
-当你开始下载时，发现这个 v1 torrent 实际上是一个 hybird torrent（既支持 v1 也支持 v2）。
-客户端会更新这个原 v1 torrent 的 info_hash_t 对象，使其同时包含 v1 和 v2 的 info-hash。
-同样的情况也适用于 v2-only 磁力链。
-
 ## queuing（队列管理）
 
 libtorrent 支持队列管理。队列管理是一种基于特定条件自动暂停和恢复种子的机制。这些条件取决于种子的整体状态（检查中、下载中或做种中）。
