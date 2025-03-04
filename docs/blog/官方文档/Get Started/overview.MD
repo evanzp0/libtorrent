@@ -170,10 +170,12 @@ magnet:?xt=urn:btih: Base16 encoded info-hash [ &dn= name of download ] [ &tr= t
 
 要从通过 `magnet link`（或以任何方式）添加的 `torrent` 中保存一个 `.torrent` 文件，请按照以下步骤操作：
 
-- 在 [torrent_handle](https://www.libtorrent.org/reference-Torrent_Handle.html#save_resume_data()) 上调用 [save_resume_data()](https://www.libtorrent.org/reference-Torrent_Handle.html#torrent_handle) ，并确保传入 `save_info_dict` 标志。
+- 在 [torrent_handle](https://www.libtorrent.org/reference-Torrent_Handle.html#save_resume_data()) 上，
+调用 [save_resume_data()](https://www.libtorrent.org/reference-Torrent_Handle.html#torrent_handle)，并确保传入 `save_info_dict` 标志。
 - 等待 `resume_data_alert` 。
-- 调用 [write_torrent_file()](https://www.libtorrent.org/reference-Resume_Data.html#write_torrent_file()) ，并传入从 [alert](https://www.libtorrent.org/reference-Alerts.html#alert) 中获取的 [add_torrent_params](https://www.libtorrent.org/reference-Add_Torrent.html#add_torrent_params
-续传数据格式与.torrent文件格式非常相似，当在续传数据中包含信息字典（info-dict）时，续传文件可以作为一个.torrent文件使用（仅有一些细微的例外）。) 对象。
+- 调用 [write_torrent_file()](https://www.libtorrent.org/reference-Resume_Data.html#write_torrent_file()) ，
+并传入从 [alert](https://www.libtorrent.org/reference-Alerts.html#alert) 中
+获取的 [add_torrent_params](https://www.libtorrent.org/reference-Add_Torrent.html#add_torrent_params)对象。
 
 续传数据格式(`resume data format`)与 `.torrent` 文件格式非常相似，当在续传数据中包含 `info-dict` 时，续传文件可以作为一个 `.torrent` 文件使用（仅有一些细微的例外）。
 
