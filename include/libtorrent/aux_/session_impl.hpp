@@ -940,12 +940,18 @@ namespace aux {
 			// m_files. The disk io thread posts completion
 			// events to the io service, and needs to be
 			// constructed after it.
+			//
+			// m_disk_thread 用于异步处理磁盘输入输出请求，
+			// 对等端拥有指向磁盘缓冲区池的指针，并且必须在此 m_disk_thread 之前被析构。
+			// 磁盘线程依赖于文件池对象，并且必须在 m_files 之前被析构。
+			// 磁盘输入输出线程会向输入输出服务发布完成事件，并且需要在输入输出服务之后被构造。
 			std::unique_ptr<disk_interface> m_disk_thread;
 
 			// the bandwidth manager is responsible for
 			// handing out bandwidth to connections that
 			// asks for it, it can also throttle the
 			// rate.
+			// 带宽管理器负责为请求带宽的连接分配带宽，它还可以对速率进行限制。
 			bandwidth_manager m_download_rate;
 			bandwidth_manager m_upload_rate;
 
@@ -1022,6 +1028,9 @@ namespace aux {
 			// the addresses or device names of the interfaces we are supposed to
 			// listen on. if empty, it means that we should let the os decide
 			// which interface to listen on
+			//
+			// 我们应该监听的网络接口的地址或设备名称。
+			// 如果该列表为空，则意味着我们应该让操作系统决定监听哪个网络接口。
 			std::vector<listen_interface_t> m_listen_interfaces;
 
 			// the network interfaces outgoing connections are opened through. If
@@ -1281,6 +1290,10 @@ namespace aux {
 			// in this queue and get announced the next time
 			// the timer fires, instead of the next one in
 			// the round-robin sequence.
+			//
+			// 那些在添加时没有任何对等端的种子文件，应尽快向分布式哈希表（DHT）进行通告。
+			// 此类种子文件会被放入这个队列中，当下一次定时器触发时就会进行通告，
+			// 而不是按照轮询顺序等到下一个才通告。
 			std::deque<std::weak_ptr<torrent>> m_dht_torrents;
 #endif
 

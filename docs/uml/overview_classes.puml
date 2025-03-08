@@ -1,0 +1,50 @@
+@startuml classes overview
+    session_handle <|-- session
+    session o-- session_impl
+    session o-- io_context
+    session o-- thread
+
+    session_impl *-- alert_manager
+    session_impl *-- handler_storage
+    session_impl "1" o-- "0..*" block_info
+    session_impl *-- peer_class_pool
+    session_impl "1" o-- "0..*" peer_connection
+    session_impl "1" o-- "0..*" endpoint: m_dht_nodes
+    session_impl *-- dht_state
+    session_impl *-- dht_storage_interface
+    session_impl o-- dht_tracker
+    session_impl *-- disk_interface
+    session_impl *-- resolver
+    session_impl *-- i2p_connection
+    session_impl *-- ip_filter
+    session_impl *-- port_filter
+    session_impl *-- ip_change_notifier
+    session_impl "1" o-- "0..*" listen_socket_t
+    session_impl *-- torrent_peer_allocator
+    session_impl *-- session_settings
+    session_impl *-- stat
+    session_impl *-- m_utp_socket_manager
+
+    class torrent_list<T> {
+        m_array: torrent_array
+        m_index: torrent_map
+    }
+    torrent_list *-- torrent
+    session_impl "1" o.. "0..*" torrent_list
+
+    listen_socket_t *-- acceptor
+    listen_socket_t *-- session_udp_socket
+
+    bandwidth_manager "1" o-- "0..*" bw_request
+    bw_request o-- bandwidth_socket
+
+    interface bandwidth_socket {}
+
+    bandwidth_socket <|..peer_connection
+
+    peer_class_pool "1" o-- "0..*" peer_class
+
+    alert_manager "1" *-- "0..*" alert
+    alert_manager o-- stack_allocator
+    alert_manager o-- plugin
+@enduml

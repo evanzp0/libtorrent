@@ -77,12 +77,14 @@ struct TORRENT_EXTRA_EXPORT bandwidth_manager
 private:
 
 	// these are the consumers that want bandwidth
+	// 队列中所有请求所涉及的字节数
 	std::vector<bw_request> m_queue;
 	// the number of bytes all the requests in queue are for
 	std::int64_t m_queued_bytes;
 
 	// this is the channel within the consumers
 	// that bandwidth is assigned to (upload or download)
+	// 这是消费者内部的通道，带宽会分配到该通道（上传或下载）。
 	int m_channel;
 
 	bool m_abort;

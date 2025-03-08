@@ -164,6 +164,10 @@ namespace aux {
 		// manager gives exclusive access to m_alerts[m_generation] and
 		// m_allocations[m_generation] whereas the other copy is exclusively
 		// used by the client thread.
+		//
+		// 所有警报都在此处排队。为了实现线程访问的双重缓冲，使用了两个异构队列。
+		// 警报管理器中的 std::mutex 为 m_alerts[m_generation] 和 m_allocations[m_generation] 提供独占访问权限，
+		// 而另一个副本则由客户端线程独占使用。
 		aux::array<heterogeneous_queue<alert>, 2> m_alerts;
 
 		// this is a stack where alerts can allocate variable length content,
