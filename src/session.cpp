@@ -254,8 +254,19 @@ namespace {
 		return set;
 	}
 
+	/**
+	 * 启动会话
+	 * 
+	 * 该函数根据提供的标志和参数初始化并启动一个会话。如果用户未提供IO上下文，则会创建一个内部的IO上下文。
+	 * 此外，还会处理DHT设置、扩展插件、DHT状态、IP过滤器等配置项，并最终启动会话。
+	 * 
+	 * @param flags 会话启动标志，用于控制会话的行为
+	 * @param params 会话参数，包含各种配置选项
+	 * @param ios IO上下文指针，用于事件循环。如果为nullptr，则使用内部创建的IO上下文
+	 */
 	void session::start(session_flags_t const flags, session_params&& params, io_context* ios)
 	{
+		// 检查是否需要使用内部的IO上下文
 		bool const internal_executor = ios == nullptr;
 
 		if (internal_executor)
@@ -265,74 +276,88 @@ namespace {
 			ios = m_io_service.get();
 		}
 
-#if TORRENT_ABI_VERSION <= 2
-#ifndef TORRENT_DISABLE_DHT
+	#if TORRENT_ABI_VERSION <= 2
+	#ifndef TORRENT_DISABLE_DHT
 		// in case the session_params has its dht_settings in use, pick out the
 		// non-default settings from there and move them into the main settings.
 		// any conflicting options set in main settings take precedence
+		//
+		// 如果 session_params 主设置（settings）中有DHT设置在使用，则从中提取非默认的设置（dht_settings）并移动到主设置（settings）中。
+		// 主设置中的任何冲突选项将优先于DHT设置。
 		{
-		dht::dht_settings const def_sett{};
-#define SET_BOOL(name) if (!params.settings.has_val(settings_pack::dht_ ## name) && \
-	def_sett.name != params.dht_settings.name) \
+			dht::dht_settings const def_sett{};
+	#define SET_BOOL(name) if (!params.settings.has_val(settings_pack::dht_ ## name) && \
+		def_sett.name != params.dht_settings.name) \
 		params.settings.set_bool(settings_pack::dht_ ## name, params.dht_settings.name)
-#define SET_INT(name) if (!params.settings.has_val(settings_pack::dht_ ## name) && \
-	def_sett.name != params.dht_settings.name) \
+	#define SET_INT(name) if (!params.settings.has_val(settings_pack::dht_ ## name) && \
+		def_sett.name != params.dht_settings.name) \
 		params.settings.set_int(settings_pack::dht_ ## name, params.dht_settings.name)
 
-		SET_INT(max_peers_reply);
-		SET_INT(search_branching);
-		SET_INT(max_fail_count);
-		SET_INT(max_torrents);
-		SET_INT(max_dht_items);
-		SET_INT(max_peers);
-		SET_INT(max_torrent_search_reply);
-		SET_BOOL(restrict_routing_ips);
-		SET_BOOL(restrict_search_ips);
-		SET_BOOL(extended_routing_table);
-		SET_BOOL(aggressive_lookups);
-		SET_BOOL(privacy_lookups);
-		SET_BOOL(enforce_node_id);
-		SET_BOOL(ignore_dark_internet);
-		SET_INT(block_timeout);
-		SET_INT(block_ratelimit);
-		SET_BOOL(read_only);
-		SET_INT(item_lifetime);
-		SET_INT(upload_rate_limit);
-		SET_INT(sample_infohashes_interval);
-		SET_INT(max_infohashes_sample_count);
-#undef SET_BOOL
-#undef SET_INT
-		}
-#endif
-#endif
+			// 设置DHT相关参数
 
-		m_impl = std::make_shared<aux::session_impl>(std::ref(*ios)
-			, std::move(params.settings)
-			, std::move(params.disk_io_constructor)
-			, flags);
+			// if (!params.settings.has_val(settings_pack::dht_max_peers_reply) &&
+			//			def_sett.max_peers_reply != params.dht_settings.max_peers_reply) 
+			//		params.settings.set_int(settings_pack::dht_max_peers_reply, params.dht_settings.max_peers_reply);
+			SET_INT(max_peers_reply);
+
+			SET_INT(search_branching);
+			SET_INT(max_fail_count);
+			SET_INT(max_torrents);
+			SET_INT(max_dht_items);
+			SET_INT(max_peers);
+			SET_INT(max_torrent_search_reply);
+			SET_BOOL(restrict_routing_ips);
+			SET_BOOL(restrict_search_ips);
+			SET_BOOL(extended_routing_table);
+			SET_BOOL(aggressive_lookups);
+			SET_BOOL(privacy_lookups);
+			SET_BOOL(enforce_node_id);
+			SET_BOOL(ignore_dark_internet);
+			SET_INT(block_timeout);
+			SET_INT(block_ratelimit);
+			SET_BOOL(read_only);
+			SET_INT(item_lifetime);
+			SET_INT(upload_rate_limit);
+			SET_INT(sample_infohashes_interval);
+			SET_INT(max_infohashes_sample_count);
+	#undef SET_BOOL
+	#undef SET_INT
+		}
+	#endif
+	#endif
+
+		// 创建并初始化会话实现对象
+		m_impl = std::make_shared<aux::session_impl>(std::ref(*ios),
+			std::move(params.settings),
+			std::move(params.disk_io_constructor),
+			flags);
 		*static_cast<session_handle*>(this) = session_handle(m_impl);
 
-#ifndef TORRENT_DISABLE_EXTENSIONS
+	#ifndef TORRENT_DISABLE_EXTENSIONS
+		// 加载并添加扩展插件
 		for (auto& ext : params.extensions)
 		{
 			ext->load_state(params.ext_state);
 			m_impl->add_ses_extension(std::move(ext));
 		}
-#endif
+	#endif
 
-#ifndef TORRENT_DISABLE_DHT
+	#ifndef TORRENT_DISABLE_DHT
+		// 设置DHT状态和存储构造函数
 		m_impl->set_dht_state(std::move(params.dht_state));
 
 		TORRENT_ASSERT(params.dht_storage_constructor);
 		m_impl->set_dht_storage(std::move(params.dht_storage_constructor));
-#endif
+	#endif
 
+		// 如果提供了IP过滤器，则设置IP过滤器
 		if (!params.ip_filter.empty())
 		{
 			std::shared_ptr<ip_filter> copy = std::make_shared<ip_filter>(std::move(params.ip_filter));
 			m_impl->set_ip_filter(std::move(copy));
 		}
 
+		// 启动会话
 		m_impl->start_session();
 
 		if (internal_executor)
@@ -345,7 +370,7 @@ namespace {
 				s->run();
 			});
 		}
-	}
+	} // function end
 
 #if TORRENT_ABI_VERSION <= 2
 	void session::start(session_flags_t const flags, settings_pack&& sp, io_context* ios)

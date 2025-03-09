@@ -25,6 +25,8 @@
     session_impl *-- stat
     session_impl *-- m_utp_socket_manager
 
+    dht_storage_interface <|.. dht_default_storage
+
     class torrent_list<T> {
         m_array: torrent_array
         m_index: torrent_map
@@ -47,4 +49,14 @@
     alert_manager "1" *-- "0..*" alert
     alert_manager o-- stack_allocator
     alert_manager o-- plugin
+
+    plugin <|-- session_plugin_wrapper
+
+    interface torrent_plugin {}
+
+    torrent_plugin <|.. ut_pex_plugin
+    torrent_plugin <|.. ut_metadata_plugin
+    torrent_plugin <|.. smart_ban_plugin
+
+    session_plugin_wrapper ..> torrent_plugin : create
 @enduml
