@@ -25,6 +25,14 @@
     session_impl *-- stat
     session_impl *-- m_utp_socket_manager
 
+    session_impl ..|> session_interface
+    session_impl ..|> dht_observer
+    session_impl ..|> portmap_callback
+    session_impl ..|> lsd_callback
+    session_impl ..|> single_threaded
+    session_impl ..|> error_handler_interface
+    session_impl ..|> enable_shared_from_this
+
     dht_storage_interface <|.. dht_default_storage
 
     class torrent_list<T> {

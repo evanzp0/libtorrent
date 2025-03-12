@@ -73,21 +73,31 @@ namespace aux {
 		{
 			std::unique_lock<std::recursive_mutex> lock(m_mutex);
 
+			// 获取当前生成的警报队列的引用
 			heterogeneous_queue<alert>& queue = m_alerts[m_generation];
 
 			// don't add more than this number of alerts, unless it's a
 			// high priority alert, in which case we try harder to deliver it
 			// for high priority alerts, double the upper limit
+			//
+			// 不要添加超过这个数量的警报，除非是
+			// 高优先级警报，在这种情况下，我们会更努力地传递它
+			// 对于高优先级警报，上限加倍
+			//
+			// 优先级越高，分母越大，最后值越小。
+			// 这意味着，对于高优先级的警报，队列可以容纳更多的警报而不触发上限检查。
 			if (queue.size() / (1 + static_cast<int>(T::priority)) >= m_queue_size_limit)
 			{
 				// record that we dropped an alert of this type
 				m_dropped.set(T::alert_type);
 				return;
 			}
-
+			
+			// 使用提供的参数将新的警报对象放置在队列中
 			T& alert = queue.emplace_back<T>(
 				m_allocations[m_generation], std::forward<Args>(args)...);
 
+			// 通知任何等待的线程有新警报已添加
 			maybe_notify(&alert);
 		}
 		catch (std::bad_alloc const&)
