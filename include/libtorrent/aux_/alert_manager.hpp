@@ -94,6 +94,7 @@ namespace aux {
 			}
 			
 			// 使用提供的参数将新的警报对象放置在队列中
+			// m_allocations[m_generation] => heterogeneous_queue , 就是说 m_allocations 这个 array 对象里有 2 个 heterogeneous_queue。
 			T& alert = queue.emplace_back<T>(
 				m_allocations[m_generation], std::forward<Args>(args)...);
 

@@ -69,25 +69,39 @@ namespace aux {
 		heterogeneous_queue(heterogeneous_queue const&) = delete;
 		heterogeneous_queue& operator=(heterogeneous_queue const&) = delete;
 
+		/**
+		 * @brief 向容器末尾添加一个类型为 U 的对象。
+		 * 
+		 * 该函数仅在 U 是 T 的派生类时启用。函数确保容器有足够的容量来存储新对象。
+		 * 如果当前容量不足，则会扩展存储空间。此外，函数还处理对象的内存对齐和填充需求。
+		 * 
+		 * @tparam Args 可变模板参数，用于转发给 U 的构造函数。
+		 * @param args 转发给 U 的构造函数的参数。
+		 * @return U& 返回新构造对象的引用。
+		 */
 		template <class U, typename... Args>
 		typename std::enable_if<std::is_base_of<T, U>::value, U&>::type
 		emplace_back(Args&&... args)
 		{
 			// make the conservative assumption that we'll need the maximum padding
 			// for this object, just for purposes of growing the storage
+			// 检查当前存储容量是否足够容纳新对象（包括头部和填充）。
 			if (std::size_t(m_size) + sizeof(header_t) + alignof(U) + sizeof(U) > std::size_t(m_capacity))
 				grow_capacity(sizeof(header_t) + alignof(U) + sizeof(U));
 
 			char* ptr = m_storage.get() + m_size;
 
+			// 计算为对齐 item 所需的填充字节数。
 			std::size_t const pad_bytes = aux::calculate_pad_bytes(ptr + sizeof(header_t), alignof(U));
 
 			// pad_bytes is only 8 bits in the header, so types that need more than
 			// 256 byte alignment may not be supported
+			// 确保对齐要求不超过 256 字节。
 			static_assert(alignof(U) <= 256
 				, "heterogeneous_queue does not support types with alignment requirements > 256");
 
 #ifdef TORRENT_ADDRESS_SANITIZER
+			// 计算地址检查器所需的头部长度。
 			std::size_t const hdr_len = sizeof(U)
 				+ aux::calculate_pad_bytes(ptr + sizeof(header_t) + pad_bytes + sizeof(U)
 					, alignof(header_t));
@@ -104,15 +118,18 @@ namespace aux {
 			// if this assert triggers, the type being added to the queue has
 			// alignment requirements stricter than what malloc() returns. This is
 			// not supported
+			// 如果断言触发，表示要添加到队列中的类型具有比 malloc() 返回值更严格的对齐要求，这是不支持的。
 			TORRENT_ASSERT((reinterpret_cast<std::uintptr_t>(m_storage.get())
 				& (alignof(U) - 1)) == 0);
 
 			// make sure the current position in the storage is aligned for
 			// creating a heder_t object
+			// 确保当前存储位置已正确对齐，以创建 header_t 对象。
 			TORRENT_ASSERT((reinterpret_cast<std::uintptr_t>(ptr)
 				& (alignof(header_t) - 1)) == 0);
 
 			// length prefix
+			// 创建头部信息。
 			header_t* hdr = new (ptr) header_t;
 			hdr->pad_bytes = static_cast<std::uint8_t>(pad_bytes);
 			hdr->move = &move<U>;
@@ -122,14 +139,17 @@ namespace aux {
 
 			// make sure ptr is correctly aligned for the object we're about to
 			// create there
+			 // 确保指针已正确对齐，以创建即将放置的对象。
 			TORRENT_ASSERT((reinterpret_cast<std::uintptr_t>(ptr)
 				& (alignof(U) - 1)) == 0);
 
 			// construct in-place
+			// 就地构造对象。
 			U* const ret = new (ptr) U(std::forward<Args>(args)...);
 
 			// if we constructed the object without throwing any exception
 			// update counters to indicate the new item is in there
+			// 如果对象构造成功且未抛出异常，则更新计数器以指示新项已存在。
 			++m_num_items;
 			m_size += int(sizeof(header_t) + pad_bytes + hdr->len);
 #ifdef TORRENT_ADDRESS_SANITIZER
