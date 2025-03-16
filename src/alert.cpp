@@ -105,35 +105,38 @@ namespace libtorrent {
 	alert::~alert() = default;
 	time_point alert::timestamp() const { return m_timestamp; }
 
-	torrent_alert::torrent_alert(aux::stack_allocator& alloc
-		, torrent_handle const& h)
-		: handle(h)
-		, m_alloc(alloc)
+	// 构造函数 torrent_alert，用于初始化与 torrent 相关的警报信息
+	torrent_alert::torrent_alert(
+		aux::stack_allocator& alloc, // 分配器，用于管理内存
+		torrent_handle const& h      // 传入的 torrent 句柄
+	) 
+		: handle(h), m_alloc(alloc) 
 	{
-		std::shared_ptr<torrent> t = h.native_handle();
-		if (t)
+		std::shared_ptr<torrent> t = h.native_handle(); // 获取底层的 torrent 对象
+		
+		if (t) // 如果 torrent 对象存在
 		{
-			std::string name_str = t->name();
-			if (!name_str.empty())
+			std::string name_str = t->name(); // 获取 torrent 的名称
+			if (!name_str.empty()) // 如果名称不为空
 			{
-				m_name_idx = alloc.copy_string(name_str);
+				m_name_idx = alloc.copy_string(name_str); // 将名称复制到分配器中，并保存索引
 			}
-			else
+			else // 如果名称为空
 			{
-				if (t->info_hash().has_v2())
-					m_name_idx = alloc.copy_string(aux::to_hex(t->info_hash().v2));
-				else
-					m_name_idx = alloc.copy_string(aux::to_hex(t->info_hash().v1));
+				if (t->info_hash().has_v2()) // 如果包含 v2 版本的 info_hash
+					m_name_idx = alloc.copy_string(aux::to_hex(t->info_hash().v2)); // 将 v2 hash 转为十六进制字符串并复制
+				else // 否则
+					m_name_idx = alloc.copy_string(aux::to_hex(t->info_hash().v1)); // 将 v1 hash 转为十六进制字符串并复制
 			}
 		}
-		else
+		else // 如果 torrent 对象不存在
 		{
-			m_name_idx = alloc.copy_string("");
+			m_name_idx = alloc.copy_string(""); // 复制空字符串到分配器中
 		}
 
-#if TORRENT_ABI_VERSION == 1
-		name = m_alloc.get().ptr(m_name_idx);
-#endif
+	#if TORRENT_ABI_VERSION == 1 // 如果 ABI 版本为 1
+		name = m_alloc.get().ptr(m_name_idx); // 获取名称指针并赋值给成员变量 name
+	#endif
 	}
 
 	char const* torrent_alert::torrent_name() const

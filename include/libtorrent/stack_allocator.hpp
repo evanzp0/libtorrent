@@ -86,7 +86,8 @@ namespace aux {
 		void reset();
 
 	private:
-
+		// 存放多个字符串，字符串之间用 \0 分割。
+		// 每个字符串的索引，都存放在 allocation_slot 对象中。
 		vector<char> m_storage;
 	};
 

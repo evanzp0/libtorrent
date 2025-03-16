@@ -156,6 +156,7 @@ TORRENT_VERSION_NAMESPACE_3
 	protected:
 		std::reference_wrapper<aux::stack_allocator const> m_alloc;
 	private:
+		// 在 m_alloc 中分配的 string 的 index
 		aux::allocation_slot m_name_idx;
 #if TORRENT_ABI_VERSION == 1
 	public:
