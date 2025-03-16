@@ -144,7 +144,7 @@ namespace aux {
 				& (alignof(U) - 1)) == 0);
 
 			// construct in-place
-			// 就地构造对象。
+			// 创建 U 对象。
 			U* const ret = new (ptr) U(std::forward<Args>(args)...);
 
 			// if we constructed the object without throwing any exception
