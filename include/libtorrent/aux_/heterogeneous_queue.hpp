@@ -101,6 +101,10 @@ namespace aux {
 				, "heterogeneous_queue does not support types with alignment requirements > 256");
 
 #ifdef TORRENT_ADDRESS_SANITIZER
+			// 地址检查器（Address Sanitizer）：
+			// - 用于检测内存错误（如越界访问、使用未初始化内存等）。
+			// - 在启用 Address Sanitizer 时，更新内存区域的注解，以帮助检测错误。
+
 			// 计算地址检查器所需的头部长度。
 			std::size_t const hdr_len = sizeof(U)
 				+ aux::calculate_pad_bytes(ptr + sizeof(header_t) + pad_bytes + sizeof(U)
