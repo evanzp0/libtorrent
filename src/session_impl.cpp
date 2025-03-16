@@ -4935,6 +4935,7 @@ namespace {
 
 		if (!torrent_ptr)
 		{
+			// 生成 add_torrent_alert 对象，并 push 到 alert_manager.m_alerts[m_generation] : heterogeneous_queue<alert> 中
 			m_alerts.emplace_alert<add_torrent_alert>(handle, std::move(alert_params), ec);
 			return handle;
 		}
