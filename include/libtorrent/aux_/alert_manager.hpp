@@ -168,6 +168,16 @@ namespace aux {
 		// the alert_manager is allowed to use right now. This is swapped when
 		// the client calls get_all(), at which point all of the alert objects
 		// passed to the client will be owned by libtorrent again, and reset.
+		//
+		// 该值为 0 或 1，分别表示 alert_manager 允许使用的 m_alerts[2] 和 m_allocations[2] 数组的当前 idx。
+		// 当客户端调用 get_all() 时:
+		// 1. m_generation 会在 0 和 1 间进行切换。
+		// 2. 当前缓冲区中的 alerts 会传递给客户端。
+		// 3. 重置之前的缓冲区，以便 libtorrent 可以重新使用它生成新的警报。
+		// 
+		// 所以，
+		// m_alerts[m_generation] 是 libbtorrent 内部正在 push alert 缓冲区。
+		// m_alerts[1 - m_generation] 是 客户端 正在读的 alert 缓冲区。
 		int m_generation = 0;
 
 		// this is where all alerts are queued up. There are two heterogeneous
@@ -179,7 +189,10 @@ namespace aux {
 		// 所有警报都在此处排队。为了实现线程访问的双重缓冲，使用了两个异构队列。
 		// 警报管理器中的 std::mutex 为 m_alerts[m_generation] 和 m_allocations[m_generation] 提供独占访问权限，
 		// 而另一个副本则由客户端线程独占使用。
-		// container_wrapper<heterogeneous_queue<alert>, IndexType, [heterogeneous_queue<alert>; 2]>
+		// 展开后是 container_wrapper<heterogeneous_queue<alert>, IndexType, [heterogeneous_queue<alert>; 2]>
+		// 也就是说 container_wrapper 继承了 std::array<heterogeneous_queue<alert>, 2>
+		//
+		// 相当于声明了 m_alerts[heterogeneous_queue<alert>; 2]
 		aux::array<heterogeneous_queue<alert>, 2> m_alerts;
 
 		// this is a stack where alerts can allocate variable length content,
