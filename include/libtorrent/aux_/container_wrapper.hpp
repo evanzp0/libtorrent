@@ -104,6 +104,13 @@ namespace libtorrent { namespace aux {
 			this->Base::resize(std::size_t(s), v);
 		}
 
+		/**
+		 * C++ 模板是惰性实例化的（lazy instantiation）。也就是说，模板中的方法只有在被实际调用时才会实例化。
+		 * 如果某个方法从未被调用，编译器不会检查它的有效性。
+		 * 代码中，std::array 作为 Base 是没有 resize() 方法的。而 container_wrapper 定义了多个 resize 方法，
+		 * 但这些方法只有在实际调用时才会实例化。
+		 * 如果 Base 是 std::array，而代码中从未调用过 resize，那么这些方法不会被实例化，因此不会触发编译错误。
+		*/
 		void resize(std::size_t s)
 		{
 			TORRENT_ASSERT(s <= std::size_t((std::numeric_limits<underlying_index>::max)()));
