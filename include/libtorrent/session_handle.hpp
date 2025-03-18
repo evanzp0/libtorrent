@@ -108,10 +108,8 @@ namespace libtorrent {
 		// not be valid.
 		bool is_valid() const { return !m_impl.expired(); }
 
-		// 一个 flag 常量，用于 saves settings (i.e. the settings_pack)
-		// 例如把 settings_pack 保存到 buffer，
-		// 这样使用 ses.save_state(buffer, libtorrent::session_handle::save_settings); 
-		// save_settings = 0_bit 表示 save_settings 标志占用第 0 位。换句话说，save_settings 的值是 1（2^0 = 1）。
+		// 一个 flag 常量，值位 1，用于 saves settings (i.e. the settings_pack)
+		// save_settings = 0_bit 表示 save_settings 标志的第 0 位 set 为 1。
 		//
 		// 可以通过按位或 | 组合这些标志：
 		// save_state_flags_t flags = save_settings | save_dht_state; // 值为 1 | 2 = 3
