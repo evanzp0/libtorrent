@@ -39,7 +39,20 @@ POSSIBILITY OF SUCH DAMAGE.
 
 namespace libtorrent {
 
-	// hidden
+	// save_state_flags_t 是一个位标志字段类型，它的底层类型是 std::uint32_t，可以存储 32 个二进制标志。
+  // 它使用 save_state_flags_tag 作为类型标签，确保类型安全。
+  // 它可以用于表示一组二进制标志，例如 save_settings、save_dht_state 等。
+  // 
+  // struct save_state_flags_tag 是一个空的标签结构体。它的唯一作用是作为一个唯一的类型标识符，用于区分不同的位标志字段类型。
+  // 如果定义了 using other_flags_t = flags::bitfield_flag<std::uint32_t, struct other_flags_tag>;
+  // 那么 save_state_flags_t 和 other_flags_t 就是完全不同的类型，即使它们的底层类型都是 std::uint32_t。
+  // 这种设计可以避免不同类型的位标志字段之间的误用。
+  //
+  // Example:
+  // ```c++
+  // static constexpr save_state_flags_t save_settings = 0_bit;  // 第 0 位，值为 1
+  // static constexpr save_state_flags_t save_dht_state = 1_bit; // 第 1 位，值为 2
+  // ```
 	using save_state_flags_t = flags::bitfield_flag<std::uint32_t, struct save_state_flags_tag>;
 
 	// hidden

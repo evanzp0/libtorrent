@@ -63,6 +63,11 @@ namespace aux {
 		int m_idx;
 	};
 
+	/**
+	 * stack_allocator 是用作 m_allocations[stack_allocator; 2] ，
+	 * m_allocations 中的两个 stack_allocator 和 m_alerts 中的两个 heterogeneous_queue 对应。
+	 * stack_allocator 中存放的是对应 heterogeneous_queue 中的 alerts 需要的多个字符串。
+	 */
 	struct TORRENT_EXTRA_EXPORT stack_allocator
 	{
 		stack_allocator() {}

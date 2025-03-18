@@ -107,28 +107,45 @@ namespace aux {
 	}
 #endif
 
+	/**
+	 * 获取所有警告信息
+	 * 
+	 * 此函数将当前管理的所有警告信息的指针添加到提供的向量中，
+	 * 它还处理警告信息下溢的情况，并在必要时重置相关数据结构
+	 * 
+	 * @param alerts 一个警告信息指针的向量，通过它返回当前所有的警告信息
+	 */
 	void alert_manager::get_all(std::vector<alert*>& alerts)
 	{
-		std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	    // 锁定互斥量以保护共享资源
+	    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	
+	    // 如果当前的警告信息为空，则清空输出向量并返回
+	    if (m_alerts[m_generation].empty())
+	    {
+	        alerts.clear();
+	        return;
+	    }
+	
+	    // 检查是否有警告信息被丢弃，如果有则将 m_dropped 的值生成一个 alerts_dropped_alert 并 push 到列表中，
+		// 然后重置 m_dropped
+	    if (m_dropped.any()) {
+	        emplace_alert<alerts_dropped_alert>(m_dropped);
+	        m_dropped.reset();
+	    }
+	
+	    // 获取当前所有警告信息的指针，并将它们添加到输出向量中
+	    m_alerts[m_generation].get_pointers(alerts);
+	
+	    // 交换缓冲区，为下一轮收集做准备
+	    m_generation = (m_generation + 1) & 1;
 
-		if (m_alerts[m_generation].empty())
-		{
-			alerts.clear();
-			return;
-		}
+	    // 清空我们现在将开始写入的缓冲区
+	    m_alerts[m_generation].clear();
 
-		if (m_dropped.any()) {
-			emplace_alert<alerts_dropped_alert>(m_dropped);
-			m_dropped.reset();
-		}
-
-		m_alerts[m_generation].get_pointers(alerts);
-
-		// swap buffers
-		m_generation = (m_generation + 1) & 1;
-		// clear the one we will start writing to now
-		m_alerts[m_generation].clear();
-		m_allocations[m_generation].reset();
+		// 清空 m_allocations 对应 stack_allocator 中的字符串。
+		// stack_allocator 是存放 m_alerts[m_generation] 队列中所有 alerts 需要的字符串。
+	    m_allocations[m_generation].reset();
 	}
 
 	bool alert_manager::pending() const

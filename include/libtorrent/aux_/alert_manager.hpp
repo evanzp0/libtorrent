@@ -145,15 +145,29 @@ namespace aux {
 		// this mutex protects everything. Since it's held while executing user
 		// callbacks (the notify function and extension on_alert()) it must be
 		// recursive to support recursively post new alerts.
+		//
+		// 这个互斥锁保护着所有内容。
+		// 由于在执行用户回调函数（notify 函数和 extension 的 on_alert() 函数）时会持有该互斥锁，
+		// 所以它必须是可递归的，以支持递归地发布新警报。
+		//
+		// std::recursive_mutex 允许同一个线程多次锁定同一个互斥锁，而不会导致死锁。这在递归函数或嵌套调用中非常有用。
 		mutable std::recursive_mutex m_mutex;
+
+		// 条件变量
 		std::condition_variable_any m_condition;
+
 		std::atomic<alert_category_t> m_alert_mask;
+
 		int m_queue_size_limit;
 
 		// a bitfield where each bit represents an alert type. Every time we drop
 		// an alert (because the queue is full or of some other error) we set the
 		// corresponding bit in this mask, to communicate to the client that it
 		// may have missed an update.
+		//
+		// 这是一个 bitfield (位域)，其中每一位代表一种 alert type (警报类型)。
+		// 每当我们 drop 一个 alert 时（可能是因为队列已满或出现其他错误），
+		// 我们会在这个掩码中设置相应的 bit 位，以此向客户端传达它可能错过了一次更新的信息。
 		std::bitset<abi_alert_count> m_dropped;
 
 		// this function (if set) is called whenever the number of alerts in
@@ -162,6 +176,16 @@ namespace aux {
 		// That call will drain every alert in one atomic operation and this
 		// notification function will be called again the next time an alert is
 		// posted to the queue
+		//
+		// 每当警报队列中的警报数量从 0 变为 1 时，就会调用此函数（如果已设置）。
+		// 这是期望客户端唤醒其主消息循环，以便对警报进行轮询（使用 get_alerts() 函数）。
+		// get_alerts() 会清空当前 m_alerts 队列中的所有警报，并且当下一次有警报被添加到这个队列时，m_notify 函数会再次被调用。
+		//
+		// 为什么需要 m_notify？
+		// libtorrent 是一个异步库，它会在后台生成警报（例如下载进度更新、错误通知等）。
+		// 客户端通常有一个主消息循环（main message loop），用于处理事件和更新 UI。
+		// 如果没有 m_notify，客户端需要不断地轮询 alert_manager 来检查是否有新的警报，这会浪费 CPU 资源。
+		// 通过 m_notify，客户端可以在有新的警报时被立即通知，从而高效地处理警报。
 		std::function<void()> m_notify;
 
 		// this is either 0 or 1, it indicates which m_alerts and m_allocations
@@ -197,6 +221,7 @@ namespace aux {
 
 		// this is a stack where alerts can allocate variable length content,
 		// such as strings, to go with the alerts.
+		// 这是一个栈，警报可以利用它来为可变长度的内容（比如字符串）分配空间，这些内容会与 alerts 关联在一起。
 		aux::array<stack_allocator, 2> m_allocations;
 
 #ifndef TORRENT_DISABLE_EXTENSIONS

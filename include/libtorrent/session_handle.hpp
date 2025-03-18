@@ -81,6 +81,11 @@ namespace libtorrent {
 	// any handle to it will no longer be valid. is_valid() will return false and
 	// any operation on it will throw a system_error exception, with error code
 	// invalid_session_handle.
+	// 
+	// 这个类为会话提供了一个非拥有型句柄，以及会话类接口的一个子集。
+	// 如果底层的会话被析构，那么指向它的任何句柄都将不再有效。
+	// is_valid() 函数将返回 false，并且对该句柄执行的任何操作都将抛出一个 system_error 异常，
+	// 错误码为 invalid_session_handle（无效会话句柄）。
 	struct TORRENT_EXPORT session_handle
 	{
 		friend struct session;
@@ -103,7 +108,13 @@ namespace libtorrent {
 		// not be valid.
 		bool is_valid() const { return !m_impl.expired(); }
 
-		// saves settings (i.e. the settings_pack)
+		// 一个 flag 常量，用于 saves settings (i.e. the settings_pack)
+		// 例如把 settings_pack 保存到 buffer，
+		// 这样使用 ses.save_state(buffer, libtorrent::session_handle::save_settings); 
+		// save_settings = 0_bit 表示 save_settings 标志占用第 0 位。换句话说，save_settings 的值是 1（2^0 = 1）。
+		//
+		// 可以通过按位或 | 组合这些标志：
+		// save_state_flags_t flags = save_settings | save_dht_state; // 值为 1 | 2 = 3
 		static constexpr save_state_flags_t save_settings = 0_bit;
 
 #if TORRENT_ABI_VERSION <= 2
