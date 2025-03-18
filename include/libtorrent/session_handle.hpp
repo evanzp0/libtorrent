@@ -184,6 +184,9 @@ namespace libtorrent {
 		// 	lots of torrents. If you're concerned about performance, consider
 		// 	using ``post_torrent_updates()`` instead.
 		//
+		//  这些调用可能开销较大，并且在处理大量种子文件时扩展性不佳。
+		//  如果你担心性能问题，考虑使用 post_torrent_updates() 来替代。
+		//
 		// ``get_torrent_status`` returns a vector of the torrent_status for
 		// every torrent which satisfies ``pred``, which is a predicate function
 		// which determines if a torrent should be included in the returned set
@@ -192,6 +195,11 @@ namespace libtorrent {
 		// torrent_handle::status(). Since ``pred`` is guaranteed to be
 		// called for every torrent, it may be used to count the number of
 		// torrents of different categories as well.
+		//
+		// get_torrent_status 会返回一个 torrent_status 向量，其中包含满足 pred 条件的每个种子文件的状态信息。
+		// pred 是一个谓词函数，用于判定某个种子文件是否应包含在返回集合中。返回 true 表示应包含，返回 false 表示应排除。
+		// flags 参数与 torrent_handle::status() 中的参数相同。
+		// 由于该函数会对每个种子文件调用 pred 函数，所以它也可用于统计不同类别的种子文件数量。
 		//
 		// ``refresh_torrent_status`` takes a vector of torrent_status structs
 		// (for instance the same vector that was returned by
@@ -202,8 +210,15 @@ namespace libtorrent {
 		// torrent status for multiple torrents in a single call. This can save a
 		// significant amount of time if you have a lot of torrents.
 		//
+		// refresh_torrent_status 接收一个 torrent_status 结构体向量（例如 get_torrent_status() 返回的向量），
+		// 并根据 torrent_status::handle 成员刷新状态。你可以先创建一个由默认构造的 torrent_status 对象组成的向量，
+		// 仅初始化 handle 成员，然后使用此函数，从而在一次调用中请求多个种子文件的状态。
+		// 如果你有大量种子文件，这样做可以节省大量时间。
+		//
 		// Any torrent_status object whose ``handle`` member is not referring to
 		// a valid torrent are ignored.
+		//
+		// 任何 handle 成员未指向有效种子文件的 torrent_status 对象都会被忽略。
 		//
 		// The intended use of these functions is to start off by calling
 		// ``get_torrent_status()`` to get a list of all torrents that match your
@@ -216,9 +231,31 @@ namespace libtorrent {
 		// time to time, to include torrents you might have become interested in
 		// since the last time. In order to stop refreshing a certain torrent,
 		// simply remove it from the list.
+		//
+		// 这些函数的预期使用方式是：首先调用 get_torrent_status() 以获取符合你条件的所有种子文件的列表。
+		// 然后对该列表调用 refresh_torrent_status()。这只会刷新列表中种子文件的状态，
+		// 从而忽略你可能正在运行的其他所有种子文件。这可能会节省大量时间，特别是当你感兴趣的种子文件数量较少时。
+		// 为了使你感兴趣的种子文件列表保持最新状态，你可以不时调用 get_torrent_status()，
+		// 以包含自上次调用以来你可能感兴趣的种子文件。若要停止刷新某个特定种子文件的状态，只需将其从列表中移除即可。
+		
+		// session_handle::get_torrent_status 函数用于获取当前会话中所有符合 pred 条件的 torrent 的状态信息。
+		// flags 参数是一个 status_flags_t 类型的位标志字段，用于控制返回的 torrent_status 对象中包含哪些信息。
+		// 
+		// 示例：
+		// ```c++
+		// std::vector<torrent_status> status_list = session.get_torrent_status(
+		//	[](torrent_status const& st) {
+		//		return st.state == torrent_status::downloading; // 只获取正在下载的 torrent
+		//	},
+		//	query_name | query_progress  // 获取名称和进度
+		// );
+		// ```
 		std::vector<torrent_status> get_torrent_status(
 			std::function<bool(torrent_status const&)> const& pred
 			, status_flags_t flags = {}) const;
+
+		// session_handle::refresh_torrent_status 是批量更新 ret 中 torrent_status 的状态信息。
+		// flags 参数是一个 status_flags_t 类型的位标志字段，用于控制返回的 torrent_status 对象中包含哪些信息。
 		void refresh_torrent_status(std::vector<torrent_status>* ret
 			, status_flags_t flags = {}) const;
 
