@@ -267,6 +267,24 @@ namespace libtorrent {
 		// included. This flag is on by default. See add_torrent_params.
 		// the ``flags`` argument is the same as for torrent_handle::status().
 		// see status_flags_t in torrent_handle.
+		//
+		// post_torrent_updates 函数会让 session 发出 state_update_alert， 
+		// 该警报包含自上次调用此函数以来所有状态发生变化的种子的状态信息。
+		//
+		// 该 alert 中只会包含那些设置了“状态订阅标志”（state subscription flag）的 torrent。
+		// 这个标志默认是开启的，可以在 add_torrent_params 中配置。
+		// flags 参数的作用与 torrent_handle::status() 中的 flags 参数相同，
+		// 具体可以参考 torrent_handle 中的 status_flags_t。
+		// 在 torrent_handle 中定义的 status_flags_t： 
+		// ```cpp
+		// status_flags_t = flags::bitfield_flag<std::uint32_t, struct status_flags_tag>
+		// ```
+		//
+		// 在 add_torrent_params 类中有定义 flags 的默认值：
+		// ```cpp
+		// torrent_flags_t flags = torrent_flags::default_flags;
+		// ```
+		// 其中 torrent_flags::default_flags 定义包含了 torrent_flags::update_subscribe
 		void post_torrent_updates(status_flags_t flags = status_flags_t::all());
 
 		// This function will post a session_stats_alert object, containing a
@@ -286,6 +304,9 @@ namespace libtorrent {
 		// set the DHT state for the session. This will be taken into account the
 		// next time the DHT is started, as if it had been passed in via the
 		// session_params on startup.
+		//
+		// 设置会话的 DHT 状态。当下次启动 DHT 时，此设置将会被考虑在内，
+		// 就好像在启动时通过 session_params（会话参数）传入了该设置一样。
 		void set_dht_state(dht::dht_state const& st);
 		void set_dht_state(dht::dht_state&& st);
 
@@ -294,12 +315,16 @@ namespace libtorrent {
 		// torrent is returned. In case the torrent cannot be found, an invalid
 		// torrent_handle is returned.
 		//
+		// find_torrent() 函数会查找具有指定 info-hash 的 torrent。
+		// 如果会话中存在这样的 torrent，将返回一个指向该 torrent 的 torrent_handle 。
+		// 如果找不到该 torrent，则返回一个无效的 torrent_handle。
+		//
 		// See ``torrent_handle::is_valid()`` to know if the torrent was found or
 		// not.
-		//
+		torrent_handle find_torrent(sha1_hash const& info_hash) const;
+
 		// ``get_torrents()`` returns a vector of torrent_handles to all the
 		// torrents currently in the session.
-		torrent_handle find_torrent(sha1_hash const& info_hash) const;
 		std::vector<torrent_handle> get_torrents() const;
 
 		// You add torrents through the add_torrent() function where you give an
