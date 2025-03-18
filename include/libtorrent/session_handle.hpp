@@ -335,17 +335,32 @@ namespace libtorrent {
 		// immediately, without waiting for the torrent to add. Notification of
 		// the torrent being added is sent as add_torrent_alert.
 		//
+		// 你可以通过 add_torrent() 函数添加 torrent，调用该函数时需传入一个包含所有参数的对象。
+		// add_torrent() 的重载版本会处于阻塞状态，直至 torrent 添加成功（或添加失败），
+		// 之后会返回一个错误码和一个 torrent_handle 。
+		// 若想更高效地添加 torrent，可考虑使用 async_add_torrent() 函数，它会立即返回，
+		// 无需等待 torrent 添加完成。torrent 添加成功的通知会以 add_torrent_alert 的形式发出。
+		//
 		// The overload that does not take an error_code throws an exception on
 		// error and is not available when building without exception support.
 		// The torrent_handle returned by add_torrent() can be used to retrieve
 		// information about the torrent's progress, its peers etc. It is also
 		// used to abort a torrent.
 		//
+		// 不接收 error_code 参数的重载版本在出错时会抛出异常，并且在不支持异常处理的编译环境中不可用。
+		// add_torrent() 返回的 torrent_handle 可用于获取 torrent 的进度、对等节点等信息，
+		// 也能用于终止 torrent 下载。
+		//
 		// If the torrent you are trying to add already exists in the session (is
 		// either queued for checking, being checked or downloading)
 		// ``add_torrent()`` will throw system_error which derives from
 		// ``std::exception`` unless duplicate_is_error is set to false. In that
 		// case, add_torrent() will return the handle to the existing torrent.
+		//
+		// 如果你尝试添加的 torrent 已存在于会话中（处于待检查队列、正在检查或正在下载状态），
+		// 那么除非将 duplicate_is_error 设置为 false，否则 add_torrent() 会抛出
+		// 派生自 std::exception 的 system_error 异常。若 duplicate_is_error 为 false，
+		// add_torrent() 会返回指向现有 torrent 的 handle。
 		//
 		// The add_torrent_params class has a flags field. It can be used to
 		// control what state the new torrent will be added in. Common flags to
@@ -354,9 +369,16 @@ namespace libtorrent {
 		// just download the metadata, but no payload, set the
 		// torrent_flags::upload_mode flag.
 		//
+		// add_torrent_params 类有一个 flags（标志）字段，可用于控制新添加 torrent 的初始状态。
+		// 常用的可控制标志有 torrent_flags::paused（暂停）和 torrent_flags::auto_managed（自动管理）。
+		// 若要添加一个仅下载元数据而不下载数据内容的磁力链，可设置 torrent_flags::upload_mode 标志。
+		//
 		// Special consideration has to be taken when adding hybrid torrents
 		// (i.e. torrents that are BitTorrent v2 torrents that are backwards
 		// compatible with v1). For more details, see BitTorrent-v2-torrents_.
+		//
+		// 添加混合种子（即与 BitTorrent v1 向后兼容的 BitTorrent v2 种子）时，需要特别留意。
+		// 更多详细信息，请参考 BitTorrent-v2-torrents_。
 #ifndef BOOST_NO_EXCEPTIONS
 		torrent_handle add_torrent(add_torrent_params&& params);
 		torrent_handle add_torrent(add_torrent_params const& params);
