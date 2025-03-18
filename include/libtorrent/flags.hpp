@@ -51,8 +51,11 @@ private:
  * 
  * 例如：
  * ```c++
- * auto myBit = 123_bit;  // 这将调用operator ""_bit(123)来创建一个 bit_t {m_bit_idx: 123} 类型的对象
- * bitfield_flag<uint32_t, struct some_state_flags_tag> some_state = 123_bit; // 表示右数（从 0 开始）第123位为 1 的二进制数。
+ * // 调用operator ""_bit(123)来创建一个 bit_t {m_bit_idx: 123} 类型的对象
+ * auto myBit = 123_bit;  
+ * 
+ * // 生成一个 bitfield_flag 值，它的值右数（从 0 开始）第123位为 1 的二进制数。
+ * bitfield_flag<uint32_t, struct some_state_flags_tag> some_state = 123_bit; 
  * ```
  * 因为bitfield_flag 的构造函数是如下定义（将 1 右移 X 位）：
  * bitfield_flag(bit_t bit) : m_val(U1 << bit) {}
