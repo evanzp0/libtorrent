@@ -38,6 +38,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 namespace libtorrent {
 
+// bit_t 代表 bit set ，表示从右（0 开始）第几位设为 1 。
 struct bit_t
 {
 	explicit constexpr bit_t(int b) : m_bit_idx(b) {}
@@ -58,7 +59,7 @@ private:
  * bitfield_flag<uint32_t, struct some_state_flags_tag> some_state = 123_bit; 
  * ```
  * 因为bitfield_flag 的构造函数是如下定义（将 1 右移 X 位）：
- * bitfield_flag(bit_t bit) : m_val(U1 << bit) {}
+ * bitfield_flag(bit_t bit) : m_val(1 << bit) {}
  */
 constexpr bit_t operator ""_bit(unsigned long long int b) { return bit_t{static_cast<int>(b)}; }
 
