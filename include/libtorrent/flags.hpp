@@ -50,8 +50,12 @@ private:
  * 这是一个用户定义的字面量运算符，用于将一个无符号长整型字面量转换为 bit_t 类型的对象。
  * 
  * 例如：
+ * ```c++
  * auto myBit = 123_bit;  // 这将调用operator ""_bit(123)来创建一个 bit_t {m_bit_idx: 123} 类型的对象
- *
+ * bitfield_flag<uint32_t, struct some_state_flags_tag> some_state = 123_bit; // 表示右数（从 0 开始）第123位为 1 的二进制数。
+ * ```
+ * 因为bitfield_flag 的构造函数是如下定义（将 1 右移 X 位）：
+ * bitfield_flag(bit_t bit) : m_val(U1 << bit) {}
  */
 constexpr bit_t operator ""_bit(unsigned long long int b) { return bit_t{static_cast<int>(b)}; }
 
