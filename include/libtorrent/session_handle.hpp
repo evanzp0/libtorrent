@@ -419,6 +419,16 @@ namespace libtorrent {
 		// state. i.e. the session pause state is separate from the torrent pause
 		// state. A torrent is inactive if it is paused or if the session is
 		// paused.
+		//
+		// 暂停会话的效果与暂停会话中的每个 torrent 文件的效果相同，不过有一点例外，即 torrent 文件不会被自动管理机制恢复。
+		// 恢复会话会使 torrent 文件回到之前被暂停时的状态。也就是说，会话的暂停状态与 torrent 文件的暂停状态是相互独立的。
+		// 如果一个 torrent 文件被暂停，或者会话被暂停，那么该 torrent 文件就处于非活动状态。
+		//
+		// 注意：
+		// 1. 在 libtorrent 中，自动管理机制（auto-manage）可以自动恢复被暂停的 torrent（例如当下载队列中有空闲位置时）。
+		//    但是，如果会话被暂停，即使自动管理机制尝试恢复 torrent，torrent 也不会被恢复，因为整个会话处于暂停状态。
+		// 2. 每个 torrent 可以单独被暂停或恢复（通过 torrent_handle::pause() 和 torrent_handle::resume()）。
+		//    会话的暂停状态是全局的，会影响所有 torrent，但它不会覆盖单个 torrent 的暂停状态。
 		void pause();
 		void resume();
 		bool is_paused() const;
@@ -498,20 +508,50 @@ namespace libtorrent {
 		// ``set_dht_storage`` set a dht custom storage constructor function
 		// to be used internally when the dht is created.
 		//
+		// set_dht_storage 用于设置一个 DHT 自定义存储构造函数，该函数将在创建 DHT 时在内部使用。
+		//
 		// Since the dht storage is a critical component for the dht behavior,
 		// this function will only be effective the next time the dht is started.
 		// If you never touch this feature, a default map-memory based storage
 		// is used.
 		//
+		// 由于 DHT 存储是影响 DHT 行为的关键组件，因此此函数仅在下次启动 DHT 时才会生效。
+		// 如果你从未使用过此功能，将使用基于默认基于内存的 map 进行存储。
+		//
 		// If you want to make sure the dht is initially created with your
 		// custom storage, create a session with the setting
 		// ``settings_pack::enable_dht`` to false, set your constructor function
 		// and call ``apply_settings`` with ``settings_pack::enable_dht`` to true.
+		//
+		// 如果你希望确保 DHT 最初使用你自定义的存储来创建，可以在创建会话时将 settings_pack::enable_dht 设置为 false，
+		// 设置好你的构造函数，然后调用 apply_settings 并将 settings_pack::enable_dht 设置为 true。
+		//
+		// Example：
+		// ```cpp
+		//  // 创建 session
+		//	libtorrent::session ses;
+		//
+		//	// 设置自定义 DHT 存储构造函数
+		//	ses.set_dht_storage(create_custom_dht_storage);
+		//
+		//	// 配置 settings_pack，初始禁用 DHT
+		//	libtorrent::settings_pack pack;
+		//	pack.set_bool(libtorrent::settings_pack::enable_dht, false);
+		//	ses.apply_settings(pack);
+		//
+		//	// 启用 DHT
+		//	pack.set_bool(libtorrent::settings_pack::enable_dht, true);
+		//	ses.apply_settings(pack);
+		// ```
 		void set_dht_storage(dht::dht_storage_constructor_type sc);
 
 		// ``add_dht_node`` takes a host name and port pair. That endpoint will be
 		// pinged, and if a valid DHT reply is received, the node will be added to
 		// the routing table.
+		//
+		// add_dht_node 的作用是将一个 DHT 节点添加到会话的 DHT 路由表中。
+		// 该函数会在调用时自动对传入的节点进行 ping 操作，
+		// 并根据 ping 的结果是有效的 DHT 响应，那么就将该 Node 添加到路由表中。
 		void add_dht_node(std::pair<std::string, int> const& node);
 
 #if TORRENT_ABI_VERSION == 1
@@ -532,6 +572,10 @@ namespace libtorrent {
 
 		// query the DHT for an immutable item at the ``target`` hash.
 		// the result is posted as a dht_immutable_item_alert.
+		// 
+		// dht_get_item 用于从 DHT 网络中查询与指定哈希值（target）关联的不可变项。
+		// 不可变项：是一个键值对，一旦存储到 DHT 网络中，其值不能被修改。
+		// 查询结果会通过 dht_immutable_item_alert 通知返回。
 		void dht_get_item(sha1_hash const& target);
 
 		// query the DHT for a mutable item under the public key ``key``.
@@ -546,19 +590,57 @@ namespace libtorrent {
 		// the returned hash is the key that is to be used to look the item
 		// up again. It's just the SHA-1 hash of the bencoded form of the
 		// structure.
+		//
+		// 将给定的 bencoded 数据作为不可变项存储到分布式哈希表（DHT）中。
+		// 返回的哈希值是用于再次查找该条目的键。它只是该结构的 bencoded 形式的 SHA - 1 哈希值。
+		// 
+		// Example:
+		// ```cpp
+		// libtorrent::entry data;
+		// data = "Hello, DHT!"; // 可以是任意 bencoded 数据
+		// 
+		// // 将数据存储为不可变项
+		// libtorrent::sha1_hash key = ses.dht_put_item(data);
+		// 
+		// // 查询存储的数据（可选）
+		// ses.dht_get_item(key);
+		// 
+		// // 处理 alert
+		// while (true) {
+		// 	std::vector<libtorrent::alert*> alerts;
+		// 	ses.pop_alerts(&alerts);
+		// 
+		// 	for (libtorrent::alert* a : alerts) {
+		// 		// 检查是否是 dht_immutable_item_alert
+		// 		if (auto item_alert = libtorrent::alert_cast<libtorrent::dht_immutable_item_alert>(a)) {
+		// 			std::cout << "Key: " << item_alert->target << std::endl;
+		// 			std::cout << "Data: " << item_alert->item.to_string() << std::endl;
+		// 		}
+		// 	}
+		// }
+		// ```
 		sha1_hash dht_put_item(entry data);
 
+		// 这个函数就是对 DHT 网络中存放的 mutable item, 通过 key 先查后改。
+		//
 		// store a mutable item. The ``key`` is the public key the blob is
 		// to be stored under. The optional ``salt`` argument is a string that
 		// is to be mixed in with the key when determining where in the DHT
 		// the value is to be stored. The callback function is called from within
 		// the libtorrent network thread once we've found where to store the blob,
 		// possibly with the current value stored under the key.
+		//
+		// 存储一个可变项。key 是用于存储该数据块（blob）的公钥。
+		// 可选的 salt 参数是一个字符串，在确定该值要存储在 DHT 中的位置时，会将其与公钥进行混合。
+		// 一旦我们找到存储该数据块的位置，可能还会附带当前存储在该键下的值，就会在 libtorrent 网络线程内调用回调函数。
+		// 
 		// The values passed to the callback functions are:
+		// 传递给回调函数的参数如下：
 		//
 		// entry& value
 		// 	the current value stored under the key (may be empty). Also expected
 		// 	to be set to the value to be stored by the function.
+		//  当前存储在该键下的值（可能为空）。该函数也需要将其设置为要存储的值。
 		//
 		// std::array<char,64>& signature
 		// 	the signature authenticating the current value. This may be zeros
@@ -566,6 +648,9 @@ namespace libtorrent {
 		// 	fill in this buffer with the signature of the new value to store.
 		// 	To generate the signature, you may want to use the
 		// 	``sign_mutable_item`` function.
+		//  用于验证当前值的签名。如果当前没有存储任何值，该签名可能全为零。
+		//  该函数需要将这个缓冲区填充为要存储的新值的签名。
+		//  你可以使用 sign_mutable_item 函数来生成签名
 		//
 		// std::int64_t& seq
 		// 	current sequence number. May be zero if there is no current value.
@@ -573,9 +658,12 @@ namespace libtorrent {
 		// 	the value that is to be stored. Sequence numbers must be monotonically
 		// 	increasing. Attempting to overwrite a value with a lower or equal
 		// 	sequence number will fail, even if the signature is correct.
+		//  当前的序列号。如果当前没有值，该序列号可能为零。该函数需要将其设置为要存储的值的新序列号。
+		//  序列号必须单调递增。即使签名正确，尝试用较低或相等的序列号覆盖一个值也会失败。
 		//
 		// std::string const& salt
 		// 	this is the salt that was used for this put call.
+		//  这是本次存储调用所使用的盐值。
 		//
 		// Since the callback function ``cb`` is called from within libtorrent,
 		// it is critical to not perform any blocking operations. Ideally not
@@ -587,6 +675,55 @@ namespace libtorrent {
 		// must first retrieve it, then modify it, then write it back. The way
 		// the DHT works, it is natural to always do a lookup before storing and
 		// calling the callback in between is convenient.
+		// 由于回调函数 cb 是在 libtorrent 内部被调用的，因此绝对不能执行任何阻塞操作，理想情况下甚至不要对互斥锁进行加锁。
+		// 将该函数所需的任何数据与函数对象的上下文一起传递，使该函数完全自包含。
+		// 使用函数而不是直接传入新值来计算数据块的值，唯一的原因是为了避免竞态条件。
+		// 如果你想 更新 DHT 中的值，必须先检索该值，然后进行修改，最后再写回。
+		// 根据 DHT 的工作方式，在存储之前总是先进行查找是很自然的，并且在这两者之间调用回调函数也很方便。
+		//
+		
+		//
+		// Example:
+		// ```cpp
+		// // 假设有一个私钥和公钥
+		// std::array<char, 32> public_key = { /* 32-byte public key */ };
+		// std::array<char, 64> private_key = { /* 64-byte private key */ };
+		// 
+		// // 回调函数
+		// void put_callback(libtorrent::entry& value, std::array<char, 64>& signature, std::int64_t& seq, std::string const& salt)
+		// {
+		//     // 获取当前值
+		//     if (value.is_empty()) {
+		//         std::cout << "No existing value in DHT." << std::endl;
+		//         seq = 0; // 如果当前没有值，序列号从 0 开始
+		//     } else {
+		//         std::cout << "Current value in DHT: " << value.to_string() << std::endl;
+		//     }
+		// 
+		//     // 生成新值
+		//     value = "New value to store in DHT";
+		// 
+		//     // 将 value 转换为 bencoded 字符串
+		//     std::vector<char> bencoded_value;
+		//     libtorrent::bencode(std::back_inserter(bencoded_value), value);
+		// 
+		//     // 生成签名
+		//     libtorrent::sign_mutable_item(
+		//         bencoded_value, // 要签名的数据
+		//         salt,           // salt
+		//         seq + 1,        // 新的序列号（必须递增）
+		//         public_key.data(), // 公钥
+		//         private_key.data(), // 私钥
+		//         signature.data() // 输出的签名
+		//     );
+		// 
+		//     // 设置新的序列号
+		//     seq += 1; // 序列号必须递增
+		// }
+		//
+		// // 存储可变项
+    	// ses.dht_put_item(public_key, put_callback, "my_salt");
+		// ```
 		void dht_put_item(std::array<char, 32> key
 			, std::function<void(entry&, std::array<char, 64>&
 				, std::int64_t&, std::string const&)> cb
