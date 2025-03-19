@@ -732,18 +732,39 @@ namespace libtorrent {
 		// ``dht_get_peers()`` will issue a DHT get_peer request to the DHT for the
 		// specified info-hash. The response (the peers) will be posted back in a
 		// dht_get_peers_reply_alert.
+		// dht_get_peers() 函数会向 DHT 发送针对指定 info-hash 的 get_peer 请求。
+		// 响应结果（即 peers）会通过 dht_get_peers_reply_alert 通知返回。
 		//
 		// ``dht_announce()`` will issue a DHT announce request to the DHT to the
 		// specified info-hash, advertising the specified port. If the port is
 		// left at its default, 0, the port will be implied by the DHT message's
 		// source port (which may improve connectivity through a NAT).
 		// ``dht_announce()`` is not affected by the ``announce_port`` override setting.
+		// dht_announce() 函数会向 DHT 发送针对指定 info-hash 的 announce 请求，以通告指定的端口。
+		// 如果端口采用默认值 0，那么将使用 DHT 消息的源端口作为通告端口（这可能有助于提升 NAT 的连接性）。
+		// dht_announce() 不受 `announce_port` 设置的影响。
 		//
+		// `announce_port` 是 libtorrent 中的一个设置项，用于覆盖默认的宣告端口。
+		// 它可以通过 settings_pack 进行配置：
+		// ```cpp
+		// settings_pack p;
+		// p.set_int(settings_pack::announce_port, 6881);
+		// ses.apply_settings(p);
+		// ```
+		// `announce_port` 的作用是：当 libtorrent 自动向 tracker 或 DHT 宣告时，使用指定的端口号，而不是默认的监听端口。
+
 		// Both these functions are exposed for advanced custom use of the DHT.
 		// All torrents eligible to be announce to the DHT will be automatically,
 		// by libtorrent.
+		// 这两个函数主要是为了满足对 DHT 进行高级自定义使用的需求而提供的。
+		// 所有符合条件向 DHT 进行通告的种子文件，libtorrent 都会自动处理。
 		//
 		// For possible flags, see announce_flags_t.
+		// 有关可能使用的标志，请参考 announce_flags_t。
+		// 
+		// announce_flags_t 是一个位标志类型，用于指定 dht_announce 的行为。常见的标志包括：
+		// - dht::announce_seed：仅宣告种子（即仅上传，不下载）。
+		// - dht::announce_implied_port：使用 DHT 消息的源端口作为宣告端口。
 		void dht_get_peers(sha1_hash const& info_hash);
 		void dht_announce(sha1_hash const& info_hash, int port = 0, dht::announce_flags_t flags = {});
 
