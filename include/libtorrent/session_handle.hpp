@@ -781,6 +781,23 @@ namespace libtorrent {
 		// can perform a key space traversal with a single RPC per node by adjusting
 		// the target value for each RPC. It has no effect on the returned sample value.
 		// The result is posted as a ``dht_sample_infohashes_alert``.
+		//
+		// 查询由 ep 指定的 DHT 节点，以获取该节点当前存储的 info - hashes 的一个样本。
+		// target 用于迭代查找（target 的值可以根据上一次 sample 的值进行调整），
+		// 这样索引节点（即本机）可以通过为每次 RPC 调整目标值（相其他 Node 发送 Sample 消息），
+		// 从而对每个节点仅执行一次 RPC 来完成键空间遍历。它对返回的样本值没有影响。
+		// 查询结果会以 dht_sample_infohashes_alert 的形式发布。
+		//
+		// 假设我们想要遍历整个 DHT 网络的键空间，获取所有 info-hash 样本，可以按照以下步骤进行：
+		// 1. 初始查找：
+		//    - 设置 target 为某个初始值（例如全零）。
+		//    - 调用 dht_sample_infohashes，获取第一个区间的 info-hash 样本。
+		// 2. 调整 target 值：
+		//    - 根据返回的样本和 interval，计算下一个 target 值。
+		//    - 例如，将 target 值增加 interval。
+		// 3. 重复查找：
+		//    - 使用新的 target 值再次调用 dht_sample_infohashes，获取下一个区间的 info-hash 样本。
+		// 重复这个过程，直到遍历完整个键空间。
 		void dht_sample_infohashes(udp::endpoint const& ep, sha1_hash const& target);
 
 		// Send an arbitrary DHT request directly to the specified endpoint. This
@@ -789,6 +806,10 @@ namespace libtorrent {
 		// with the response (if any) and the userdata pointer passed in here.
 		// Since this alert is a response to an explicit call, it will always be
 		// posted, regardless of the alert mask.
+		// 
+		// 直接向指定的端点发送任意的 DHT请求。此函数供插件使用。当收到响应或请求超时时，
+		// 会发布一个 dht_direct_response_alert，其中包含响应内容（如果有）以及此处传入的用户数据指针。
+		// 由于此通知是对显式调用的响应，无论通知掩码设置如何，它总会被发布。
 		void dht_direct_request(udp::endpoint const& ep, entry const& e, client_data_t userdata = {});
 
 #if TORRENT_ABI_VERSION == 1
@@ -799,7 +820,8 @@ namespace libtorrent {
 		TORRENT_DEPRECATED
 		void start_dht(entry const& startup_state);
 #endif
-
+		// 该函数允许用户通过回调函数动态创建并注册自定义的 torrent_plugin 插件。
+		//
 		// This function adds an extension to this session. The argument is a
 		// function object that is called with a ``torrent_handle`` and which should
 		// return a ``std::shared_ptr<torrent_plugin>``. To write custom
@@ -829,6 +851,8 @@ namespace libtorrent {
 		// 	A plugin that, with a small overhead, can ban peers
 		// 	that sends bad data with very high accuracy. Should
 		// 	eliminate most problems on poisoned torrents.
+		//  该插件只需付出较小的开销，就能以极高的准确率封禁发送不良数据的对等节点。
+		//  它能解决被污染种子文件所引发的大多数问题。
 		//
 		// .. code:: c++
 		//
@@ -856,6 +880,14 @@ namespace libtorrent {
 		// default filter will allow connections to any ip address. To build a
 		// set of rules for which addresses are accepted and not, see ip_filter.
 		//
+		// set_ip_filter 函数用于设置一个 IP 过滤器，该过滤器会根据连接的源 IP 地址，
+		// 来决定是否接受或拒绝传入（incoming）和传出（outgoing）的连接。
+		//
+		// 连接的源 IP 地址 是指发起连接的那一方的 IP 地址。
+		// 如果你设置了一个规则，拒绝 10.0.0.0/8 网段的连接，那么：
+		// 任何来自 10.0.0.0/8 网段的传入连接都会被拒绝。
+		// 任何传出连接到 10.0.0.0/8 网段的 peer 也会被拒绝。
+		//
 		// Each time a peer is blocked because of the IP filter, a
 		// peer_blocked_alert is generated. ``get_ip_filter()`` Returns the
 		// ip_filter currently in the session. See ip_filter.
@@ -866,6 +898,8 @@ namespace libtorrent {
 		// will reject making outgoing peer connections to certain remote ports.
 		// The main intention is to be able to avoid triggering certain
 		// anti-virus software by connecting to SMTP, FTP ports.
+		//
+		// 连接到对方的特定 port 会被过滤，不论对方 peer 是传入还是传出。
 		void set_port_filter(port_filter const& f);
 
 #if TORRENT_ABI_VERSION == 1
@@ -886,6 +920,18 @@ namespace libtorrent {
 		void set_key(std::uint32_t key);
 #endif
 
+		// 在 libtorrent 中，peer class（对等节点类）是一种用于管理和控制对等节点行为的机制。
+		// 通过将不同的对等节点分配到不同的 peer class，你可以为每个类设置独立的带宽限制、优先级和其他策略。
+		// global_peer_class_id、tcp_peer_class_id 和 local_peer_class_id 是 libtorrent 内置的三个 peer class ID，
+		// 它们分别用于管理不同类型的对等节点。以下是它们的具体作用：
+		// - global_peer_class_id: 
+		//     表示全局的 peer class，用于管理所有对等节点的带宽限制。
+		// - tcp_peer_class_id：
+		//     表示使用 TCP 协议的对等节点的 peer class。
+		// - local_peer_class_id：
+		//     表示本地网络中的对等节点的 peer class。
+		//     如果你希望优先处理本地网络中的对等节点，可以为 local_peer_class_id 设置更高的优先级。
+		//
 		// built-in peer classes
 		static constexpr peer_class_t global_peer_class_id{0};
 		static constexpr peer_class_t tcp_peer_class_id{1};
@@ -906,35 +952,61 @@ namespace libtorrent {
 		// will take this into account and be added to the peer classes specified
 		// by this filter, based on the peer's IP address.
 		//
+		// 为该会话设置 peer 类别过滤器。所有新的 peer 连接都会被过滤器过滤，
+		// 并根据 peer 的 IP 地址，将其添加到该过滤器指定的 peer 类别中。
+		//
 		// The ip-filter essentially maps an IP -> uint32. Each bit in that 32
 		// bit integer represents a peer class. The least significant bit
 		// represents class 0, the next bit class 1 and so on.
+		// 
+		// ip-filter 可以将一个 IP 地址关联到一个 32 位无符号整数（uint32）上 (ip class mask)。
+		// 这个 32 位整数中的每一位代表一个对等 peer 类别。
+		// 最低有效位代表类别 0，下一位代表类别 1，依此类推，peer class 最大值为 31。
 		//
 		// For more info, see ip_filter.
 		//
 		// For example, to make all peers in the range 200.1.1.0 - 200.1.255.255
 		// belong to their own peer class, apply the following filter:
 		//
+		// 例如，要让 200.1.1.0 - 200.1.255.255 范围内的所有对等节点属于它们自己的对等节点类别，可应用以下过滤器：
+		//
 		// .. code:: c++
 		//
 		// 	ip_filter f = ses.get_peer_class_filter();
+		//
+		//  // my_class 就是一个 ip class，peer_class_t 值为 0 - 31 的整数。
 		// 	peer_class_t my_class = ses.create_peer_class("200.1.x.x IP range");
-		// 	f.add_rule(make_address("200.1.1.0"), make_address("200.1.255.255")
-		// 		, 1 << static_cast<std::uint32_t>(my_class));
+		//  peer_class_t my_class1 = ses.create_peer_class("my_class1 range");
+		//
+		// 	f.add_rule(
+		//      make_address("200.1.1.0"), 
+		//      make_address("200.1.255.255"), 
+		//      // 将 1 右移 x 位，得到一个 ip class mask
+		//      1 << static_cast<std::uint32_t>(my_class) | 1 << static_cast<std::uint32_t>(my_class1));  
 		// 	ses.set_peer_class_filter(f);
+		// .. 
 		//
 		// This setting only applies to new connections, it won't affect existing
 		// peer connections.
+		//
+		// 此设置仅适用于新连接，不会影响现有的 peer 连接。
 		//
 		// This function is limited to only peer class 0-31, since there are only
 		// 32 bits in the IP range mapping. Only the set bits matter; no peer
 		// class will be removed from a peer as a result of this call, peer
 		// classes are only added.
 		//
+		// 此函数仅限于 peer 类别 0 - 31，因为 IP 范围映射中只有 32 位。
+		// 只有被设置的位才起作用；此调用不会从 peer 中移除任何对等 peer 类别，只会添加 peer 类别。
+		//
 		// The ``peer_class`` argument cannot be greater than 31. The bitmasks
 		// representing peer classes in the ``peer_class_filter`` are 32 bits.
 		//
+		// peer_class 参数不能大于 31。peer_class_filter 中表示 peer 类别的位掩码是 32 位的。
+		//
 		// The ``get_peer_class_filter()`` function returns the current filter.
+		//
+		// get_peer_class_filter() 函数会返回当前的过滤器。
 		//
 		// For more information, see peer-classes_.
 		void set_peer_class_filter(ip_filter const& f);
