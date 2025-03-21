@@ -158,10 +158,18 @@ namespace aux {
 		// configuring it, you can pass in a session_params object. Its settings
 		// will take effect before the session starts up.
 		//
+		// 构造会话对象，该对象充当种子文件的容器。
+		// 为避免在启动会话和配置会话之间出现竞态条件，你可以传入一个 session_params 对象。
+		// 该对象中的设置会在会话启动前生效。
+		//
 		// The overloads taking ``flags`` can be used to start a session in
 		// paused mode (by passing in ``session::paused``). Note that
 		// ``add_default_plugins`` do not have an affect on constructors that
 		// take a session_params object. It already contains the plugins to use.
+		//
+		// 接受 flags 参数的重载函数可用于以暂停模式启动会话（通过传入 session::paused）。
+		// 请注意，add_default_plugins 对接受 session_params 对象的构造函数没有影响，
+		// 因为 session_params 对象中已经包含了要使用的插件。
 		explicit session(session_params const& params);
 		explicit session(session_params&& params);
 		session(session_params const& params, session_flags_t flags);
@@ -174,6 +182,10 @@ namespace aux {
 		// systems where additional threads are expensive and sharing an
 		// io_context with other events is fine.
 		//
+		// 此构造函数重载接受一个外部的 io_context，用于运行会话对象。
+		// 这对于某些测试场景特别有用，比如希望在单个 io_context 上运行多个会话；
+		// 或者在资源受限的系统中，额外的线程开销较大，此时与其他事件共享一个 io_context 是可行的。
+		//
 		// .. warning::
 		// 	The session object does not cleanly terminate with an external
 		// 	``io_context``. The ``io_context::run()`` call *must* have returned
@@ -181,6 +193,11 @@ namespace aux {
 		// 	call session::abort() and save the session_proxy first, then
 		// 	destruct the session object, then sync with the io_context, then
 		// 	destruct the session_proxy object.
+		//
+		// 使用外部 io_context 时，会话对象无法正常终止。
+		// 在安全地销毁会话之前，io_context::run() 调用 必须 已经返回。
+		// 这意味着你 必须 先调用 session::abort() 并保存 session_proxy，然后销毁会话对象，
+		// 接着与 io_context 进行同步，最后销毁 session_proxy 对象。
 		session(session_params&& params, io_context& ios);
 		session(session_params const& params, io_context& ios);
 		session(session_params&& params, io_context& ios, session_flags_t);
@@ -263,8 +280,16 @@ namespace aux {
 		// that any kind of interface (such as windows) are closed before
 		// destructing the session object. Because it can take a few second for
 		// it to finish. The timeout can be set with apply_settings().
+		//
+		// session 的析构函数会通知所有 trackers，告知它们我们的 torrents 已停止运行。
+		// 如果某些 trackers 处于离线状态，这些通知操作会超时。所有这些操作都会在会话析构函数返回之前完成。
+		// 因此，建议在销毁会话对象之前关闭任何类型的界面（例如窗口），因为这一过程可能需要花费几秒钟才能完成。
+		// 可以使用 apply_settings() 函数来设置超时时间。
 		~session();
 
+		// abort 是 libtorrent 中用于异步销毁 session 对象的函数。
+		// 它返回一个 session_proxy 对象，允许你在不阻塞主线程的情况下关闭 session。
+		//
 		// In case you want to destruct the session asynchronously, you can
 		// request a session destruction proxy. If you don't do this, the
 		// destructor of the session object will block while the trackers are
@@ -276,12 +301,21 @@ namespace aux {
 		// call. The ``session_proxy`` does not have any operations on it (since
 		// the session is being closed down, no operations are allowed on it).
 		// The only valid operation is calling the destructor::
+		// 
+		// 如果你想异步销毁会话，你可以请求一个 session_proxy。
+		// 如果你不这样做，session 的析构函数在与 tracker 通信时会阻塞。
+		// 如果你在销毁 session 时保留一个 session_proxy 指向该会话，
+		// session 的析构函数将不会阻塞，而是开始关闭会话，随后 session_proxy 的析构函数会对线程进行同步。
+		// 因此，从调用 session 的析构函数开始，到调用 session_proxy 的析构函数结束，整个过程完成 session 的销毁。
+		// session_proxy 没有任何操作方法（因为会话正在关闭，不允许对其进行任何操作），唯一有效的操作就是调用它的析构函数。
 		//
 		// 	struct session_proxy {};
 		/**
-		 * 使用外部io_context时，需要特别注意会话对象的正确终止。
-		 * 在销毁session对象之前，必须先调用abort()方法并保存返回的session_proxy对象，
-		 * 然后确保io_context::run()已经返回，最后才能销毁session对象和session_proxy对象。
+		 * 使用外部 io_context 时，需要特别注意会话对象的正确终止。
+		 * 在销毁 session 对象之前，必须先调用 abort() 方法并保存返回的 session_proxy 对象，
+		 * 调用 abort 后，session 会开始关闭，但不会阻塞主线程。
+		 * 然后确保 io_context::run() 已经返回，最后才能销毁 session_proxy 对象(其析构函数会等待 )。
+		 * 当 session_proxy 的析构函数被调用时，它会等待 session 的关闭操作完成，确保所有资源被正确释放。
 		 */
 		session_proxy abort();
 
