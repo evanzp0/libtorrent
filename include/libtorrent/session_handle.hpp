@@ -1109,6 +1109,9 @@ namespace libtorrent {
 		// priority among any of its classes is the one that is taken into
 		// account.
 		//
+		// 如果一个对等节点或 torrent 属于多个 peer class，
+		// 则其某个优先级属性的值取这些 peer class 中该优先级属性的最高值。
+		//
 		// For more information, see peer-classes_.
 		peer_class_info get_peer_class(peer_class_t cid) const;
 		void set_peer_class(peer_class_t cid, peer_class_info const& pci);
@@ -1178,10 +1181,17 @@ namespace libtorrent {
 		// afterward with the same torrent will succeed. Note that this creates a
 		// new handle which is not equal to the removed one.
 		//
+		// remove_torrent() 是非阻塞的，但会同步地将该种子文件从会话中移除。
+		// 紧接着调用 session_handle::add_torrent() 并传入相同的种子文件，操作将会成功。
+		// 请注意，这会创建一个新的句柄，它与被移除的句柄并不相同。
+		//
 		// The optional second argument ``options`` can be used to delete all the
 		// files downloaded by this torrent. To do so, pass in the value
 		// ``session_handle::delete_files``. Once the torrent is deleted, a
 		// torrent_deleted_alert is posted.
+		//
+		// `remove_flags_t` 参数可以传递 `session_handle::delete_files`，
+		// 这样在删除 torrent 时会删除它的所有的文件。
 		//
 		// The torrent_handle remains valid for some time after remove_torrent() is
 		// called. It will become invalid only after all libtorrent tasks (such as
@@ -1190,6 +1200,12 @@ namespace libtorrent {
 		// as torrent_handle::status() will succeed. Because of this, and because
 		// remove_torrent() is non-blocking, the following sequence usually
 		// succeeds (does not throw system_error):
+		//
+		// 在调用 remove_torrent() 之后，torrent_handle 在一段时间内仍然有效。
+		// 只有在所有 libtorrent 任务（如 I/O 任务）释放对该种子文件的引用之后，它才会失效。
+		// 在此之前，torrent_handle::is_valid() 会返回 true，像 torrent_handle::status() 这样的其他调用也会成功。
+		// 正因如此，并且由于 remove_torrent() 是非阻塞的，以下代码序列通常会成功（不会抛出 system_error）：
+		//
 		// .. code:: c++
 		//
 		//	session.remove_handle(handle);
@@ -1201,6 +1217,10 @@ namespace libtorrent {
 		// large state_update to be posted. When removing all torrents, it is
 		// advised to remove them from the back of the queue, to minimize the
 		// shifting.
+		//
+		// 请注意，当一个处于队列中或正在下载的种子文件被移除时，它在下载队列中的位置会被空出，
+		// 队列中后续的每个种子文件的队列位置都会更新。这可能会导致发布一个大型的状态更新通知。
+		// 当移除所有种子文件时，建议从队列末尾开始移除，以尽量减少位置的移动。
 		void remove_torrent(const torrent_handle&, remove_flags_t = {});
 
 		// Applies the settings specified by the settings_pack ``s``. This is an
@@ -1319,10 +1339,19 @@ namespace libtorrent {
 		// valid until the next time ``pop_alerts`` is called. You may not delete
 		// the alert objects.
 		//
+		// Alerts 是 libtorrent 报告错误和事件的主要机制。
+		// pop_alerts 函数会将指向新 alerts 的指针填充到传入的向量中。
+		// 直到下一次调用 pop_alerts 为止，会话会一直持有这些 alerts。
+		// 你不能删除这些 pop_alert 对象。
+		//
 		// It is safe to call ``pop_alerts`` from multiple different threads, as
 		// long as the alerts themselves are not accessed once another thread
 		// calls ``pop_alerts``. Doing this requires manual synchronization
 		// between the popping threads.
+		//
+		// 只要在另一个线程调用 pop_alerts 后不再访问这些警报，
+		// 就可以从多个不同的线程安全地调用 pop_alerts。
+		// 这需要在调用 pop_alerts 的线程之间进行手动同步。
 		//
 		// ``wait_for_alert`` will block the current thread for ``max_wait`` time
 		// duration, or until another alert is posted. If an alert is available
@@ -1331,6 +1360,12 @@ namespace libtorrent {
 		// pop alerts from the queue, it merely peeks at it. The returned alert
 		// will stay valid until ``pop_alerts`` is called twice. The first time
 		// will pop it and the second will free it.
+		//
+		// wait_for_alert 会使当前线程阻塞 max_wait 时长，或者直到有新的警报被发布。
+		// 如果在调用时已有警报可用，它会立即返回。返回的警报指针是警报队列的头部。
+		// wait_for_alert 不会从队列中弹出警报，只是查看队列。
+		// 返回的警报将保持有效，直到调用两次 pop_alerts。
+		// 第一次调用会将其从队列中弹出，第二次调用会释放它。
 		//
 		// If there is no alert in the queue and no alert arrives within the
 		// specified timeout, ``wait_for_alert`` returns nullptr.
@@ -1343,11 +1378,19 @@ namespace libtorrent {
 		// number of alerts that's queued by the session, see
 		// ``settings_pack::alert_queue_size``.
 		//
+		// 会话中的警报队列不会无限增长。要确保定期调用 pop_alerts，以免错过通知。
+		// 若要控制会话中排队的最大警报数量，请参考 settings_pack::alert_queue_size。
+		//
 		// Some alerts are considered so important that they are posted even when
 		// the alert queue is full. Some alerts are considered mandatory and cannot
 		// be disabled by the ``alert_mask``. For instance,
 		// save_resume_data_alert and save_resume_data_failed_alert are always
 		// posted, regardless of the alert mask.
+		//
+		// 有些警报被认为非常重要，即使警报队列已满也会被发布。
+		// 有些警报是强制发布的，不能通过 alert_mask 禁用。
+		// 例如，save_resume_data_alert 和 save_resume_data_failed_alert 总是会被发布，
+		// 无论 alert_mask 设置如何。
 		//
 		// To control which alerts are posted, set the alert_mask
 		// (settings_pack::alert_mask).
@@ -1358,6 +1401,11 @@ namespace libtorrent {
 		// make sure the alert queue is large enough, the alert_mask doesn't have
 		// unnecessary categories enabled and to call pop_alert() frequently, to
 		// avoid alerts being dropped.
+		//
+		// 如果警报队列已满，导致警报被丢弃，这将通过 alerts_dropped_alert 指示，
+		// 该警报包含一个位掩码，表明哪些类型的警报被丢弃了。
+		// 通常，确保警报队列足够大、alert_mask 没有启用不必要的类别，
+		// 并频繁调用 pop_alert() 以避免警报被丢弃，是个不错的做法。
 		//
 		// the ``set_alert_notify`` function lets the client set a function object
 		// to be invoked every time the alert queue goes from having 0 alerts to
@@ -1371,6 +1419,15 @@ namespace libtorrent {
 		// retrieval of alerts should not be done in the callback. In fact, the
 		// callback should not block. It should not perform any expensive work.
 		// It really should just notify the main application thread.
+		//
+		// set_alert_notify 函数允许客户端设置一个函数对象，
+		// 每当警报队列从 0 个警报变为 1 个警报时，该函数对象就会被调用。
+		// 这个函数在 libtorrent 内部被调用，调用它的可能是主线程，也可能是在用户调用过程中。
+		// 该函数的目的是让客户端唤醒其主线程，以便使用 pop_alerts() 轮询更多警报。
+		// 如果通知函数未能做到这一点，那么在出于其他原因调用 pop_alerts 之前，它将不会再次被调用。
+		// 例如，它可以向 eventfd 发送信号、向 HWND 发送消息或向其他主消息泵发送消息。
+		// 实际的警报检索操作不应在回调函数中完成。实际上，回调函数不应阻塞，也不应执行任何耗时的工作。
+		// 它真正应该做的只是通知主应用程序线程。
 		//
 		// The type of an alert is returned by the polymorphic function
 		// ``alert::type()`` but can also be queries from a concrete type via
@@ -1446,6 +1503,10 @@ namespace libtorrent {
 		// in the session. The return values are all handles referring to the
 		// port mappings that were just created. Pass them to delete_port_mapping()
 		// to remove them.
+		//
+		// add_port_mapping 会在已启用的 UPnP / NAT-PMP 上添加一个或多个端口转发规则。
+		// 它会为会话中的每个 listen socket 创建一个映射。返回值是所有指向刚刚创建的端口映射的句柄。
+		// 你可以将这些句柄传递给 delete_port_mapping() 函数，以移除相应的端口映射。
 		std::vector<port_mapping_t> add_port_mapping(portmap_protocol t, int external_port, int local_port);
 		void delete_port_mapping(port_mapping_t handle);
 
@@ -1453,17 +1514,25 @@ namespace libtorrent {
 		// and upnp. If mapping was already made, they are deleted and added
 		// again. This only works if natpmp and/or upnp are configured to be
 		// enable.
+		//
+		// 此选项用于指示是否使用 NAT-PMP（网络地址转换端口映射协议）和 UPnP（通用即插即用）来进行端口映射。
+		// 如果已经完成了端口映射，这些映射将会被删除并重新添加。
+		// 仅当 NAT - PMP 和 / 或 UPnP 被配置为启用状态时，此操作才会生效。
 		static constexpr reopen_network_flags_t reopen_map_ports = 0_bit;
 
 		// Instructs the session to reopen all listen and outgoing sockets.
+		// 指示会话重新打开所有 listen sockets 和 outgoing sockets。
 		//
 		// It's useful in the case your platform doesn't support the built in
 		// IP notifier mechanism, or if you have a better more reliable way to
 		// detect changes in the IP routing table.
+		// 如果你的平台不支持内置的 IP 通知机制，
+		// 或者你有更好、更可靠的方法来检测 IP 路由表的变化，那么这个操作会很有用。
 		void reopen_network_sockets(reopen_network_flags_t options = reopen_map_ports);
 
 		// This function is intended only for use by plugins. This type does
 		// not have a stable API and should be relied on as little as possible.
+		// 此函数仅供插件使用。该类型没有稳定的应用程序编程接口（API），应尽量少依赖它。
 		std::shared_ptr<aux::session_impl> native_handle() const
 		{ return m_impl.lock(); }
 
