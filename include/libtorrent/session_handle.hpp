@@ -1507,6 +1507,9 @@ namespace libtorrent {
 		// add_port_mapping 会在已启用的 UPnP / NAT-PMP 上添加一个或多个端口转发规则。
 		// 它会为会话中的每个 listen socket 创建一个映射。返回值是所有指向刚刚创建的端口映射的句柄。
 		// 你可以将这些句柄传递给 delete_port_mapping() 函数，以移除相应的端口映射。
+		//
+		// 当调用 add_port_mapping 时，libtorrent 会尝试通过 UPnP 或 NAT-PMP 在路由器上创建一个端口映射。
+		// NAT-PMP，是一种网络协议，使私人网络内的设备能够自动请求打开路由器或网关上的端口。
 		std::vector<port_mapping_t> add_port_mapping(portmap_protocol t, int external_port, int local_port);
 		void delete_port_mapping(port_mapping_t handle);
 
