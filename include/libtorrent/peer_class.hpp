@@ -58,6 +58,9 @@ namespace libtorrent {
 		// honor the unchoke slot limits. It's used for local peers by default.
 		// If *any* of the peer classes a peer belongs to has this set to true,
 		// that peer will be unchoked at all times.
+		//
+		// unchoke_slots 是用于控制客户端的每个 torrent 的同一时刻的上传数据的对等节点（peer）数量。
+		// ignore_unchoke_slots 字段，可以使得 peer_class 中的 peer 不受 unchoke_slots 限制。
 		bool ignore_unchoke_slots;
 
 		// adjusts the connection limit (global and per torrent) that applies to
@@ -68,6 +71,9 @@ namespace libtorrent {
 		// accept this peer. This factor applies both to the global connection
 		// limit and the per-torrent limit. Note that if not used carefully one
 		// peer class can potentially completely starve out all other over time.
+		//
+		// 用于调整 peer_class 中的连接在全局连接数中的占比的因子。
+		// 单个 peer_class 最多占用的连接数 = (全局连接数 - 非 peer_class 连接数) * (当前 peer_class 因子 / 所有 peer_class 因子之和)
 		int connection_limit_factor;
 
 		// not used by libtorrent. It's intended as a potentially user-facing

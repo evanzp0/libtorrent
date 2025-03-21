@@ -1015,19 +1015,47 @@ namespace libtorrent {
 		// Sets and gets the *peer class type filter*. This is controls automatic
 		// peer class assignments to peers based on what kind of socket it is.
 		//
+		// 设置和获取 peer class type 过滤器。
+		// 该过滤器可根据 socket 类型来控制自动为 peer 分配 peer class。
+		//
 		// It does not only support assigning peer classes, it also supports
 		// removing peer classes based on socket type.
 		//
+		//  它不仅支持分配 peer class，还支持根据 socket 类型移除 peer class。
+		//
 		// The order of these rules being applied are:
+		// 这些规则的应用顺序如下：
 		//
 		// 1. peer-class IP filter
 		// 2. peer-class type filter, removing classes
 		// 3. peer-class type filter, adding classes
 		//
 		// For more information, see peer-classes_.
+		//
+		// peer_class 是整形，它针对的是 peer 的 ip 分类
+		// peer_class_type 是一个枚举型，它针对的是 peer 的 socket 分类
+		//
+		// Example：
+		// ```cpp
+		// // 创建 peer class
+		// libtorrent::peer_class_t tcp_class = ses.create_peer_class("TCP 对等节点")
+		//
+		// // 设置 peer class 类型过滤器
+        // libtorrent::peer_class_type_filter type_filter;
+		//
+		// // 将 TCP 连接分配到 tcp_class
+    	// type_filter.add(libtorrent::peer_class_type_filter::tcp_socket, tcp_class);
+		// 
+		// // 设置 peer class 类型过滤器
+    	// ses.set_peer_class_type_filter(type_filter);
+		//```
 		void set_peer_class_type_filter(peer_class_type_filter const& f);
 		peer_class_type_filter get_peer_class_type_filter() const;
 
+		// create_peer_class 函数创建一个新的 peer class，并返回其唯一标识符（ID）。
+		// 参数 name 是一个字符串，表示 peer class 的名称。
+		// 标识符是从 0 开始，从小到大依次分配的，最大不超过 31。
+		//
 		// Creates a new peer class (see peer-classes_) with the given name. The
 		// returned integer is the new peer class identifier. Peer classes may
 		// have the same name, so each invocation of this function creates a new
@@ -1047,14 +1075,22 @@ namespace libtorrent {
 		// Calling it more than once for the same class will lead to memory
 		// corruption.
 		//
+		// peer class 的引用计数在创建时初始化为 1，并在被分配给 torrent 或 peer 时 + 1。
+		// delete_peer_class 只能调用一次，因为它是对初始引用计数的“归还”，多次调用会导致未定义行为。
+		//
 		// Since peer classes are reference counted, this function will not
 		// remove the peer class if it's still assigned to torrents or peers. It
 		// will however remove it once the last peer and torrent drops their
 		// references to it.
 		//
+		// 由于 peer 类别采用引用计数机制，因此如果该 peer 类别仍被分配给种子文件或 peer，此函数不会将其移除。
+		// 不过，当最后一个 peer 和种子文件不再引用它时，该对等 peer 类别将会被移除。
+		//
 		// There is no need to call this function for custom peer classes. All
 		// peer classes will be properly destructed when the session object
 		// destructs.
+		//
+		// 对于自定义 peer 类别无需调用此函数。会话对象析构时，所有 peer 类别都会被正确销毁。
 		//
 		// For more information on peer classes, see peer-classes_.
 		void delete_peer_class(peer_class_t cid);
