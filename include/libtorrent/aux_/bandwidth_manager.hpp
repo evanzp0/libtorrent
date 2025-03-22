@@ -86,15 +86,37 @@ struct TORRENT_EXTRA_EXPORT bandwidth_manager
     // 非优先级对等节点意味着，如果存在带宽分配的情况，其他节点会插队到非优先级对等节点之前。
 	// 这在网络种子（web seeds）的场景中会用到。
 	/**
-	 * @brief 请求带宽分配。
+	 * @brief 用于请求带宽分配。
+	 * 当一个对等方需要上传或下载数据时，会调用 request_bandwidth 请求带宽。
+	 * 根据带宽通道的状态，请求可能立即得到满足，或者需要排队等待。
 	 * 
-	 * @param peer 请求带宽的 bandwidth_socket 对象。
-	 * @param blk 请求的块大小。
-	 * @param priority 请求的优先级。
-	 * @param chan 带宽通道数组。
-	 * @param num_channels 请带宽通道的数量。
+	 * @param peer 请求带宽的 bandwidth_socket 对象，表示需要带宽的对等方（peer）。
+	 * @param blk 请求的块大小（字节数）。
+	 * @param priority 请求的优先级，优先级越高，越优先分配带宽。
+	 * @param chan 带宽通道数组，表示该请求涉及的带宽通道。
+	 * 		比如 peer_class_info 中就有属性 bandwidth_channel channel[2]，
+	 * 		用来跟踪当前的上传和下载通道的配额情况（0: 上传；1：下载）。
+	 * @param num_channels 请带宽通道的数量。如果 num_channels 为 0，表示该请求不受任何带宽通道的限制。
 	 * 
-	 * @return 分配的字节数。如果为 0，则表示稍后会调用 peer 的 assign_bandwidth 回调函数。
+	 * @return 如果请求可以立即满足，返回分配的字节数（通常是 blk）。
+	 * 如果请求需要排队，返回 0，表示稍后会通过回调分配带宽。
+	 * 
+	 * @example:
+	 * ```cpp
+	 * bandwidth_manager download_manager;
+	 * 
+	 * // 创建一个带宽请求
+	 * std::shared_ptr<bandwidth_socket> peer = ...;
+	 * bandwidth_channel* channels[] = { &upload_channel, &download_channel };
+	 * int bytes_assigned = download_manager.request_bandwidth(peer, 1024, 1, channels, 2);
+	 *
+	 * if (bytes_assigned > 0) {
+	 *    // 请求立即得到满足
+	 *    peer->assign_bandwidth(bytes_assigned);
+	 * } else {
+	 *    // 请求需要排队，稍后会通过回调分配带宽
+	 * }
+	 * ```
 	 */
 	int request_bandwidth(std::shared_ptr<bandwidth_socket> peer
 		, int blk, int priority, bandwidth_channel** chan, int num_channels);

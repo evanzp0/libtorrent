@@ -4863,7 +4863,7 @@ namespace {
 		m_stats_counters.set_value(counters::limiter_down_queue
 			, m_download_rate.queue_size());
 
-		// 上下行字节数
+		// 上下行请求的字节数
 		m_stats_counters.set_value(counters::limiter_up_bytes
 			, m_upload_rate.queued_bytes());
 		m_stats_counters.set_value(counters::limiter_down_bytes

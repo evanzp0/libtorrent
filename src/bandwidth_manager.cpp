@@ -88,6 +88,7 @@ namespace aux {
 	// non prioritized means that, if there's a line for bandwidth,
 	// others will cut in front of the non-prioritized peers.
 	// this is used by web seeds
+
 	int bandwidth_manager::request_bandwidth(std::shared_ptr<bandwidth_socket> peer
 		, int const blk, int const priority, bandwidth_channel** chan, int const num_channels)
 	{
@@ -107,17 +108,28 @@ namespace aux {
 			// bandwidth channels, or it doesn't belong to any
 			// channels. There's no point in adding it to
 			// the queue, just satisfy the request immediately
+			// 如果 num_channels 为 0，表示该请求不受任何带宽通道的限制，或者对等方不属于任何带宽通道。
+			// 在这种情况下，直接返回 blk，表示请求可以立即满足。
 			return blk;
 		}
 
+		// 一个计数器，用于记录需要排队的带宽通道数量。
 		int k = 0;
+
+		// 初始化带宽请求
 		bw_request bwr(std::move(peer), blk, priority);
+
+		// 遍历所有带宽通道，检查每个通道是否需要排队。
 		for (int i = 0; i < num_channels; ++i)
 		{
+			// 如果 chan[i]->need_queueing(blk) 返回 true，表示该通道需要排队。
+			// 将其加入 bwr.channel 数组，并递增 k。
 			if (chan[i]->need_queueing(blk))
 				bwr.channel[k++] = chan[i];
 		}
 
+		// 如果 k 为 0，表示所有带宽通道都不需要排队。
+		// 直接返回 blk，表示请求可以立即满足。
 		if (k == 0) return blk;
 
 		m_queued_bytes += blk;
