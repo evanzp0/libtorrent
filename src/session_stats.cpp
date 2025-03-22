@@ -55,6 +55,10 @@ namespace {
 		int value_index;
 	};
 
+/**
+ * @brief metrics 是一个数组，它的每一个 item 都和 counters 枚举值对应，
+ * 它的值为 stats_metric_impl {name，value_index}。
+ */
 #define METRIC(category, name) { #category "." #name, counters:: name },
 	aux::array<stats_metric_impl, counters::num_counters> const metrics
 	({{

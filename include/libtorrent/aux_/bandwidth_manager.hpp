@@ -47,17 +47,35 @@ POSSIBILITY OF SUCH DAMAGE.
 namespace libtorrent {
 namespace aux {
 
+/**
+ * bandwidth_manager 是一个用于管理带宽分配的结构体，主要用于控制上传和下载带宽的分配。
+ * 它通过维护一个请求队列，并根据优先级和配额来分配带宽。
+ */
 struct TORRENT_EXTRA_EXPORT bandwidth_manager
 {
+	/**
+	 * @brief bandwidth_manager 构造函数
+	 * @param channel 参数表示带宽通道的类型（例如，上传或下载）
+	 */
 	explicit bandwidth_manager(int channel);
 
+	/**
+	 * @brief 关闭带宽管理器，停止所有带宽分配操作
+	 */
 	void close();
 
 #if TORRENT_USE_ASSERTS
 	bool is_queued(bandwidth_socket const* peer) const;
 #endif
 
+	/**
+	 * @brief 返回当前请求队列的大小，即等待带宽分配的请求数量。
+	 */
 	int queue_size() const;
+
+	/**
+	 * @brief 返回当前请求队列中所有请求的总字节数。
+	 */
 	std::int64_t queued_bytes() const;
 
 	// non prioritized means that, if there's a line for bandwidth,
@@ -65,6 +83,19 @@ struct TORRENT_EXTRA_EXPORT bandwidth_manager
 	// this is used by web seeds
 	// returns the number of bytes to assign to the peer, or 0
 	// if the peer's 'assign_bandwidth' callback will be called later
+    // 非优先级对等节点意味着，如果存在带宽分配的情况，其他节点会插队到非优先级对等节点之前。
+	// 这在网络种子（web seeds）的场景中会用到。
+	/**
+	 * @brief 请求带宽分配。
+	 * 
+	 * @param peer 请求带宽的 bandwidth_socket 对象。
+	 * @param blk 请求的块大小。
+	 * @param priority 请求的优先级。
+	 * @param chan 带宽通道数组。
+	 * @param num_channels 请带宽通道的数量。
+	 * 
+	 * @return 分配的字节数。如果为 0，则表示稍后会调用 peer 的 assign_bandwidth 回调函数。
+	 */
 	int request_bandwidth(std::shared_ptr<bandwidth_socket> peer
 		, int blk, int priority, bandwidth_channel** chan, int num_channels);
 
@@ -72,21 +103,30 @@ struct TORRENT_EXTRA_EXPORT bandwidth_manager
 	void check_invariant() const;
 #endif
 
+	/**
+	 * @brief 更新带宽配额。
+	 * 
+	 * @param dt 参数表示时间间隔，用于计算新的配额。
+	 */
 	void update_quotas(time_duration const& dt);
 
 private:
 
 	// these are the consumers that want bandwidth
-	// 队列中所有请求所涉及的字节数
+	// 存储带宽请求的队列。
 	std::vector<bw_request> m_queue;
+	
 	// the number of bytes all the requests in queue are for
+	// 队列中所有请求的总字节数。
 	std::int64_t m_queued_bytes;
 
 	// this is the channel within the consumers
 	// that bandwidth is assigned to (upload or download)
-	// 这是消费者内部的通道，带宽会分配到该通道（上传或下载）。
+	// 带宽通道的类型（例如，上传或下载）。
+	// 这是消费者内部的通道，带宽会分配到该通道。
 	int m_channel;
 
+	// 标志位，表示是否中止带宽分配
 	bool m_abort;
 };
 

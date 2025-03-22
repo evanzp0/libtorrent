@@ -4829,29 +4829,41 @@ namespace {
 #if TORRENT_USE_ASSERTS
 		m_posting_torrent_updates = false;
 #endif
-
+		// 在当前 m_generation 的异构队列中，添加 state_update_alert 警报。 
 		m_alerts.emplace_alert<state_update_alert>(std::move(status));
 	} // end of post_torrent_updates
 
+	/**
+	 * @brief post_session_stats() 的作用是收集并发布当前会话（session）的统计信息。
+	 * 它会更新各种统计计数器，并通过警报系统（alerts）将统计信息发送给用户。
+	 */
 	void session_impl::post_session_stats()
 	{
+		// 检查是否已经发布过统计头信息
 		if (!m_posted_stats_header)
 		{
 			m_posted_stats_header = true;
+
+			// 发布一个 session_stats_header_alert 警报。
+			// session_stats_header_alert 是一个警报类型，用于通知用户统计信息的头部信息（通常是统计字段的名称）。
 			m_alerts.emplace_alert<session_stats_header_alert>();
 		}
+
+		// 更新磁盘线程的统计计数器。
+		// m_stats_counters 是一个统计计数器对象，用于存储各种统计信息。
 		m_disk_thread->update_stats_counters(m_stats_counters);
 
 #ifndef TORRENT_DISABLE_DHT
 		if (m_dht)
 			m_dht->update_stats_counters(m_stats_counters);
 #endif
-
+		// 上下行请求数
 		m_stats_counters.set_value(counters::limiter_up_queue
 			, m_upload_rate.queue_size());
 		m_stats_counters.set_value(counters::limiter_down_queue
 			, m_download_rate.queue_size());
 
+		// 上下行字节数
 		m_stats_counters.set_value(counters::limiter_up_bytes
 			, m_upload_rate.queued_bytes());
 		m_stats_counters.set_value(counters::limiter_down_bytes

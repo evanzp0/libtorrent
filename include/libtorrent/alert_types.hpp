@@ -2825,6 +2825,9 @@ TORRENT_VERSION_NAMESPACE_3
 	// header that properly match the stats values string returned in
 	// ``session_stats_alert::message()``.
 	//
+	// message() 成员函数会返回一个字符串形式的表头，
+	// 该表头与 session_stats_alert::message() 中返回的统计值字符串能正确匹配。
+	//
 	// this specific output is parsed by tools/parse_session_stats.py
 	// if this is changed, that parser should also be changed
 	struct TORRENT_EXPORT session_stats_header_alert final : alert

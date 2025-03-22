@@ -33,6 +33,17 @@
     session_impl ..|> error_handler_interface
     session_impl ..|> enable_shared_from_this
 
+    session_impl *-- disk_interface
+    session_impl *-- bandwidth_manager
+
+    interface disk_interface
+
+    disk_interface <|.. mmap_disk_io
+    disk_interface <|.. posix_disk_io
+    disk_interface <|.. disabled_disk_io
+
+    mmap_disk_io *-- disk_job_pool
+
     dht_storage_interface <|.. dht_default_storage
 
     class torrent_list<T> {
