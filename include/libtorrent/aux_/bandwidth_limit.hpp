@@ -119,12 +119,13 @@ struct TORRENT_EXTRA_EXPORT bandwidth_channel
 	// - 否则，减少剩余配额并返回 false，表示可以立即分配带宽。
 	bool need_queueing(int amount)
 	{
-		// 如果 m_quota_left - amount < m_limit, 
-		// 需要按时间均匀分配，要等待一个完整的时间周期才能获得固定的配额。
+		// 如果 m_quota_left - amount < m_limit, 意味着当前剩余配额不足以满足请求，且剩余的配额不足以维持带宽限制。
+		// 这就要需要将请求加入队列，等待下一个时间周期分配固定的带宽配额（按时间均匀分配）。
 		if (m_quota_left - amount < m_limit) return true;
 
 		// 如果带宽通道中积累了超过一秒的配额（即 m_quota_left - amount >= m_limit），
-		// 则可以直接分配配额，而不需要按时间均匀分配。
+		// 这意味着当前剩余配额足够满足请求，且剩余的配额仍然可以维持带宽限制。
+		// 则可以直接分配配额，而不需要按时间均匀分配，所以不需要将请求加入队列。
 		m_quota_left -= amount;
 		return false;
 	}
