@@ -89,6 +89,7 @@ namespace aux {
 			return c[index];
 		}
 
+		// 各自生成数组
 		std::array<std::string, settings_pack::num_string_settings> m_strings;
 		std::array<int, settings_pack::num_int_settings> m_ints;
 		std::bitset<settings_pack::num_bool_settings> m_bools;

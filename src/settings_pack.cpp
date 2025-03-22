@@ -498,9 +498,15 @@ constexpr int DISK_WRITE_MODE = settings_pack::enable_os_cache;
 		return pack;
 	}
 
+	/**
+	 * @brief non_default_settings 的作用是从传入的 aux::session_settings 对象 sett 中提取所有与默认值不同的设置，
+	 * 并将这些设置存储到一个新的 settings_pack 对象中返回。
+	 */
 	settings_pack non_default_settings(aux::session_settings const& sett)
 	{
 		settings_pack ret;
+
+		// bulk_get 是 aux::session_settings 的一个方法，用于批量获取设置
 		sett.bulk_get([&ret](aux::session_settings_single_thread const& s)
 		{
 		// loop over all settings that differ from default

@@ -616,13 +616,23 @@ namespace {
 
 } // anonymous namespace
 
+	/**
+	 * @brief 获取当前 DHT的状态，并将其封装到一个 dht_state 对象中返回。
+	 * DHT的状态包括：本机 socket 信息和本机的 dht id，ret.nodes 采集 dht 节点信息
+	 */
 	dht_state dht_tracker::state() const
 	{
+		// dht_state 是一个表示 DHT 状态的对象，通常包含节点 ID 和节点列表等信息
 		dht_state ret;
 		for (auto& n : m_nodes)
 		{
 			// use the local rather than external address because if the user is behind NAT
 			// we won't know the external IP on startup
+			// 
+			//  ret.nids 采集本机 socket 信息和本机的 dht id，ret.nodes 采集 dht 节点信息。
+			// - n.first 是本机监听 socket，这里用 get_local_endpoint() 获取节点的本地地址（而不是外部地址），
+			//   因为如果用户位于 NAT 后面，启动时可能无法知道外部 IP。
+			// - n.second.dht.nid() 获取节点的 DHT ID。
 			ret.nids.emplace_back(n.first.get_local_endpoint().address(), n.second.dht.nid());
 			auto nodes = save_nodes(n.second.dht);
 			ret.nodes.insert(ret.nodes.end(), nodes.begin(), nodes.end());

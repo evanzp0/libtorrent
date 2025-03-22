@@ -67,4 +67,8 @@
     torrent_plugin <|.. smart_ban_plugin
 
     session_plugin_wrapper ..> torrent_plugin : create
+
+    session_settings *-- session_settings_single_thread
+
+    session_settings_single_thread "1" *-- "0..*" settings_pack
 @enduml

@@ -922,13 +922,20 @@ bool ssl_server_name_callback(ssl::stream_handle_type stream_handle, std::string
 	}
 #endif
 
+	/**
+	 * @brief 提取 session 的状态，包括：
+	 *  - non_default_settings（和默认设置不同的 setting 设置）
+	 *  - dht_state
+	 *  - extension_state
+	 *  - ip_filter
+	 */
 	session_params session_impl::session_state(save_state_flags_t const flags) const
 	{
 		TORRENT_ASSERT(is_single_thread());
 
 		session_params ret;
 		if (flags & session::save_settings)
-			ret.settings = non_default_settings(m_settings);
+			ret.settings = non_default_settings(m_settings); // 提取和默认设置不同的 setting 设置
 
 #ifndef TORRENT_DISABLE_DHT
 #if TORRENT_ABI_VERSION <= 2

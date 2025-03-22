@@ -195,6 +195,13 @@ namespace libtorrent {
 	}
 #endif
 
+	/**
+	 * @brief 提取 session 的状态，包括：
+	 *  - non_default_settings（和默认设置不同的 setting 设置）
+	 *  - dht_state
+	 *  - extension_state
+	 *  - ip_filter
+	 */
 	session_params session_handle::session_state(save_state_flags_t const flags) const
 	{
 		return sync_call_ret<session_params>(&session_impl::session_state, flags);

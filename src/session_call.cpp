@@ -80,13 +80,19 @@ void torrent_wait(bool& done, aux::session_impl& ses)
 	// blocking_call() 是不必要的或者用于特定的初始化或同步目的
 	blocking_call(); 
 	
+	// 建一个 std::unique_lock 对象，并锁定 ses.mut 互斥锁。
+	// 互斥锁用于保护共享数据（这里是 done），确保线程安全。
 	std::unique_lock<std::mutex> l(ses.mut);
-	while (!done) { 
-		// wait方法会原子地解锁l（即释放ses.mut），然后等待条件变量的通知（即另一个线程调用notify_one或notify_all）。
-		// 一旦条件变量被通知，wait方法会重新锁定l，然后检查循环条件（这里是!done）。
-		// 如果done仍然为false，则继续等待；如果为true，则退出循环。
+
+	while (!done) {
+
+		// 如果条件不满足(done 为 false), 调用 ses.cond.wait(l),
+		// wait 会释放互斥锁 l，并将当前线程挂起，直到条件变量 ses.cond 被通知。
+		// 当 ses.cond 被通知时，线程会被唤醒（即另一个线程调用notify_one或notify_all），并重新获取互斥锁 l。
 		ses.cond.wait(l);
 	}
+
+	// 当 torrent_wait 函数结束时，l(ses.mut) 这个锁会被释放。
 }
 
 } } // namespace aux namespace libtorrent
