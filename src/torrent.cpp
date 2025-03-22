@@ -12085,7 +12085,7 @@ namespace {
 		}
 
 		st->last_seen_complete = m_swarm_last_seen_complete;
-	}
+	} // end of status
 
 	int torrent::priority() const
 	{

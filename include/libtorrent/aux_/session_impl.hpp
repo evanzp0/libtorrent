@@ -872,6 +872,7 @@ namespace aux {
 			// negative, return INT_MAX
 			int get_int_setting(int n) const;
 
+			// m_torrent_lists 是一个长度为 8 的数组，每一个 item 都是 vector<torrent*>
 			aux::array<aux::vector<torrent*>, num_torrent_lists, torrent_list_index_t>
 				m_torrent_lists;
 

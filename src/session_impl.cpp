@@ -4778,8 +4778,10 @@ namespace {
 	{
 		INVARIANT_CHECK;
 
+		// 断言当前函数在单线程上下文中执行，确保线程安全。
 		TORRENT_ASSERT(is_single_thread());
 
+		// 获取用户上次请求更新以来，状态发生变化的种子列表
 		std::vector<torrent*>& state_updates
 			= m_torrent_lists[aux::session_impl::torrent_state_updates];
 
@@ -4796,17 +4798,32 @@ namespace {
 		// pushed back. Perhaps the status_update_alert could even have a fixed
 		// array of n entries rather than a vector, to further improve memory
 		// locality.
+		// TODO: 在此处添加一个功能，限制单次更新中发送的种子数量，或许会是个不错的主意。
+		// 通过仅发布前 n 个种子，由于种子列表总是会被重新放回队列尾部，它们将能很好地实现轮询。
+		// 也许 status_update_alert 甚至可以使用一个固定大小为 n 的数组来替代向量（vector），从而进一步提升内存局部性。
 		for (auto& t : state_updates)
 		{
+			// 断言当前种子 t 在状态更新列表中
 			TORRENT_ASSERT(t->m_links[aux::session_impl::torrent_state_updates].in_list());
+
+			// 在容器的尾部自动生成一个新的元素（item），然后返回对该元素的引用。
 			status.emplace_back();
+			
 			// querying accurate download counters may require
 			// the torrent to be loaded. Loading a torrent, and evicting another
 			// one will lead to calling state_updated(), which screws with
 			// this list while we're working on it, and break things
+			// 查询精确的下载计数器可能需要加载种子文件。
+			// 加载一个种子文件并逐出另一个种子文件会导致调用 state_updated() 函数，
+			// 而这会在我们处理此列表时对其造成干扰，进而引发问题。
+			//
+			// 获取种子状态
 			t->status(&status.back(), flags);
+			// 清除种子 t 的状态更新标记，表示其状态已更新。
 			t->clear_in_state_update();
 		}
+
+		// 将 m_torrent_lists[aux::session_impl::torrent_state_updates] 的 torrent 更新列表清空
 		state_updates.clear();
 
 #if TORRENT_USE_ASSERTS
@@ -4814,7 +4831,7 @@ namespace {
 #endif
 
 		m_alerts.emplace_alert<state_update_alert>(std::move(status));
-	}
+	} // end of post_torrent_updates
 
 	void session_impl::post_session_stats()
 	{

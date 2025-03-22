@@ -246,26 +246,34 @@ namespace aux {
 
 		// this is the set of (subscribed) torrents that have changed
 		// their states since the last time the user requested updates.
+		// 这是自用户上次请求更新以来，（已订阅的）状态发生变化的种子列表。
 		static constexpr torrent_list_index_t torrent_state_updates{0};
 
-			// all torrents that want to be ticked every second
+		// all torrents that want to be ticked every second
+		// 所有需要每秒执行一次 “心跳” 操作的种子。
 		static constexpr torrent_list_index_t torrent_want_tick{1};
 
-			// all torrents that want more peers and are still downloading
-			// these typically have higher priority when connecting peers
+		// all torrents that want more peers and are still downloading
+		// these typically have higher priority when connecting peers
+		// 所有仍在下载且需要更多对等节点的种子。
+		// 连接对等节点时，这些种子通常具有更高的优先级。
 		static constexpr torrent_list_index_t torrent_want_peers_download{2};
 
-			// all torrents that want more peers and are finished downloading
+		// all torrents that want more peers and are finished downloading
+		// 所有已完成下载且需要更多对等节点的种子。
 		static constexpr torrent_list_index_t torrent_want_peers_finished{3};
 
-			// torrents that want auto-scrape (only paused auto-managed ones)
+		// torrents that want auto-scrape (only paused auto-managed ones)
+		// 需要自动进行种子信息查询（scrape）的种子（仅针对处于暂停状态且自动管理的种子）。
 		static constexpr torrent_list_index_t torrent_want_scrape{4};
 
-			// auto-managed torrents by state. Only these torrents are considered
-			// when recalculating auto-managed torrents. started auto managed
-			// torrents that are inactive are not part of these lists, because they
-			// are not considered for auto managing (they are left started
-			// unconditionally)
+		// auto-managed torrents by state. Only these torrents are considered
+		// when recalculating auto-managed torrents. started auto managed
+		// torrents that are inactive are not part of these lists, because they
+		// are not considered for auto managing (they are left started
+		// unconditionally)
+		// 按状态划分的自动管理种子列表。重新计算自动管理种子时，仅考虑这些种子。
+		// 已启动但处于非活动状态的自动管理种子不在这些列表中，因为它们不参与自动管理（它们会无条件保持启动状态）。
 		static constexpr torrent_list_index_t torrent_downloading_auto_managed{5};
 		static constexpr torrent_list_index_t torrent_seeding_auto_managed{6};
 		static constexpr torrent_list_index_t torrent_checking_auto_managed{7};

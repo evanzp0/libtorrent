@@ -1209,9 +1209,13 @@ namespace libtorrent {
 		void predicted_have_piece(piece_index_t index, int milliseconds);
 #endif
 
+		/**
+		 * 将当前 torrent 对象从状态更新列表中移除
+		 */
 		void clear_in_state_update()
 		{
 			TORRENT_ASSERT(m_links[aux::session_interface::torrent_state_updates].in_list());
+			// m_links[aux::session_interface::torrent_state_updates] 是当前 torrent，在状态更新列表中的 link 值
 			m_links[aux::session_interface::torrent_state_updates].clear();
 		}
 

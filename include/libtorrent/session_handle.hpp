@@ -254,7 +254,7 @@ namespace libtorrent {
 			std::function<bool(torrent_status const&)> const& pred
 			, status_flags_t flags = {}) const;
 
-		// session_handle::refresh_torrent_status 是批量更新 ret 中 torrent_status 的状态信息。
+		// refresh_torrent_status 是根据 torrents 的 status 批量更新 ret 中 torrent_status 的状态信息。
 		// flags 参数是一个 status_flags_t 类型的位标志字段，用于控制返回的 torrent_status 对象中包含哪些信息。
 		void refresh_torrent_status(std::vector<torrent_status>* ret
 			, status_flags_t flags = {}) const;
