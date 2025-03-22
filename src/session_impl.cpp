@@ -4857,13 +4857,13 @@ namespace {
 		if (m_dht)
 			m_dht->update_stats_counters(m_stats_counters);
 #endif
-		// 上下行请求数
+		// 上下行等待配额的请求数
 		m_stats_counters.set_value(counters::limiter_up_queue
 			, m_upload_rate.queue_size());
 		m_stats_counters.set_value(counters::limiter_down_queue
 			, m_download_rate.queue_size());
 
-		// 上下行请求的字节数
+		// 上下行等待配额的请求的字节数
 		m_stats_counters.set_value(counters::limiter_up_bytes
 			, m_upload_rate.queued_bytes());
 		m_stats_counters.set_value(counters::limiter_down_bytes
