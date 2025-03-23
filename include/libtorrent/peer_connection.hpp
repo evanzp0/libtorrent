@@ -646,6 +646,13 @@ namespace aux {
 		void send_block_requests();
 		void send_block_requests_impl();
 
+
+		/**
+		 * @brief 为 peer 分配带宽，并根据分配的带宽设置上传或下载操作
+		 * 
+		 * @param channel 表示带宽通道的类型（例如，上传或下载）。
+		 * @param amount 分配的带宽大小（字节数）。
+		 */
 		void assign_bandwidth(int channel, int amount) override;
 
 #if TORRENT_USE_INVARIANT_CHECKS
@@ -665,6 +672,10 @@ namespace aux {
 		virtual piece_block_progress downloading_piece_progress() const;
 
 		void send_buffer(span<char const> buf);
+		
+		/**
+		 * 设置上传操作，将数据从发送缓冲区（m_send_buffer）写入到网络套接字中。
+		 */
 		void setup_send();
 
 		template <typename Holder>
@@ -844,6 +855,7 @@ namespace aux {
 		aux::receive_buffer m_recv_buffer;
 
 		// number of bytes this peer can send and receive
+		// m_quota 是一个数组，用于存储获得的上传和下载的配额。(可以有多少字节下载或发送)
 		int m_quota[2];
 
 		// the blocks we have reserved in the piece
@@ -967,6 +979,9 @@ namespace aux {
 		// end has to send us in order to respond
 		// to all outstanding piece requests we
 		// have sent to it
+		//
+		// 为了回应我们向对端发送的所有未完成的分片请求，
+		// 对端需要发送给我们的字节数。
 		int m_outstanding_bytes = 0;
 
 		aux::handler_storage<aux::read_handler_max_size, aux::read_handler> m_read_handler_storage;
@@ -1044,6 +1059,9 @@ namespace aux {
 		// the number of bytes we are currently reading
 		// from disk, that will be added to the send
 		// buffer as soon as they complete
+		//
+		// 我们当前正在从磁盘读取的字节数（在读数据），
+		// 这些字节一旦读取完成就会被添加到发送缓冲区中。
 		int m_reading_bytes = 0;
 
 		// options used for the piece picker. These flags will

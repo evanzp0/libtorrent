@@ -5666,17 +5666,26 @@ namespace libtorrent {
 			? peer_log_alert::outgoing : peer_log_alert::incoming
 			, "ASSIGN_BANDWIDTH", "bytes: %d", amount);
 #endif
-
+		// 断言 amount 大于 0，或者对等方正在断开连接。
 		TORRENT_ASSERT(amount > 0 || is_disconnecting());
+
+		// 将分配的带宽大小 amount 加到 m_quota[channel] 中。
 		m_quota[channel] += amount;
+
+		// 断言 m_channel_state[channel] 包含 peer_info::bw_limit 标志。
+		//（该 channel 正被限制等待分配配额，无法发送/接收）。
 		TORRENT_ASSERT(m_channel_state[channel] & peer_info::bw_limit);
+
+		// 清除 m_channel_state[channel] 中的 peer_info::bw_limit 标志，表示带宽限制已经解除。
 		m_channel_state[channel] &= ~peer_info::bw_limit;
 
 #if TORRENT_USE_INVARIANT_CHECKS
 		check_invariant();
 #endif
-
+		// 如果对等方正在断开连接，则直接返回
 		if (is_disconnecting()) return;
+
+		// 设置上传或下载操作
 		if (channel == upload_channel)
 		{
 			setup_send();
@@ -5690,22 +5699,55 @@ namespace libtorrent {
 	// the number of bytes we expect to receive, or want to send
 	// channel either refer to upload or download. This is used
 	// by the rate limiter to allocate quota for this peer
+
+	/**
+	 * @brief 计算出在下一个 tick 间隔内期望传输的字节数。
+	 *        limiter（速率限制器）会使用这个值来为该对等节点分配配额。
+	 * 
+	 * 根据当前的下载或上传速率、缓冲区状态以及配置的 tick 间隔，
+	 * 计算出在下一个 tick 间隔内期望传输的字节数。这用于优化数据传输，
+ 	 * 确保高效利用网络带宽同时避免过度缓冲。
+	 * 
+	 * @param channel 指的是向上传或下载通道。
+	 * 
+	 * @return int 期望传输的字节数
+	 */
 	int peer_connection::wanted_transfer(int const channel)
 	{
 		TORRENT_ASSERT(is_single_thread());
 
+		// 获取 tick 间隔，至少为1（tick_interval 毫秒）
 		const int tick_interval = std::max(1, m_settings.get_int(settings_pack::tick_interval));
 
+		// 根据通道类型计算期望的传输字节数
 		if (channel == download_channel)
 		{
+			// 计算调整后的下载速率
+			//
+			// 将下载速率乘以 3/2（即增加 50%），可能是为了预留额外的带宽空间，
+			// 确保在网络波动或延迟情况下仍能保持高效的数据传输。
+			// 这种调整通常用于优化性能，避免因低估需求而导致缓冲区不足。
 			std::int64_t const download_rate = std::int64_t(m_statistics.download_rate()) * 3 / 2;
+
+			// 返回期望的下载字节数，考虑当前未完成的字节数（已请求未收到）、接收缓冲区剩余空间和下载速率，取以下三者最大值
+			//
+			// - m_outstanding_bytes + 30：表示当前已请求未收到的字节数，+30 为了增加一定的余量。
+			// - m_recv_buffer.packet_bytes_remaining() + 30：表示接收缓冲区中剩余的字节数（即还需要接收多少字节才能完成当前包的组装）。
+			// - download_rate * tick_interval / 1000：将下载速率转换为 tick_interval 时间间隔内期望传输的字节数
 			return std::max({m_outstanding_bytes + 30
 				, m_recv_buffer.packet_bytes_remaining() + 30
 				, int(download_rate * tick_interval / 1000)});
 		}
 		else
 		{
+			 // 计算调整后的上传速率
 			std::int64_t const upload_rate = std::int64_t(m_statistics.upload_rate()) * 2;
+
+			// 返回期望的上传字节数，考虑当前读取的字节数、发送缓冲区大小和上传速率，取以下三者最大值
+			// 
+			// m_reading_bytes：磁盘在读上传数
+			// m_send_buffer.size()：发送缓冲区大小
+			// upload_rate * tick_interval / 1000：上传速率转换为 tick_interval 时间间隔内期望传输的字节数
 			return std::max({m_reading_bytes
 				, m_send_buffer.size()
 				, int(upload_rate * tick_interval / 1000)});
@@ -5718,6 +5760,7 @@ namespace libtorrent {
 		INVARIANT_CHECK;
 
 		// we can only have one outstanding bandwidth request at a time
+		// 我们一次只能有一个未完成的带宽请求。
 		if (m_channel_state[channel] & peer_info::bw_limit) return 0;
 
 		std::shared_ptr<torrent> t = m_torrent.lock();
@@ -5787,6 +5830,27 @@ namespace libtorrent {
 		return ret;
 	}
 
+	/**
+	 * @brief 设置并启动对等连接的发送操作。
+	 * 
+	 * 该函数负责管理发送缓冲区、带宽配额以及网络写入操作。它确保在适当的条件下触发异步写入，
+	 * 并处理与磁盘和网络相关的状态更新。
+	 * 
+	 * @details
+	 * - 如果当前正在断开连接或发送缓冲区为空，则直接返回。
+	 * - 请求上传通道的带宽配额。
+	 * - 检查是否有未完成的发送操作，若有则累积发送缓冲区以合并后续写入。
+	 * - 处理发送屏障（send_barrier），将加密消息限制为1MB，并注入额外的数据块。
+	 * - 根据发送缓冲区状态、磁盘读取字节数和剩余配额，决定是否等待磁盘数据。
+	 * - 如果无法写入（例如缓冲区耗尽或条件不满足），记录日志并返回。
+	 * - 计算可发送的字节数，触发异步写入操作，并更新通道状态。
+	 * 
+	 * @note
+	 * - 函数依赖于多个成员变量和外部状态，如m_send_buffer、m_quota、m_channel_state等。
+	 * - 日志功能在TORRENT_DISABLE_LOGGING未定义时启用。
+	 * 
+	 * @return void
+	 */
 	void peer_connection::setup_send()
 	{
 		TORRENT_ASSERT(is_single_thread());
@@ -5940,7 +6004,7 @@ namespace libtorrent {
 
 		m_channel_state[upload_channel] |= peer_info::bw_network;
 		m_last_sent.set(m_connect, aux::time_now());
-	}
+	} // end of setup_send
 
 	void peer_connection::on_disk()
 	{

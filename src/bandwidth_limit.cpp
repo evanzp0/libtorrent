@@ -79,6 +79,7 @@ namespace aux {
 		{
 			m_quota_left += to_add;
 			if (m_quota_left / 3 > m_limit) m_quota_left = std::int64_t(m_limit) * 3;
+			
 			// "m_quota_left" will never have int64 overflow but may exceed "<int>::max"
 			m_quota_left = std::min(m_quota_left, std::int64_t(inf));
 		}
@@ -89,6 +90,7 @@ namespace aux {
 	// this is used when connections disconnect with
 	// some quota left. It's returned to its bandwidth
 	// channels.
+	
 	void bandwidth_channel::return_quota(int const amount)
 	{
 		TORRENT_ASSERT(amount >= 0);

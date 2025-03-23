@@ -55,9 +55,11 @@ struct TORRENT_EXTRA_EXPORT bandwidth_channel
 
 	bandwidth_channel();
 
-	// 设置带宽限制（字节/秒）。0 表示无限带宽。
+	// 设置通道的带宽限制（字节/秒）。0 表示无限带宽。
 	// 0 means infinite
 	void throttle(int limit);
+
+	// 获取通道的带宽限制（字节/秒）。0 表示无限带宽。
 	int throttle() const
 	{
 		TORRENT_ASSERT_VAL(m_limit >= 0, m_limit);

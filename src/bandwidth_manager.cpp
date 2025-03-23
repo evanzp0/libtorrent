@@ -151,12 +151,18 @@ namespace aux {
 
 	void bandwidth_manager::update_quotas(time_duration const& dt)
 	{
+		
+		// 如果带宽管理器已经中止，直接返回
 		if (m_abort) return;
+
+		// 如果没有待处理的带宽请求，直接返回
 		if (m_queue.empty()) return;
 
 		INVARIANT_CHECK;
 
 		std::int64_t dt_milliseconds = total_milliseconds(dt);
+
+		// 如果时间间隔超过 3 秒，则将其限制为 3 秒，避免一次性分配过多配额
 		if (dt_milliseconds > 3000) dt_milliseconds = 3000;
 
 		// for each bandwidth channel, call update_quota(dt)
@@ -165,25 +171,32 @@ namespace aux {
 
 		std::vector<bw_request> queue;
 
+		// 处理请求队列中，正在断开连接的 peer 的配额
 		for (auto i = m_queue.begin(); i != m_queue.end();)
 		{
+			// 如果 peer 正在断开连接
 			if (i->peer->is_disconnecting())
 			{
+				// 减少 m_queued_bytes，表示队列中总字节数减少。
 				m_queued_bytes -= i->request_size - i->assigned;
 
 				// return all assigned quota to all the
 				// bandwidth channels this peer belongs to
+				// 将已分配的配额返还给所有该 bw_request 关联的带宽通道。
 				for (int j = 0; j < bw_request::max_bandwidth_channels && i->channel[j]; ++j)
 				{
 					bandwidth_channel* bwc = i->channel[j];
 					bwc->return_quota(i->assigned);
 				}
 
+				// 将 bw_request 请求移动到 queue 中，并从 m_queue 中移除。
 				i->assigned = 0;
 				queue.push_back(std::move(*i));
 				i = m_queue.erase(i);
 				continue;
 			}
+
+			// 如果 peer 没有断开连接，则初始化带宽通道的临时变量 tmp
 			for (int j = 0; j < bw_request::max_bandwidth_channels && i->channel[j]; ++j)
 			{
 				bandwidth_channel* bwc = i->channel[j];
@@ -192,6 +205,7 @@ namespace aux {
 			++i;
 		}
 
+		// 计算每个带宽通道的总优先级
 		for (auto const& r : m_queue)
 		{
 			for (int j = 0; j < bw_request::max_bandwidth_channels && r.channel[j]; ++j)
@@ -199,18 +213,26 @@ namespace aux {
 				bandwidth_channel* bwc = r.channel[j];
 				if (bwc->tmp == 0) channels.push_back(bwc);
 				TORRENT_ASSERT(INT_MAX - bwc->tmp > r.priority);
+
+				// 累加每个带宽通道的总优先级
 				bwc->tmp += r.priority;
 			}
 		}
 
+		// 遍历 channels 中的每个带宽通道，更新带宽通道的配额
 		for (auto const& ch : channels)
 		{
+			// 根据时间间隔 dt_milliseconds 更新配额
 			ch->update_quota(int(dt_milliseconds));
 		}
 
+		// 遍历 m_queue 中的每个带宽请求，分配带宽给请求
 		for (auto i = m_queue.begin(); i != m_queue.end();)
 		{
+			// 分配带宽
 			int a = i->assign_bandwidth();
+
+			// 如果请求已经完成（i->assigned == i->request_size）或生存时间耗尽（i->ttl <= 0）
 			if (i->assigned == i->request_size
 				|| (i->ttl <= 0 && i->assigned > 0))
 			{
@@ -223,12 +245,17 @@ namespace aux {
 			{
 				++i;
 			}
+
+			// 减少 m_queued_bytes，表示队列中总字节数减少
 			m_queued_bytes -= a;
 		}
 
+		// 通知 peer 分配带宽
 		while (!queue.empty())
 		{
 			bw_request& bwr = queue.back();
+
+			// 调用对等方的 assign_bandwidth 函数，通知分配的带宽
 			bwr.peer->assign_bandwidth(m_channel, bwr.assigned);
 			queue.pop_back();
 		}

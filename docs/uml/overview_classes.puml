@@ -60,8 +60,14 @@
     bw_request o-- bandwidth_socket
 
     interface bandwidth_socket {}
+    interface disk_observer  {}
+    interface peer_connection_interface {}
 
-    bandwidth_socket <|..peer_connection
+    peer_class_set <|-- peer_connection
+    peer_connection_hot_members <|-- peer_connection
+    bandwidth_socket <|.. peer_connection
+    disk_observer <|.. peer_connection
+    peer_connection_interface <|.. peer_connection
 
     peer_class_pool "1" o-- "0..*" peer_class
 

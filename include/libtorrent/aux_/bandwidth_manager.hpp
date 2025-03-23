@@ -126,9 +126,9 @@ struct TORRENT_EXTRA_EXPORT bandwidth_manager
 #endif
 
 	/**
-	 * @brief 更新带宽配额。
+	 * @brief 更新带宽配额，并根据配额分配带宽给队列中的请求。
 	 * 
-	 * @param dt 参数表示时间间隔，用于计算新的配额。
+	 * @param dt 时间间隔，表示从上一次更新配额到现在的时间差。
 	 */
 	void update_quotas(time_duration const& dt);
 
