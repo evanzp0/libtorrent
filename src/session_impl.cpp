@@ -1433,10 +1433,15 @@ namespace {
 	// is considered pertinent and copied
 	// returns the number of pointers copied
 	// channel is upload_channel or download_channel
+	//
+	// 复制带宽限制大于 0 的 upload_channel/download_channel channel。
 	int session_impl::copy_pertinent_channels(peer_class_set const& set
 		, int channel, bandwidth_channel** dst, int const max)
 	{
+		// 每个 peer_class（peer 分类）中都有 download_channel 和 upload_channel，通过 channel 参数来区分。
+		// num_channels 就是 set 中有多少 peer_class，也代表了set 中有多少个 upload_channel/download_channel channel。
 		int num_channels = set.num_classes();
+
 		int num_copied = 0;
 		for (int i = 0; i < num_channels; ++i)
 		{
