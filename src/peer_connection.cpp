@@ -5765,29 +5765,38 @@ namespace libtorrent {
 
 		std::shared_ptr<torrent> t = m_torrent.lock();
 
+		// 确保请求的带宽至少满足 wanted_transfer（期望传输字节数) 的需求
 		bytes = std::max(wanted_transfer(channel), bytes);
 
 		// we already have enough quota
+		// 如果当前配额已经足够，无需请求更多带宽
 		if (m_quota[channel] >= bytes) return 0;
 
 		// deduct the bytes we already have quota for
+		// 计算还需要多少带宽才能满足传输需求（需要传输的字节数 - 当前通道已分配的配额）
 		bytes -= m_quota[channel];
 
+		// 获取通道的优先级
 		int const priority = get_priority(channel);
 
+		// 计算最大可能的带宽通道数量，并分配临时存储空间
+		//
+		// max_channels = peer_connection 上的 peer_class 数量 + torrent 上的 peer_class 数量 + 2
+		// torrent 有带宽限制和优先级；peer 上也有 有带宽限制和优先级。
 		int const max_channels = num_classes() + (t ? t->num_classes() : 0) + 2;
+		// 使用 TORRENT_ALLOCA 分配一个临时数组 channels，用于存储带宽通道指针
 		TORRENT_ALLOCA(channels, aux::bandwidth_channel*, max_channels);
 
 		// collect the pointers to all bandwidth channels
 		// that apply to this torrent
+		// 收集所有适用于此 torrent 的带宽通道的指针。
 		int c = 0;
 
-		c += m_ses.copy_pertinent_channels(*this, channel
-			, channels.subspan(c).data(), max_channels - c);
+		// 调用 copy_pertinent_channels 函数，收集与当前 peer_connection 和 torrent 相关的带宽通道。
+		c += m_ses.copy_pertinent_channels(*this, channel, channels.subspan(c).data(), max_channels - c);
 		if (t)
 		{
-			c += m_ses.copy_pertinent_channels(*t, channel
-				, channels.subspan(c).data(), max_channels - c);
+			c += m_ses.copy_pertinent_channels(*t, channel, channels.subspan(c).data(), max_channels - c);
 		}
 
 #if TORRENT_USE_ASSERTS
@@ -5802,11 +5811,11 @@ namespace libtorrent {
 
 		TORRENT_ASSERT(!(m_channel_state[channel] & peer_info::bw_limit));
 
+		// 请求带宽
 		aux::bandwidth_manager* manager = m_ses.get_bandwidth_manager(channel);
+		int const ret = manager->request_bandwidth(self(), bytes, priority, channels.data(), c);
 
-		int const ret = manager->request_bandwidth(self()
-			, bytes, priority, channels.data(), c);
-
+		// 如果带宽请求无法立即满足，需要排队（manager->request_bandwidth(..) 中已经加入请求队列，等待后续分配）
 		if (ret == 0)
 		{
 #ifndef TORRENT_DISABLE_LOGGING
@@ -5820,10 +5829,13 @@ namespace libtorrent {
 					, wanted_transfer(channel), priority, c);
 			}
 #endif
+			// 设置 m_channel_state[channel] 中的 peer_info::bw_limit 标志（表面请求带宽排队中）
 			m_channel_state[channel] |= peer_info::bw_limit;
 		}
+		// 如果带宽请求立即能满足，
 		else
 		{
+			// 增加当前通道已分配的配额数。
 			m_quota[channel] += ret;
 		}
 

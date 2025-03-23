@@ -69,6 +69,11 @@
     disk_observer <|.. peer_connection
     peer_connection_interface <|.. peer_connection
 
+    single_threaded <|-- torrent
+    torrent_hot_members <|-- torrent
+    request_callback <|-- torrent
+    peer_class_set <|-- torrent
+
     peer_class_pool "1" o-- "0..*" peer_class
 
     alert_manager "1" *-- "0..*" alert

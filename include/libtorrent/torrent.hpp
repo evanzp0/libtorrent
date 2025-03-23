@@ -359,6 +359,9 @@ namespace libtorrent {
 	// a torrent is a class that holds information
 	// for a specific download. It updates itself against
 	// the tracker
+	//
+	// torrent 是一个用于存储特定下载任务相关信息的类。
+	// 它会根据追踪器（tracker）的信息来更新自身状态。
 	struct TORRENT_EXTRA_EXPORT torrent
 		: private single_threaded
 		, private torrent_hot_members
@@ -1546,6 +1549,7 @@ namespace libtorrent {
 
 		// for torrents who have a bandwidth limit, this is != 0
 		// and refers to a peer_class in the session.
+		// 对于那些有带宽限制的 torrent 而言，此值不为 0，并且它指向会话中的一个 peer_class
 		peer_class_t m_peer_class{0};
 
 		// of all peers in m_connections, this is the number
