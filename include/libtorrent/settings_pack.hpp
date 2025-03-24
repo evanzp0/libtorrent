@@ -1221,12 +1221,20 @@ namespace aux {
 			// and snappy seeding performance, set this fairly high, to at least
 			// fit a few blocks. This is essentially the initial window size which
 			// will determine how fast we can ramp up the send rate
+			// send_buffer_low_watermark 是发送缓冲区的最小目标大小（发送缓冲区包含等待从磁盘读取的字节）。
+			// 为了实现良好且快速的做种性能，应将此值设置得相当高，至少要能容纳几个数据块。
+			// 本质上，这就是初始窗口大小，它将决定我们能够多快地提升发送速率。
 			//
 			// if the send buffer has fewer bytes than ``send_buffer_watermark``,
 			// we'll read another 16 kiB block onto it. If set too small, upload
 			// rate capacity will suffer. If set too high, memory will be wasted.
 			// The actual watermark may be lower than this in case the upload rate
 			// is low, this is the upper limit.
+			// 如果发送缓冲区中的字节数少于 send_buffer_watermark（发送缓冲区水位线），
+			// 我们会再读取一个 16KB 的数据块到缓冲区中。
+			// 如果该值设置得过小，上传速率性能将会受到影响；
+			// 如果设置得过高，则会造成内存浪费。在上传速率较低的情况下，
+			// 实际的水位线可能会低于此值，此值为上限。
 			//
 			// the current upload rate to a peer is multiplied by this factor to
 			// get the send buffer watermark. The factor is specified as a
@@ -1236,7 +1244,15 @@ namespace aux {
 			// high capacity connections, setting this higher can improve upload
 			// performance and disk throughput. Setting it too high may waste RAM
 			// and create a bias towards read jobs over write jobs.
+			// 当前向某个对等节点的上传速率会乘以这个系数，从而得到发送缓冲区的高水位线。
+			// 该系数以百分比形式指定，例如 50 代表 0.5。
+			// 计算得到的结果会被限制在 send_buffer_watermark 设置的范围内，以确保不超过最大值。
+			// 对于高速上传的情况，这个系数应设置为大于 100 的值。
+			// 对于高容量的网络连接，将此系数设置得更高可以提升上传性能和磁盘吞吐量。
+			// 但如果设置得过高，可能会浪费内存，并且会使系统更倾向于处理读取任务而非写入任务。
 			send_buffer_low_watermark,
+
+			// 发送缓冲区的高水位线（默认值通常为 512 KB）
 			send_buffer_watermark,
 			send_buffer_watermark_factor,
 

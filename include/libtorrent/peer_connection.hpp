@@ -244,6 +244,13 @@ namespace aux {
 		// attempts, which means that the connection
 		// may not even have been attempted when the
 		// time out is reached.
+		// 在这个套接字首次变得可写（即连接完成）之前，此状态为真。
+		// 在连接过程中，超时机制不会触发。这是因为 Windows XP SP2 可能会延迟连接尝试，
+		// 这意味着在达到超时时间时，连接甚至可能都还未尝试发起。
+		//
+		// peer_connection 的一个状态标志，表示 当前是否正在尝试建立 TCP 连接（即握手阶段）；
+		// - true：正在连接（尚未完成）
+		// - false：连接已建立（或已失败）
 		bool m_connecting:1;
 
 		// this is set to true if the last time we tried to
@@ -771,6 +778,10 @@ namespace aux {
 		 * 
 		 * @param iovec 是通过 m_send_buffer.build_mutable_iovec() 生成的，表示 当前待发送的数据块列表。
 		 * 				每个 span<char> 条目指向 m_send_buffer 中的一个非连续内存块（例如多个协议消息拼接后的数据）
+		 * 
+		 * @return std::tuple<int, span<span<char const>>> 返回一个元组，包含两个元素：
+		 * 			1. int 类型，表示当前待发送的数据的大小。
+		 * 			2. span<span<char const>> 类型，表示当前插入额外的数据。
 		 * 
 		 * @example
 		 * ```cpp

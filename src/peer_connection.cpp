@@ -5930,31 +5930,51 @@ namespace libtorrent {
 					, static_cast<int>(i->size()));
 			}
 
+			// 更新 m_send_barrier
 			set_send_barrier(next_barrier);
 		}
 
+		// 在满足 m_send_buffer 不为空 和 握手完成 的前提下，检测到：没有配额，或 send_barrier 为 0，则暂时不发送
 		if ((m_quota[upload_channel] == 0 || m_send_barrier == 0)
-			&& !m_send_buffer.empty()
-			&& !m_connecting)
+			// 如果 m_send_buffer 为空，m_quota 和 m_send_barrier 的限制已无意义，
+			// 此时应允许函数继续执行，可能触发其他逻辑（如申请新配额）。
+			&& !m_send_buffer.empty() 
+			// 连接已建立（握手完成）
+			&& !m_connecting) 
 		{
 			return;
 		}
 
 		int const quota_left = m_quota[upload_channel];
-		if (m_send_buffer.empty()
-			&& m_reading_bytes > 0
-			&& quota_left > 0)
+
+		// 性能监控：处理磁盘 I/O 延迟
+		//
+		// 如果发送缓冲区为空，但仍有数据在磁盘读取队列中（m_reading_bytes > 0），表示磁盘 I/O 成为瓶颈
+		if (m_send_buffer.empty() && m_reading_bytes > 0 && quota_left > 0)
 		{
+			// 如果上传通道的当前状态没有已标记为 bw_disk（即通道未因磁盘读写而阻塞）
 			if (!(m_channel_state[upload_channel] & peer_info::bw_disk))
+				// 增加统计计数器，如果通道已处于 bw_disk 状态，说明之前已统计过，无需重复增加计数器。
 				m_counters.inc_stats_counter(counters::num_peers_up_disk);
+
 			m_channel_state[upload_channel] |= peer_info::bw_disk;
 #ifndef TORRENT_DISABLE_LOGGING
 			peer_log(peer_log_alert::outgoing, "WAITING_FOR_DISK", "outstanding: %d"
 				, m_reading_bytes);
 #endif
+			// 问题：
+			// - 你还能发送数据（有配额 m_quota[upload_channel]、已连接 !m_connecting）
+			// - 对方还在请求数据（!m_requests.empty()）
+			// - 但发送缓冲区已经空了（数据发完了，m_send_buffer.empty()）
+			// - 同时有很多数据"正在从磁盘读取的路上"（m_reading_bytes很大）
+			// 原因：
+			// - 磁盘太慢（机械硬盘读取速度跟不上网络上传速度, m_reading_bytes 会长期维持高位（接近或超过水位线）)
+			// - 发送缓冲区设置太小（偶尔超过水位线，但增大缓冲区 send_buffer_watermark 后问题缓解）
 
-			if (!m_connecting
-				&& !m_requests.empty()
+			// 如果磁盘读取延迟过大，可能触发性能警告
+			if (!m_connecting // 已连接
+				&& !m_requests.empty() // 对方有请求
+				// 正在读取的数据大小 > 发送缓冲区的高水位线 - 16K (减 16K 是为了提前预警)
 				&& m_reading_bytes > m_settings.get_int(settings_pack::send_buffer_watermark) - 0x4000)
 			{
 				std::shared_ptr<torrent> t = m_torrent.lock();
@@ -5969,6 +5989,14 @@ namespace libtorrent {
 				// upload rate being virtually 0. If m_requests is empty, it doesn't
 				// matter anyway, because we don't have any more requests from the
 				// peer to hang on to the disk
+				//
+				// 我们在磁盘操作上陷入了停滞。
+				// 我们想要进行写入操作，并且具备写入的条件，但发送缓冲区为空，正在等待从磁盘获取新的数据来填充。
+				// 这可能意味着磁盘速度比网络连接速度慢，或者我们设置的发送缓冲区水位线过小，
+				// 以至于在磁盘返回数据之前，我们就已经把缓冲区的数据全部发送出去了。
+				// 正因如此，只有当我们已经填满了允许的发送缓冲区时，才会触发这种情况。
+				// 第一次请求时，由于上传速率实际上为 0，不会将缓冲区完全填满。
+				// 如果 m_requests 为空，那就无关紧要了，因为我们没有来自对等节点的更多请求需要依赖磁盘来处理。
 				if (t && t->alerts().should_post<performance_alert>())
 				{
 					t->alerts().emplace_alert<performance_alert>(t->get_handle()
