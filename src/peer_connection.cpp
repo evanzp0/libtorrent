@@ -5949,7 +5949,8 @@ namespace libtorrent {
 
 		// 性能监控：处理磁盘 I/O 延迟
 		//
-		// 如果发送缓冲区为空，但仍有数据在磁盘读取队列中（m_reading_bytes > 0），表示磁盘 I/O 成为瓶颈
+		// 如果发送缓冲区为空，但仍有数据在磁盘读取队列中（m_reading_bytes > 0），表示磁盘 I/O 成为瓶颈。
+		// 进入磁盘等待状态（设置 bw_disk 标志）
 		if (m_send_buffer.empty() && m_reading_bytes > 0 && quota_left > 0)
 		{
 			// 如果上传通道的当前状态没有已标记为 bw_disk（即通道未因磁盘读写而阻塞）
@@ -5973,8 +5974,8 @@ namespace libtorrent {
 
 			// 如果磁盘读取延迟过大，可能触发性能警告
 			if (!m_connecting // 已连接
-				&& !m_requests.empty() // 对方有请求
-				// 正在读取的数据大小 > 发送缓冲区的高水位线 - 16K (减 16K 是为了提前预警)
+				&& !m_requests.empty() // 有对方的真实请求积压
+				// 磁盘延迟：正在读取的数据大小 > 发送缓冲区的高水位线 - 16K (减 16K 是为了提前预警)
 				&& m_reading_bytes > m_settings.get_int(settings_pack::send_buffer_watermark) - 0x4000)
 			{
 				std::shared_ptr<torrent> t = m_torrent.lock();
@@ -6004,10 +6005,14 @@ namespace libtorrent {
 				}
 			}
 		}
+		// 清除磁盘 I/O 等待状态 的逻辑
 		else
 		{
-			if (m_channel_state[upload_channel] & peer_info::bw_disk)
-				m_counters.inc_stats_counter(counters::num_peers_up_disk, -1);
+			//上传通道之前被标记为 bw_disk（即处于"等待磁盘数据"状态）
+			if (m_channel_state[upload_channel] & peer_info::bw_disk) 
+				m_counters.inc_stats_counter(counters::num_peers_up_disk, -1); // 将统计计数器 num_peers_up_disk（因磁盘 I/O 阻塞的对等连接数）减 1
+
+			// 移除上传通道的 bw_disk 标志位，磁盘数据已就绪 或 不再需要等待磁盘数据
 			m_channel_state[upload_channel] &= ~peer_info::bw_disk;
 		}
 
@@ -6037,13 +6042,15 @@ namespace libtorrent {
 				}
 			}
 #endif
+			// 如果不能写入（如 socket 不可写或配额不足），则返回
 			return;
 		}
 
+		// 最终要发送的数据量取以下最小值
 		int const amount_to_send = std::min({
-			m_send_buffer.size()
-			, quota_left
-			, m_send_barrier});
+			m_send_buffer.size(),  // 发送缓冲区大小
+			quota_left,            // 剩余的带宽配额
+			m_send_barrier});      // send_barrier 限制（避免发送不完整的数据块）
 
 		TORRENT_ASSERT(amount_to_send > 0);
 
@@ -6051,6 +6058,9 @@ namespace libtorrent {
 #ifndef TORRENT_DISABLE_LOGGING
 		peer_log(peer_log_alert::outgoing, "ASYNC_WRITE", "bytes: %d", amount_to_send);
 #endif
+		// 发起异步发送 -------------------
+
+		// 使用 build_iovec() 构建 I/O 向量（iovec）。
 		auto const vec = m_send_buffer.build_iovec(amount_to_send);
 		ADD_OUTSTANDING_ASYNC("peer_connection::on_send_data");
 
@@ -6070,9 +6080,13 @@ namespace libtorrent {
 			>;
 		static_assert(sizeof(write_handler_type) == sizeof(std::shared_ptr<peer_connection>)
 			, "write handler does not have the expected size");
+		
+		// 调用 async_write_some 进行异步发送，并设置回调 on_send_data
 		m_socket.async_write_some(vec, write_handler_type(self()));
 
+		// 设置 peer_info::bw_network 标志，表示当前有一个未完成的发送操作。
 		m_channel_state[upload_channel] |= peer_info::bw_network;
+		// 更新 m_last_sent 记录最后发送时间。
 		m_last_sent.set(m_connect, aux::time_now());
 	} // end of setup_send
 
@@ -6407,6 +6421,15 @@ namespace libtorrent {
 		}
 	}
 
+	/**
+	 * 是否可发送数据
+	 * 
+	 * 当以下条件都满足时，返回 true：
+	 * - 发送缓冲有数据
+	 * - 已握手
+	 * - 上行通道有配额
+	 * - 发送数据的边界
+	 */
 	bool peer_connection::can_write() const
 	{
 		TORRENT_ASSERT(is_single_thread());
