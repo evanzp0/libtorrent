@@ -764,6 +764,34 @@ namespace aux {
 
 		void send_piece_suggestions(int num);
 
+		/**
+		 * @brief 用于在发送数据时检查是否需要 插入额外的数据（如协议头） 或 限制发送边界
+		 * 
+		 * 动态检查 iovec 数据内容，决定是否插入额外数据
+		 * 
+		 * @param iovec 是通过 m_send_buffer.build_mutable_iovec() 生成的，表示 当前待发送的数据块列表。
+		 * 				每个 span<char> 条目指向 m_send_buffer 中的一个非连续内存块（例如多个协议消息拼接后的数据）
+		 * 
+		 * @example
+		 * ```cpp
+		 * // 派生类重写 hit_send_barrier
+		 * std::tuple<int, span<span<char const>>> hit_send_barrier(span<span<char>> iov) override {
+		 *     // 检查第一个数据块是否是握手消息
+		 *     if (iov.size() > 0 && is_handshake(iov[0])) {
+		 *         static char header[4] = {0x01, 0x02, 0x03, 0x04};
+		 *         return std::make_tuple(INT_MAX, span<span<char const>>(header, 4));
+		 *     }
+		 *     return std::make_tuple(INT_MAX, span<span<char const>>());
+		 * }
+		 * ```
+		 * 多个消息可被拼接，从而物理上不连续）两个消息可能位于不同的内存地址），
+		 * 但逻辑上连续（通过链表或指针关联），形成完整的数据流。如下 iovec 的两个 item：
+		 * 
+		 * Buffer Node 1: [Have消息头][Have数据]          → 5字节
+		 * Buffer Node 2: [Piece消息头][Piece数据...]    → 13字节
+		 * 
+		 * 当调用 build_mutable_iovec() 时，会生成一个 iovec 数组（span<span<char>>），每个条目指向一个 非连续的消息块
+		 */
 		virtual
 		std::tuple<int, span<span<char const>>>
 		hit_send_barrier(span<span<char>> /* iovec */)
@@ -1097,6 +1125,8 @@ namespace aux {
 		int m_upload_rate_peak = 0;
 
 		// stop sending data after this many bytes, INT_MAX = inf
+		// 在发送了这么多字节的数据之后停止发送，INT_MAX 表示 无穷大。
+		// 用于控制发送数据的边界（例如，确保协议消息完整发送）
 		int m_send_barrier = INT_MAX;
 
 		// the number of request we should queue up

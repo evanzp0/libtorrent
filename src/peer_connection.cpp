@@ -5843,23 +5843,14 @@ namespace libtorrent {
 	}
 
 	/**
-	 * @brief 设置并启动对等连接的发送操作。
-	 * 
-	 * 该函数负责管理发送缓冲区、带宽配额以及网络写入操作。它确保在适当的条件下触发异步写入，
-	 * 并处理与磁盘和网络相关的状态更新。
+	 * @brief 负责管理 上传（upload）数据的发送逻辑
 	 * 
 	 * @details
-	 * - 如果当前正在断开连接或发送缓冲区为空，则直接返回。
-	 * - 请求上传通道的带宽配额。
-	 * - 检查是否有未完成的发送操作，若有则累积发送缓冲区以合并后续写入。
-	 * - 处理发送屏障（send_barrier），将加密消息限制为1MB，并注入额外的数据块。
-	 * - 根据发送缓冲区状态、磁盘读取字节数和剩余配额，决定是否等待磁盘数据。
-	 * - 如果无法写入（例如缓冲区耗尽或条件不满足），记录日志并返回。
-	 * - 计算可发送的字节数，触发异步写入操作，并更新通道状态。
-	 * 
-	 * @note
-	 * - 函数依赖于多个成员变量和外部状态，如m_send_buffer、m_quota、m_channel_state等。
-	 * - 日志功能在TORRENT_DISABLE_LOGGING未定义时启用。
+	 * - 检查是否可以进行数据发送（如连接是否断开、发送缓冲区是否为空）
+	 * - 申请带宽配额（request_bandwidth）。
+	 * - 处理发送缓冲区（m_send_buffer），构建 I/O 向量（iovec）用于异步发送。
+	 * - 处理磁盘 I/O 延迟问题（如等待磁盘读取数据）。
+	 * - 调用底层 socket 的异步写入操作（async_write_some）。
 	 * 
 	 * @return void
 	 */
@@ -5867,13 +5858,36 @@ namespace libtorrent {
 	{
 		TORRENT_ASSERT(is_single_thread());
 
+		// 检查是否可以发送数据
 		if (m_disconnecting || m_send_buffer.empty()) return;
 
 		// we may want to request more quota at this point
+		// 申请带宽配额，如果当前没有足够的配额（m_quota[upload_channel]），则可能进入等待状态。
 		request_bandwidth(upload_channel);
 
+		// 检查是否已经有未完成的发送操作
+		//
 		// if we already have an outstanding send operation, don't issue another
 		// one, instead accrue more send buffer to coalesce for the next write
+		// 如果我们已经有一个未完成的发送操作，就不要再发起另一个发送操作了。
+		// 相反，应积累更多的发送缓冲区数据，以便在下次写入时合并发送。
+		//
+		// 在网络编程中，发送数据通常使用 非阻塞 I/O（如 async_write_some），
+		// 即发送请求提交后立即返回，而实际发送由操作系统在后台完成。
+		// 在数据完全发送完成之前，这个操作被称为 "outstanding"（未完成）。
+		//
+		// libtorrent 使用 m_quota 限制每个连接的发送速率。
+		// 如果有未完成的发送操作，说明配额可能已被占用，需要等待操作完成后再申请新配额。
+		//
+		// 典型场景示例
+		// 1. 正常流程：
+		//    - 用户调用 setup_send() → 发起 async_write_some → 设置 bw_network 标志。
+		//    - 数据发送完成后，on_send_data 回调被调用 → 清除 bw_network 标志。
+		//    - 下一次 setup_send() 可以继续发送新数据。
+		// 2. 背压（Backpressure）场景（当接收方处理不过来时，通过流量控制机制限制发送方速率）：
+		//    - 对端接收速度较慢 → TCP 窗口满 → async_write_some 无法立即完成。
+		//    - bw_network 标志保持设置状态，setup_send() 不会发起新发送。
+		//    - 当操作系统通知 socket 可写时，on_send_data 被调用，继续后续逻辑。
 		if (m_channel_state[upload_channel] & peer_info::bw_network)
 		{
 #ifndef TORRENT_DISABLE_LOGGING
@@ -5883,15 +5897,30 @@ namespace libtorrent {
 			return;
 		}
 
+		// 处理发送屏障
+		//
+		// m_send_barrier 用于控制发送数据的边界（例如，确保协议消息完整发送）
 		if (m_send_barrier == 0)
 		{
+			// 构建 I/O 向量（iovec），限制最大发送 1MB
 			std::vector<span<char>> vec;
 			// limit outgoing crypto messages to 1MB
 			int const send_bytes = std::min(m_send_buffer.size(), 1024 * 1024);
+			// m_send_buffer 是一个 发送缓冲区，用于存储待发送的数据。
+			// build_mutable_iovec() 的作用是 将缓冲区中的数据转换为适合高效 I/O 操作的 iovec 结构，
+			// 以便进行 零拷贝（zero-copy）发送。（writev 系统调用：一次性发送多个 iovec 块，内核直接读取用户态内存，无需中间拷贝。）
 			m_send_buffer.build_mutable_iovec(send_bytes, vec);
+
 			int next_barrier;
 			span<span<char const>> inject_vec;
+			// hit_send_barrier 用于在发送数据时检查是否需要 插入额外的数据（如协议头） 或 限制发送边界
+			// 当前 hit_send_barrier 实现：
+			// - 不限制发送边界（返回 INT_MAX，即允许发送所有数据）。
+			// - 不插入任何数据（返回空的 span<span<char const>>）。
+			// 在 BitTorrent 的 ut_metadata 扩展协议中，重写 hit_send_barrier() 来插入元数据消息头。
 			std::tie(next_barrier, inject_vec) = hit_send_barrier(vec);
+
+			// 如果有需要插入的数据，则将其添加到发送缓冲区的前面
 			for (auto i = inject_vec.rbegin(); i != inject_vec.rend(); ++i)
 			{
 				// this const_cast is a here because chained_buffer need to be
@@ -5900,6 +5929,7 @@ namespace libtorrent {
 				m_send_buffer.prepend_buffer(span<char>(ptr, i->size())
 					, static_cast<int>(i->size()));
 			}
+
 			set_send_barrier(next_barrier);
 		}
 
