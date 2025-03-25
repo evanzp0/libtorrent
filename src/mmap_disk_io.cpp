@@ -1431,6 +1431,31 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 		}
 	}
 
+	/**
+	 * 在 libtorrent 的 mmap_disk_io 实现中，
+	 * 所有累积的磁盘 I/O 作业确实被分类存储在 m_generic_io_jobs 和 m_hash_io_jobs 这两个队列中。
+	 * 
+	 * 作业分类标准：
+	 * - m_generic_io_jobs：write_piece、read_piece、flush
+	 * - m_hash_io_jobs：hash_piece、check_fastresume
+	 * 
+	 * 作业提交入口：
+	 * - add_job
+	 * 
+	 * 批量累积的典型场景:
+	 * ```sequence_diagram
+	 * participant N as 网络线程
+	 * participant D as mmap_disk_io
+	 * participant T as I/O线程
+	 * 
+	 * loop 多个piece完成
+	 * 	N->>D: add_job(write_piece)
+	 * 	D->>D: 存入m_generic_io_jobs.queued_jobs
+	 * end
+	 * N->>D: deferred_submit_jobs()
+	 * D->>T: notify_all()唤醒线程，处理 queue 中积累的任务
+	 * ```
+	 */
 	void mmap_disk_io::submit_jobs()
 	{
 		std::unique_lock<std::mutex> l(m_job_mutex);

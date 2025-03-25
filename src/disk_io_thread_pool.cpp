@@ -139,20 +139,50 @@ namespace aux {
 		return m_threads.front().get_id();
 	}
 
+	/**
+	 * libtorrent 中磁盘 I/O 线程池的动态扩缩容核心逻辑，
+	 * 根据队列任务数 (queue_size) 动态调整线程池规模：
+	 * - 缩减待退出线程数（避免过度收缩）
+	 * - 扩容线程池（直到满足需求或达上限）
+	 * - 启动空闲线程回收定时器（当首次创建线程时）
+	 */
 	void disk_io_thread_pool::job_queued(int const queue_size)
 	{
 		// this check is not strictly necessary
 		// but do it to avoid acquiring the mutex in the trivial case
+		// 这个检查并非绝对必要，但进行此检查是为了在简单情形下避免获取互斥锁。
+		//
+		// 当空闲线程足够处理新任务（queue_size）时立即返回，无需调整线程数
 		if (m_num_idle_threads >= queue_size) return;
+
 		std::lock_guard<std::mutex> l(m_mutex);
+
 		if (m_abort) return;
 
 		// reduce the number of threads requested to stop if we're going to need
 		// them for these new jobs
+		// 如果我们即将为这些新任务用到某些线程，那就减少请求停止的线程数量。
+		//
+		// 注：在多线程编程场景中，有时候系统可能会请求停止部分线程以释放资源，
+		// 但如果有新的任务到来，并且这些新任务需要使用之前打算停止的线程来执行，那么就可以减少请求停止的线程数量。
+		//
+		// to_exit 期望退出的线程数
 		int to_exit = m_threads_to_exit;
-		while (to_exit > std::max(0, m_num_idle_threads - queue_size) &&
-			!m_threads_to_exit.compare_exchange_weak(to_exit
-				, std::max(0, m_num_idle_threads - queue_size)));
+		/**
+		 * 实际可以退出的线程数 = max(0, 当前闲置线程（m_num_idle_threads ） - 待处理任务数（queue_size）)
+		 * 
+		 * 这个 while 循环是典型的 CAS (Compare-And-Swap) 模式，用于在并发环境下安全地更新共享变量 m_threads_to_exit。
+		 * 逻辑上相当于：
+		 * if (to_exit > (m_num_idle_threads - queue_size) {
+		 *     to_exit = m_num_idle_threads - queue_size;
+		 * }
+		 */
+		while (to_exit > std::max(0, m_num_idle_threads - queue_size) // 如果，期望退出的线程数 > 实际可退出线程数，
+			&&  !m_threads_to_exit.compare_exchange_weak(to_exit
+				, std::max(0, m_num_idle_threads - queue_size)))
+			// 如果 to_exit == m_threads_to_exit，则将 m_threads_to_exit 更新为 “实际可退出的线程”，并返回 true；
+			// 否则不修改 m_threads_to_exit，但会将 to_exit 更新为 m_threads_to_exit 的当前实际值，并返回 false。
+		;
 
 		// now start threads until we either have enough to service
 		// all queued jobs without blocking or hit the max

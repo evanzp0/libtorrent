@@ -4914,7 +4914,7 @@ namespace {
 					alerts().emplace_alert<cache_flushed_alert>(get_handle());
 			}
 
-			// 调用 m_ses.deferred_submit_jobs() 通过 post 将任务投递到 I/O 事件循环，不阻塞当前线程。
+			// 调用 m_ses.deferred_submit_jobs() 通过 post 将任务投递到 I/O 事件循环，异步处理 submit_jobs 的任务。
 			m_ses.deferred_submit_jobs();
 		}
 		else
