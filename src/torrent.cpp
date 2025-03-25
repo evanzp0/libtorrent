@@ -4852,14 +4852,17 @@ namespace {
 	{
 		TORRENT_ASSERT(is_single_thread());
 
+		// 如果已经处于中止状态，直接返回
 		if (m_abort) return;
 
 		m_abort = true;
-		update_want_peers();
-		update_want_tick();
-		update_want_scrape();
-		update_gauge();
-		stop_announcing();
+
+		// 更新相关状态
+		update_want_peers();	// 更新是否需要更多 peer 的状态
+		update_want_tick();		// 更新是否需要定时器 tick
+		update_want_scrape();	// 更新是否需要 scrape tracker
+		update_gauge();			// 更新统计指标
+		stop_announcing();		// 停止所有 tracker 公告
 
 		// remove from download queue
 		m_ses.set_queue_position(this, queue_position_t{-1});
@@ -8176,34 +8179,43 @@ namespace {
 	}
 
 	// returns true if this torrent is interested in connecting to more peers
+	// 判断当前torrent是否需要更多peer连接
 	bool torrent::want_peers() const
 	{
 		// if all our connection slots are taken, we can't connect to more
+		// 1. 检查连接数是否已达上限
 		if (num_peers() >= int(m_max_connections)) return false;
 
 		// if we're paused, obviously we're not connecting to peers
+		 // 2. 检查是否处于暂停/中止状态
 		if (is_paused() || m_abort || m_graceful_pause_mode) return false;
 
 		// if metadata are valid and we are either checking files or checking resume data without no_verify_files flag,
 		// we don't want peers
-		if ((m_state == torrent_status::checking_files
-			|| (m_state == torrent_status::checking_resume_data
+		// 3. 检查是否处于文件校验状态
+		if ((m_state == torrent_status::checking_files // 1) 当前正在检查文件（校验文件完整性）且有有效的元数据
+			// 2) 处于恢复数据检查状态(checking_resume_data), 且没有设置 no_verify_files 标志（即需要验证文件）, 且有有效的元数据
+			|| (m_state == torrent_status::checking_resume_data  
 				&& !(m_add_torrent_params && m_add_torrent_params->flags & torrent_flags::no_verify_files)))
+			// 当前有有效的元数据（torrent文件信息完整）
 			&& valid_metadata())
 			return false;
 
 		// if we don't know of any more potential peers to connect to, there's
 		// no point in trying
+		// 4. 检查是否有可连接的候选peer
 		if (!m_peer_list || m_peer_list->num_connect_candidates() == 0)
 			return false;
 
 		// if the user disabled outgoing connections for seeding torrents,
 		// don't make any
+		// 5. 检查做种时的出站连接设置
 		if (!settings().get_bool(settings_pack::seeding_outgoing_connections)
 			&& (m_state == torrent_status::seeding
 				|| m_state == torrent_status::finished))
 			return false;
 
+		 // 6. 检查全局出站连接设置
 		if (!settings().get_bool(settings_pack::enable_outgoing_tcp)
 			&& !settings().get_bool(settings_pack::enable_outgoing_utp))
 			return false;
@@ -8211,6 +8223,15 @@ namespace {
 		return true;
 	}
 
+	/**
+	 * 判断当前 torrent 是否需要下载用的 peer 连接
+	 * 
+	 * 条件包括：
+	 * 1. 当前torrent必须处于downloading（下载中）状态
+	 * 2. 处于downloading_metadata（下载元数据，即磁力链接获取元数据）状态
+	 * 
+	 * @return 如果满足条件，返回true；否则返回false。
+	 */
 	bool torrent::want_peers_download() const
 	{
 		return (m_state == torrent_status::downloading
@@ -8225,6 +8246,15 @@ namespace {
 			&& want_peers();
 	}
 
+	/**
+	 * 更新Torrent对象的想要的 peer 列表。
+	 * 
+	 * 该函数通过调用update_list方法，分别更新两种类型的peer需求列表：
+	 * 1. 下载中的Torrent（want_peers_download）对应的peer列表。
+	 * 2. 已完成下载的Torrent（want_peers_finished）对应的peer列表。
+	 * 
+	 * 具体逻辑由update_list函数实现，传入的参数包括session_interface的枚举值和对应的peer需求状态。
+	 */
 	void torrent::update_want_peers()
 	{
 		update_list(aux::session_interface::torrent_want_peers_download, want_peers_download());
@@ -8262,20 +8292,27 @@ namespace {
 
 	} // anonymous namespace
 
+	// 更新 torrent 在指定列表中的状态
+	// 参数：
+	//   list - 列表索引，标识是哪种列表
+	//   in   - true表示加入列表，false表示从列表移除
 	void torrent::update_list(torrent_list_index_t const list, bool in)
 	{
+		// 当前 torrent 在特定列表中的"链接节点"
 		link& l = m_links[list];
+
+		// 获取 session 中对应的 torrent 列表
 		aux::vector<torrent*>& v = m_ses.torrent_list(list);
 
-		if (in)
+		if (in)  // 如果要加入列表
 		{
-			if (l.in_list()) return;
-			l.insert(v, this);
+			if (l.in_list()) return; // 如果已经在列表中，直接返回
+			l.insert(v, this);       // 否则插入列表
 		}
-		else
+		else  // 如果要移除列表
 		{
-			if (!l.in_list()) return;
-			l.unlink(v, list);
+			if (!l.in_list()) return; 	// 如果不在列表中，直接返回
+			l.unlink(v, list);			// 否则从列表移除
 		}
 
 #ifndef TORRENT_DISABLE_LOGGING

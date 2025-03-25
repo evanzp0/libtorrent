@@ -726,6 +726,11 @@ namespace aux {
 			// is high, and there are no or small benefits of doing so. For
 			// instance, if no nodes are behind a firewall or a NAT, seeds don't
 			// need to make outgoing connections.
+			//
+			// seeding_outgoing_connections 用于决定做种（以及已完成下载）的种子文件是否要尝试建立出站连接。
+			// 在某些特定应用场景中，如果建立出站连接的成本很高，且这样做带来的益处很少甚至没有，
+			// 那么可以将其设置为 false。
+			// 例如，如果没有节点位于防火墙或 NAT 之后，做种节点就无需建立出站连接。
 			seeding_outgoing_connections,
 
 			// when this is true, libtorrent will not attempt to make outgoing

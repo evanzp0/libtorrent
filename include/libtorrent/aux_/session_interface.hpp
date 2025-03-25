@@ -280,6 +280,10 @@ namespace aux {
 
 		static constexpr std::size_t num_torrent_lists = 8;
 
+		/**
+		 * 根据 torrent_list_index_t 获取按状态划分的自动管理种子列表。
+		 * 自动下载、自动做种、自动检查
+		 */
 		virtual aux::vector<torrent*>& torrent_list(torrent_list_index_t i) = 0;
 
 		virtual bool has_lsd() const = 0;

@@ -4947,6 +4947,7 @@ namespace {
 
 		// in case there's an error, make sure to abort the torrent before leaving
 		// the scope
+		// 定义了一个基于作用域的资源管理工具，用于在作用域结束时自动调用 torrent_ptr->abort() 方法。
 		auto abort_torrent = aux::scope_end([&]{ if (torrent_ptr) torrent_ptr->abort(); });
 
 #ifndef TORRENT_DISABLE_EXTENSIONS

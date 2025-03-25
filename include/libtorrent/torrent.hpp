@@ -1489,6 +1489,38 @@ namespace libtorrent {
 
 		// TODO: 3 factor out the links (as well as update_list() to a separate
 		// class that torrent can inherit)
+
+		// 这个数组的每个元素都是当前 torrent 对应一种特定的分组列表的 link 节点：
+		//   - want_peers_list：需要 peer 连接的 torrent
+		//   - want_tick_list：需要定时处理的 torrent
+		//   - download_list：正在下载的 torrent
+		//   - seed_list：做种中的 torrent
+		//
+		// 模板参数：
+		//   link - 链表节点类型
+		//   aux::session_interface::num_torrent_lists - 列表种类总数 
+		//   torrent_list_index_t - 列表索引类型
+		//
+		// m_links[list_index] 不是列表本身，而是当前 torrent 在特定列表中的"链接节点"（包含 prev/next 指针）
+		//
+		// 数据流向图示：
+		// 1. Session 持有: （session 拥有不同类型的 torrent 列表）
+		// [torrent_list0] → 全局的 torrent 列表容器（vector<torrent*>）
+		// [torrent_list1] → 另一个列表容器
+		// ...
+		// 
+		// 2. 每个 Torrent 对象持有:（每个 torrent 通过 m_links 种的link元素，和 session 种的不同类型的 torrent 列表对应）
+		// [m_links] → [
+		//     link0 → 维护在 torrent_list0 中的位置信息（prev/next）
+		//     link1 → 维护在 torrent_list1 中的位置信息
+		//     ...
+		// ]
+		// 
+		// 3. 当调用 m_links[list_index].insert(list, this) 时：
+		// - 通过 list_index 确定要操作哪个列表（如下载列表、做种列表等）
+		// - 从 session 获取该列表的实际容器 (list)
+		// - 将当前 torrent (this) 插入到该列表中
+		// - 更新当前 torrent 的链接节点 (m_links[list_index]) 以记录其在该列表中的位置
 		aux::array<link, aux::session_interface::num_torrent_lists, torrent_list_index_t>
 			m_links;
 

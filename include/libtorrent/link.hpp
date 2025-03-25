@@ -53,6 +53,7 @@ namespace libtorrent {
 
 		void clear() { index = -1; }
 
+		// unlink() 从指定的动态数组中移除对象，并调整数组以保持连续性。
 		template <class T>
 		void unlink(aux::vector<T*>& list
 			, torrent_list_index_t const link_index)
@@ -69,6 +70,7 @@ namespace libtorrent {
 			index = -1;
 		}
 
+		// 将对象插入到动态数组中，并更新索引。
 		template <class T>
 		void insert(aux::vector<T*>& list, T* self)
 		{
