@@ -4882,17 +4882,21 @@ namespace {
 
 		// disconnect all peers and close all
 		// files belonging to the torrents
+		// 断开所有peer连接并关闭所有文件
 		disconnect_all(errors::torrent_aborted, operation_t::bittorrent);
 
 		// make sure to destruct the peers immediately
+		// 确保立即销毁所有 peer 对象
 		on_remove_peers();
 		TORRENT_ASSERT(m_connections.empty());
 
 		// post a message to the main thread to destruct
 		// the torrent object from there
+		// 如果有存储对象（磁盘I/O相关），异步停止torrent
 		if (m_storage)
 		{
 			try {
+				// 通过磁盘线程异步停止torrent，完成后回调on_torrent_aborted
 				m_ses.disk_thread().async_stop_torrent(m_storage
 					, std::bind(&torrent::on_torrent_aborted, shared_from_this()));
 			}
@@ -4909,10 +4913,13 @@ namespace {
 				if (alerts().should_post<cache_flushed_alert>())
 					alerts().emplace_alert<cache_flushed_alert>(get_handle());
 			}
+
+			// 延迟提交作业
 			m_ses.deferred_submit_jobs();
 		}
 		else
 		{
+			// 如果没有存储对象，直接发送通知
 			if (alerts().should_post<cache_flushed_alert>())
 				alerts().emplace_alert<cache_flushed_alert>(get_handle());
 			alerts().emplace_alert<torrent_removed_alert>(get_handle()
@@ -4922,21 +4929,27 @@ namespace {
 		// TODO: 2 abort lookups this torrent has made via the
 		// session host resolver interface
 
+		// 如果之前禁用了 ip_filter，现在重新启用并更新统计
 		if (!m_apply_ip_filter)
 		{
 			inc_stats_counter(counters::non_filter_torrents, -1);
 			m_apply_ip_filter = true;
 		}
 
+		// 更新状态
 		m_paused = false;
 		m_auto_managed = false;
-		update_state_list();
+		update_state_list(); // 更新状态列表
+
+		// 从所有torrent列表中解除链接
 		for (torrent_list_index_t i{}; i != m_links.end_index(); ++i)
 		{
 			if (!m_links[i].in_list()) continue;
 			m_links[i].unlink(m_ses.torrent_list(i), i);
 		}
+
 		// don't re-add this torrent to the state-update list
+		// 确保不再添加到状态更新列表
 		m_state_subscription = false;
 	}
 
@@ -8250,7 +8263,7 @@ namespace {
 	 * 将当前 Torrent 从 session::torrent_list 中的
 	 * torrent_want_peers_download 和 torrent_want_peers_finished 的 peer 列表中加入或移除。
 	 * 
-	 * 1. want_peers_downloa： 下载中的 Torrent
+	 * 1. want_peers_download： 下载中的 Torrent
 	 * 2. want_peers_finished： 已完成下载的 Torrent
 	 */
 	void torrent::update_want_peers()
@@ -8259,7 +8272,7 @@ namespace {
 		// 否则，添加当前 torrent。
 		update_list(aux::session_interface::torrent_want_peers_download, want_peers_download());
 		
-		// 如果不需要 peer 进行下载，则在 session::torrent_list[torrent_want_peers_finished] 的列表中移除当前 torrent。
+		// 如果不需要 peer 进行做种，则在 session::torrent_list[torrent_want_peers_finished] 的列表中移除当前 torrent。
 		// 否则，添加当前 torrent。
 		update_list(aux::session_interface::torrent_want_peers_finished, want_peers_finished());
 	}

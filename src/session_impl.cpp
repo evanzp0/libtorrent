@@ -1412,10 +1412,25 @@ namespace {
 			? &m_download_rate : &m_upload_rate;
 	}
 
+	/**
+	 * 用于延迟提交磁盘 I/O 作业的关键函数，其设计目的是优化磁盘操作的批量处理。
+	 * 
+	 * 延迟提交模式：
+	 * - 通过 m_deferred_submit_disk_jobs 标志位控制，确保短时间内多次请求只会触发一次实际提交
+	 * 
+	 * 异步触发：
+	 * - 使用 post() 将任务投递到 I/O 上下文（asio事件循环）
+	 * - 通过 make_handler 创建类型擦除的异步处理器
+	 */
 	void session_impl::deferred_submit_jobs()
 	{
+		// m_deferred_submit_disk_jobs 是阀门，短时间内多次调用 deferred_submit_jobs() 时，只有第一次会实际触发提交。
+		// 这就将将高频触发的小 I/O 请求（如多个 piece 完成）合并为单次批处理，用 session_impl::submit_disk_jobs 处理 io 请求。
 		if (m_deferred_submit_disk_jobs) return;
 		m_deferred_submit_disk_jobs = true;
+
+		// 通过 post 将实际提交操作延迟到 I/O 事件循环的下一个周期。
+		// 在同步代码快速连续调用时，所有请求会被合并到一个事件循环周期内处理。
 		post(m_io_context, make_handler(
 			[this] { wrap(&session_impl::submit_disk_jobs); }
 			, m_submit_jobs_handler_storage, *this));
