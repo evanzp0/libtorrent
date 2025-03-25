@@ -168,8 +168,11 @@ namespace aux {
 		//
 		// to_exit 期望退出的线程数
 		int to_exit = m_threads_to_exit;
+
 		/**
-		 * 实际可以退出的线程数 = max(0, 当前闲置线程（m_num_idle_threads ） - 待处理任务数（queue_size）)
+		 * 线程收缩控制
+		 * 
+		 * 实际需要退出的线程数 = max(0, 当前闲置线程_m_num_idle_threads - 待处理任务数_queue_size)
 		 * 
 		 * 这个 while 循环是典型的 CAS (Compare-And-Swap) 模式，用于在并发环境下安全地更新共享变量 m_threads_to_exit。
 		 * 逻辑上相当于：
@@ -177,23 +180,29 @@ namespace aux {
 		 *     to_exit = m_num_idle_threads - queue_size;
 		 * }
 		 */
-		while (to_exit > std::max(0, m_num_idle_threads - queue_size) // 如果，期望退出的线程数 > 实际可退出线程数，
+		while (to_exit > std::max(0, m_num_idle_threads - queue_size) // 如果，期望退出的线程数 > 实际需要退出的线程数，
 			&&  !m_threads_to_exit.compare_exchange_weak(to_exit
 				, std::max(0, m_num_idle_threads - queue_size)))
-			// 如果 to_exit == m_threads_to_exit，则将 m_threads_to_exit 更新为 “实际可退出的线程”，并返回 true；
+			// 如果 to_exit == m_threads_to_exit，则将 m_threads_to_exit 更新为 “实际需要退出的线程数”，并返回 true；
 			// 否则不修改 m_threads_to_exit，但会将 to_exit 更新为 m_threads_to_exit 的当前实际值，并返回 false。
 		;
 
 		// now start threads until we either have enough to service
 		// all queued jobs without blocking or hit the max
+		// 现在开始创建新线程，直至满足以下两个条件之一：
+		// 1. i >= queue_size，有足够的线程来处理所有已排队的任务且不会造成阻塞；
+		// 2. m_threads.size() >= m_max_threads，达到线程数量上限。
+		//
+		//  线程扩容逻辑
 		for (int i = m_num_idle_threads
 			; i < queue_size && int(m_threads.size()) < m_max_threads
 			; ++i)
 		{
 			// if this is the first thread started, start the reaper timer
+			// 如果这是启动的第一个线程，就启动清理定时器。
 			if (m_threads.empty())
 			{
-				m_idle_timer.expires_after(reap_idle_threads_interval);
+				m_idle_timer.expires_after(reap_idle_threads_interval); // 60 秒过期的定时器
 				m_idle_timer.async_wait([this](error_code const& ec) { reap_idle_threads(ec); });
 			}
 
@@ -211,24 +220,54 @@ namespace aux {
 		}
 	}
 
+	/**
+	 * 使用定时器（m_idle_timer）定期执行 reap_idle_threads，动态调整线程数量。
+	 * 
+	 * 空闲线程回收：
+	 * - 如果空闲线程过多（min_idle > 0），则尝试回收部分线程。
+	 * 
+	 * 线程数上限控制：
+	 * - 如果当前线程总数超过 m_max_threads，会强制停止多余的线程（即使它们不空闲）。
+	 */
 	void disk_io_thread_pool::reap_idle_threads(error_code const& ec)
 	{
 		// take the minimum number of idle threads during the last
 		// sample period and request that many threads to exit
 		if (ec) return;
+
 		std::lock_guard<std::mutex> l(m_mutex);
+
 		if (m_abort) return;
 		if (m_threads.empty()) return;
-		m_idle_timer.expires_after(reap_idle_threads_interval);
+
+		m_idle_timer.expires_after(reap_idle_threads_interval); 
 		m_idle_timer.async_wait([this](error_code const& e) { reap_idle_threads(e); });
+
+		// 获取最近采样周期内的最小空闲线程数（min_idle = m_min_idle_threads），
+		// 并更新当前空闲线程数（m_min_idle_threads = m_num_idle_threads）。
+		//
+		// min_idle 的值为 m_min_idle_threads 旧值；
+		// m_min_idle_threads 的值被更新为 m_num_idle_threads。
+		//
+		// 注意：在线程池中，会在线程变为 idle 时立刻维护 m_min_idle_threads 值，确保它时间是最近采样周期内的最小的空闲线程数。
+		// 此处仅仅时将“最近采样周期内的最小的空闲线程数” 提取到 min_idle。
 		int const min_idle = m_min_idle_threads.exchange(m_num_idle_threads);
+
 		if (min_idle <= 0) return;
+
 		// stop either the minimum number of idle threads or the number of threads
 		// which must be stopped to get below the max, whichever is larger
+		//
+		// 计算需要停止的线程数：
+		// 1. 至少停止 min_idle 个空闲线程
+		// 2. 如果当前线程数超过最大限制（m_max_threads），则停止足够多的线程以使总数不超过限制
+		// 最终取两者中的较大值
 		int const to_stop = std::max(min_idle, int(m_threads.size()) - m_max_threads);
+
+		 // 调用 stop_threads 方法，停止指定数量的线程
 		stop_threads(to_stop);
 	}
-
+   
 	void disk_io_thread_pool::stop_threads(int num_to_stop)
 	{
 		m_threads_to_exit = num_to_stop;

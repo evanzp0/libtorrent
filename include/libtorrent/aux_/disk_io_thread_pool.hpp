@@ -129,8 +129,11 @@ namespace aux {
 		// must hold m_mutex to access
 		bool m_abort;
 
+		// 当前时刻的空闲线程数量
 		std::atomic<int> m_num_idle_threads;
+
 		// the minimum number of idle threads seen since the last reaping
+		// 最近一段时间内线程池的最小空闲线程数
 		std::atomic<int> m_min_idle_threads;
 
 		// ensures thread creation/destruction is atomic
