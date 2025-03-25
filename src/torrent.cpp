@@ -8294,7 +8294,7 @@ namespace {
 
 	// 更新 torrent 在指定列表中的状态
 	// 参数：
-	//   list - 列表索引，标识是哪种列表
+	//   list - 列表索引，标识是 session::torrent_list 中哪种特定的列表
 	//   in   - true表示加入列表，false表示从列表移除
 	void torrent::update_list(torrent_list_index_t const list, bool in)
 	{
