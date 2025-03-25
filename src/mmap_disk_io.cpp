@@ -358,6 +358,7 @@ private:
 	// completion callbacks in m_completed jobs
 	bool m_job_completions_in_flight = false;
 
+	// 每个元素是一个指向 mmap_storage 对象的共享指针
 	aux::vector<std::shared_ptr<mmap_storage>, storage_index_t> m_torrents;
 
 	// indices into m_torrents to empty slots
@@ -423,6 +424,9 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 	void mmap_disk_io::remove_torrent(storage_index_t const idx)
 	{
 		TORRENT_ASSERT(m_torrents[idx] != nullptr);
+
+		// 调用 reset() 会触发该对象的析构函数, 并将指针重置为 nullptr。
+		// m_torrents[idx] 是一个 mmap_storage 对象。
 		m_torrents[idx].reset();
 		m_free_slots.add(idx);
 	}
@@ -1430,11 +1434,17 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 	void mmap_disk_io::submit_jobs()
 	{
 		std::unique_lock<std::mutex> l(m_job_mutex);
+
+		// 如果有通用I/O作业待处理，则通知所有等待的线程
 		if (!m_generic_io_jobs.m_queued_jobs.empty())
 		{
 			m_generic_io_jobs.m_job_cond.notify_all();
+
+			// 通知通用I/O线程作业已排队的数量
 			m_generic_threads.job_queued(m_generic_io_jobs.m_queued_jobs.size());
 		}
+
+		 // 如果有哈希I/O作业待处理，则通知所有等待的线程
 		if (!m_hash_io_jobs.m_queued_jobs.empty())
 		{
 			m_hash_io_jobs.m_job_cond.notify_all();

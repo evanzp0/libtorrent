@@ -4896,7 +4896,7 @@ namespace {
 		if (m_storage)
 		{
 			try {
-				// 通过磁盘线程异步停止torrent，完成后回调on_torrent_aborted
+				// 通过磁盘线程异步停止 torrent，完成后回调 on_torrent_aborted
 				m_ses.disk_thread().async_stop_torrent(m_storage
 					, std::bind(&torrent::on_torrent_aborted, shared_from_this()));
 			}
@@ -4914,7 +4914,7 @@ namespace {
 					alerts().emplace_alert<cache_flushed_alert>(get_handle());
 			}
 
-			// 延迟提交作业
+			// 调用 m_ses.deferred_submit_jobs() 通过 post 将任务投递到 I/O 事件循环，不阻塞当前线程。
 			m_ses.deferred_submit_jobs();
 		}
 		else

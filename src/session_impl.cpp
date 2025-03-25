@@ -1418,9 +1418,11 @@ namespace {
 	 * 延迟提交模式：
 	 * - 通过 m_deferred_submit_disk_jobs 标志位控制，确保短时间内多次请求只会触发一次实际提交
 	 * 
-	 * 异步触发：
-	 * - 使用 post() 将任务投递到 I/O 上下文（asio事件循环）
-	 * - 通过 make_handler 创建类型擦除的异步处理器
+	 * 很多地方会调用 deferred_submit_jobs()：
+	 * - torrent::piece_finished()      // 每个分块完成时
+	 * - torrent::flush_cache()         // 缓存刷盘时  
+	 * - storage::async_release_files() // 释放文件时
+	 * - torrent::abort()               // 强制停止时
 	 */
 	void session_impl::deferred_submit_jobs()
 	{
