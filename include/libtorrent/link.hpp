@@ -60,7 +60,8 @@ namespace libtorrent {
 		 * 从指定的动态数组中移除对象
 		 * 
 		 * @param list 要操作的动态数组（存储 T* 指针）
-		 * @param link_index 当前对象在 m_links 数组中的索引
+		 * @param link_index 表明 list 属于 session::torrent_list 的那种特定列表，
+		 *                   torrent::m_links[link_index] 可以取出当前 torrent 在特定列表中的 link 对象。 
 		 */
 		template <class T>
 		void unlink(aux::vector<T*>& list, torrent_list_index_t const link_index)
