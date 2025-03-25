@@ -199,13 +199,16 @@ namespace aux {
 			; ++i)
 		{
 			// if this is the first thread started, start the reaper timer
-			// 如果这是启动的第一个线程，就启动清理定时器。
+			// 如果这是启动的第一个线程，就启动定时清理器。
 			if (m_threads.empty())
 			{
-				m_idle_timer.expires_after(reap_idle_threads_interval); // 60 秒过期的定时器
+				m_idle_timer.expires_after(reap_idle_threads_interval); // 设置一个 60 秒后允许且过期的定时器
+				// m_idle_timer 到时后，会调用 reap_idle_threads() 清理空闲线程，并自动又定时 60 秒。
 				m_idle_timer.async_wait([this](error_code const& ec) { reap_idle_threads(ec); });
 			}
 
+			// 创建 disk_io 工作线程，并加入到 m_threads。
+			// 
 			// work keeps the io_context::run() call blocked from returning.
 			// When shutting down, it's possible that the event queue is drained
 			// before the disk_io_thread has posted its last callback. When this
@@ -214,9 +217,23 @@ namespace aux {
 			// that the event is destructed after the disk_io_thread. If the
 			// event refers to a disk buffer it will try to free it, but the
 			// buffer pool won't exist anymore, and crash. This prevents that.
-			m_threads.emplace_back(&pool_thread_interface::thread_fun
-				, &m_thread_iface, std::ref(*this)
-				, make_work_guard(m_ioc));
+			//
+			// work 会使 io_context::run() 调用保持阻塞状态，避免其返回。
+			// 在程序关闭时，有可能在磁盘 I/O 线程发布其最后一个回调之前，事件队列就已经被清空了。
+			// 当这种情况发生时，io_context 会有一个来自磁盘 I/O 线程的待处理回调，但事件循环却未在运行。
+			// 这意味着该事件会在磁盘 I/O 线程之后被销毁。
+			// 如果该事件引用了一个磁盘缓冲区，它会尝试释放该缓冲区，但此时缓冲区池已不存在，从而导致程序崩溃。
+			// 而 work 机制能防止这种情况发生。
+			//
+			// make_work_guard(m_ioc) 创建了 executor_work_guard 对象，阻塞 io_context::run() 会保持阻塞，
+			// 确保所有异步回调完成前，io_context::run() 事件循环不提前退出。
+			//
+			// 没有 guard 时，可能遇到：
+			// 磁盘线程投递任务A（引用缓冲区X）=> 主线程销毁 io_context → 缓冲区池被释放 => 任务A最终执行时访问已释放的X → 崩溃
+			m_threads.emplace_back(&pool_thread_interface::thread_fun 	// 线程入口函数，这是线程启动后执行的核心函数
+				, &m_thread_iface										// 线程接口对象，实现 pool_thread_interface 的实例
+				, std::ref(*this)					  					// 线程池引用
+				, make_work_guard(m_ioc));								// 关键：工作守卫
 		}
 	}
 

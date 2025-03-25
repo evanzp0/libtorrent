@@ -255,6 +255,10 @@ private:
 			// w's dtor releases the io_context to allow the run() call to return
 			// we do this once we stop posting new callbacks to it.
 			// after the dtor has been called, the mmap_disk_io object may be destructed
+			//
+			// work 的析构函数会释放 io_context，使 run() 调用能够返回。（不释放 work 就会阻塞住 io_context::run() 事件循环）。
+			// 我们会在停止向 io_context 发布新的回调之后执行此操作。
+			// 在调用析构函数之后，mmap_disk_io 对象可能会被销毁。
 			TORRENT_UNUSED(work);
 			COMPLETE_ASYNC("mmap_disk_io::work");
 		}
