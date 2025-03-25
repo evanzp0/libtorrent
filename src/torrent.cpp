@@ -8247,17 +8247,20 @@ namespace {
 	}
 
 	/**
-	 * 更新Torrent对象的想要的 peer 列表。
+	 * 将当前 Torrent 从 session::torrent_list 中的
+	 * torrent_want_peers_download 和 torrent_want_peers_finished 的 peer 列表中加入或移除。
 	 * 
-	 * 该函数通过调用update_list方法，分别更新两种类型的peer需求列表：
-	 * 1. 下载中的Torrent（want_peers_download）对应的peer列表。
-	 * 2. 已完成下载的Torrent（want_peers_finished）对应的peer列表。
-	 * 
-	 * 具体逻辑由update_list函数实现，传入的参数包括session_interface的枚举值和对应的peer需求状态。
+	 * 1. want_peers_downloa： 下载中的 Torrent
+	 * 2. want_peers_finished： 已完成下载的 Torrent
 	 */
 	void torrent::update_want_peers()
 	{
+		// 如果不需要 peer 进行下载，则在 session::torrent_list[torrent_want_peers_download] 的列表中移除当前 torrent。
+		// 否则，添加当前 torrent。
 		update_list(aux::session_interface::torrent_want_peers_download, want_peers_download());
+		
+		// 如果不需要 peer 进行下载，则在 session::torrent_list[torrent_want_peers_finished] 的列表中移除当前 torrent。
+		// 否则，添加当前 torrent。
 		update_list(aux::session_interface::torrent_want_peers_finished, want_peers_finished());
 	}
 
