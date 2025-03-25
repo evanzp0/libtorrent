@@ -5065,7 +5065,7 @@ namespace {
 		}
 
 		return handle;
-	}
+	} // end of add_torrent
 
 	std::tuple<std::shared_ptr<torrent>, info_hash_t, bool>
 	session_impl::add_torrent_impl(add_torrent_params&& params, error_code& ec)
