@@ -1490,6 +1490,7 @@ namespace libtorrent {
 		// TODO: 3 factor out the links (as well as update_list() to a separate
 		// class that torrent can inherit)
 
+		// 一个 torrent 可以同时属于多个不同的分组列表（如：需要 peers 的列表、同时需要定时处理的列表等），
 		// 这个数组的每个元素都是当前 torrent 对应一种特定的分组列表的 link 节点：
 		//   - want_peers_list：需要 peer 连接的 torrent
 		//   - want_tick_list：需要定时处理的 torrent

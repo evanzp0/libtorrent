@@ -41,6 +41,9 @@ namespace libtorrent {
 
 	using torrent_list_index_t = aux::strong_typedef<int, struct torrent_list_tag>;
 
+	/**
+	 * @brief link 对象仅保留 insert 是自己在 list 中的索引
+	 */
 	struct link
 	{
 		link() : index(-1) {}
@@ -53,20 +56,31 @@ namespace libtorrent {
 
 		void clear() { index = -1; }
 
-		// unlink() 从指定的动态数组中移除对象，并调整数组以保持连续性。
+		/**
+		 * 从指定的动态数组中移除对象
+		 * 
+		 * @param list 要操作的动态数组（存储 T* 指针）
+		 * @param link_index 当前对象在 m_links 数组中的索引
+		 */
 		template <class T>
-		void unlink(aux::vector<T*>& list
-			, torrent_list_index_t const link_index)
+		void unlink(aux::vector<T*>& list, torrent_list_index_t const link_index)
 		{
 			if (index == -1) return;
+
 			TORRENT_ASSERT(index >= 0 && index < int(list.size()));
+
 			int const last = int(list.size()) - 1;
 			if (index < last)
 			{
+				// 将 list 中最后一个 torrent 在特定(link_index)列表中的索引更新为当前要要移除的 torrent 的索引
 				list[last]->m_links[link_index].index = index;
+				// 将 list 中当前要要移除的 torrent 的那个 item, 设为 list 中最后一个 torrent
 				list[index] = list[last];
 			}
+			// 移除 list 中最后一个元素
 			list.resize(last);
+
+			// 将当前对象索引设置为 -1（表示当前 torrent 已经不在任何特定列表中）
 			index = -1;
 		}
 
