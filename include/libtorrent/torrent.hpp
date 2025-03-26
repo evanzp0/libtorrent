@@ -1347,6 +1347,9 @@ namespace libtorrent {
 		// alive, as well as the index referencing the storage/torrent in the disk
 		// I/O. When this destructs, the torrent will be removed from the disk
 		// subsystem.
+		// 这是一个句柄，它能使磁盘 I/O 子系统中的 storage 对象保持存活状态，
+		// 同时还持有磁盘 I/O 中指向该 storage/torrent 的索引。当这个句柄被销毁时，
+		// 该 torrent 将从磁盘子系统中移除。
 		storage_holder m_storage;
 
 #ifdef TORRENT_SSL_PEERS

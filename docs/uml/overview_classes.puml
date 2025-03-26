@@ -76,6 +76,8 @@
 
     peer_class_pool "1" o-- "0..*" peer_class
 
+    torrent *-- storage_holder
+
     alert_manager "1" *-- "0..*" alert
     alert_manager o-- stack_allocator
     alert_manager o-- plugin

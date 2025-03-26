@@ -67,6 +67,17 @@ namespace aux {
 	struct file_view_pool;
 }
 
+	/**
+	 * mmap_storage 是单个 torrent 的存储后端，它是 libtorrent 库中用于处理文件存储的核心类，
+	 * 它实现了基于内存映射的文件存储功能，主要用于 BitTorrent 客户端中的文件读写操作。
+	 * 
+	 * 主要功能：
+	 * - 文件存储管理：负责将下载的 torrent 文件内容存储到磁盘
+	 * - 内存映射：使用内存映射技术高效读写文件
+ 	 * - 优先级处理：根据文件优先级管理存储策略
+ 	 * - 文件操作：支持文件重命名、移动、删除等操作
+	 * - 哈希校验：支持对存储内容进行哈希校验
+	 */
 	struct TORRENT_EXTRA_EXPORT mmap_storage
 		: std::enable_shared_from_this<mmap_storage>
 		, aux::disk_job_fence
@@ -82,6 +93,16 @@ namespace aux {
 		// an empty vector. Any file whose index is not represented by the vector
 		// (because the vector is too short) are assumed to have priority 1.
 		// this is used to treat files with priority 0 slightly differently.
+		// 基于给定的 file_storage 对象（fs）构造 mmap_storage 对象。
+		// mapped 是一个可选参数（它可能为 nullptr）。
+		// 如果它不为 nullptr，则表示在添加该种子文件之前已经对其进行的文件映射。
+		// 这里规定了文件在磁盘上的保存位置以及查找位置。
+		// save_path 是该种子文件的根保存文件夹。
+		// file_view_pool 是存储模块将使用的文件映射缓存。
+		// 它打开的所有文件都会请求 file_view_pool 来完成打开操作。
+		// file_prio 是一个向量，用于指示启动时文件的优先级。它可以是一个空向量。
+		// 若向量中没有某个文件的索引（即向量长度不够），则假定该文件的优先级为 1。
+		// 这用于对优先级为 0 的文件进行不同的处理。
 		mmap_storage(storage_params const& params, aux::file_view_pool&);
 
 		// hidden

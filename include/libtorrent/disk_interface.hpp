@@ -178,6 +178,7 @@ namespace file_open_mode {
 	using disk_job_flags_t = flags::bitfield_flag<std::uint8_t, struct disk_job_flags_tag>;
 
 	// 磁盘接口 (disk_interface)
+	// 全局磁盘 I/O 管理器，负责多个 torrent 的存储调度（读写、缓存、哈希校验等）
 	//
 	// The disk_interface is the customization point for disk I/O in libtorrent.
 	// implement this interface and provide a factory function to the session constructor
