@@ -51,19 +51,27 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "libtorrent/flags.hpp"
 #include "libtorrent/session_types.hpp"
 
-// OVERVIEW
+// OVERVIEW（概述）
 //
 // The disk I/O can be customized in libtorrent. In previous versions, the
 // customization was at the level of each torrent. Now, the customization point
 // is at the session level. All torrents added to a session will use the same
 // disk I/O subsystem, as determined by the disk_io_constructor (in
 // session_params).
+// 在 libtorrent 中，磁盘 I/O 功能是可以自定义的。
+// 在早期版本里，自定义是针对每个种子文件进行的。
+// 而现在，自定义的层面提升到了会话级别。
+// 添加到某个会话中的所有种子文件都会使用相同的磁盘 I/O 子系统，
+// 该子系统由 disk_io_constructor（在 session_params 中）决定。
 //
 // This allows the disk subsystem to also customize threading and disk job
 // management.
+// 这种方式使得磁盘子系统还能够对线程和磁盘任务管理进行自定义设置。
 //
 // To customize the disk subsystem, implement disk_interface and provide a
 // factory function to the session constructor (via session_params).
+// 若要对磁盘子系统进行自定义，需要实现 disk_interface 接口，
+// 并向会话构造函数（通过 session_params）提供一个工厂函数。
 //
 // Example use:
 //
@@ -79,36 +87,44 @@ namespace libtorrent {
 
 	struct storage_holder;
 
+	// 文件打开模式标志
 	using file_open_mode_t = flags::bitfield_flag<std::uint8_t, struct file_open_mode_tag>;
 
 	// internal
 	// this is a bittorrent constant
 	constexpr int default_block_size = 0x4000;
 
+// 定义文件打开模式
 namespace file_open_mode {
 	// open the file for reading only
+	// 只读模式（b0000_0000）
 	constexpr file_open_mode_t read_only{};
 
 	// open the file for writing only
+	// 只写模式（b0000_0001）
 	constexpr file_open_mode_t write_only = 0_bit;
 
 	// open the file for reading and writing
+	// 读写模式（b0000_0010）
 	constexpr file_open_mode_t read_write = 1_bit;
 
 	// the mask for the bits determining read or write mode
+	// 用于确定读取或写入模式的位掩码（b0000_0011）
 	constexpr file_open_mode_t rw_mask = read_only | write_only | read_write;
 
-	// open the file in sparse mode (if supported by the
-	// filesystem).
+	// open the file in sparse mode (if supported by the filesystem).
+	// 稀疏文件模式（b0000_0100）
 	constexpr file_open_mode_t sparse = 2_bit;
 
 	// don't update the access timestamps on the file (if
 	// supported by the operating system and filesystem).
 	// this generally improves disk performance.
+	// 不更新访问时间（b0000_1000）
 	constexpr file_open_mode_t no_atime = 3_bit;
 
 	// When this is not set, the kernel is hinted that access to this file will
 	// be made sequentially.
+	// 随机访问（b0010_0000）
 	constexpr file_open_mode_t random_access = 5_bit;
 
 #if TORRENT_ABI_VERSION == 1
@@ -118,25 +134,43 @@ namespace file_open_mode {
 #endif
 
 	// the file is memory mapped
+	// 内存映射模式（b1000_0000）
 	constexpr file_open_mode_t mmapped = 7_bit;
 }
 
 	// this contains information about a file that's currently open by the
 	// libtorrent disk I/O subsystem. It's associated with a single torrent.
+	// 描述当前被 libtorrent 打开的文件状态，它与单个种子文件关联。
 	struct TORRENT_EXPORT open_file_state
 	{
 		// the index of the file this entry refers to into the ``file_storage``
 		// file list of this torrent. This starts indexing at 0.
+		// file_index 是文件索引，它指向 torrent 的 `file_storage` 的文件列表 (torrent::m_torrent_file::m_files)。
+		// 文件索引从 0 开始。
 		file_index_t file_index;
 
 		// ``open_mode`` is a bitmask of the file flags this file is currently
 		// opened with. For possible flags, see file_open_mode_t.
+		// `open_mode` 是文件打开模式标志
 		//
 		// Note that the read/write mode is not a bitmask. The two least significant bits are used
 		// to represent the read/write mode. Those bits can be masked out using the ``rw_mask`` constant.
+		//
+		// 通常，位掩码允许任意组合（如 sparse | no_atime），
+		// 但 read/write 模式（read_only、write_only、read_write）是互斥的（即文件不能同时是 read_only 和 write_only）。
+		// 因此，read/write 模式 只用最低 2 位（bit 0 和 bit 1） 表示：
+		// - read_only = 00（0x00）
+		// - write_only = 01（0x01）
+		// - read_write = 10（0x02）
+		//
+		// rw_mask 是一个掩码（b0000_0011），用于提取 open_mode 的最低 2 位:
+		// ```cpp
+		// file_open_mode_t mode = file.open_mode & rw_mask;
+		// ```
 		file_open_mode_t open_mode;
 
 		// a (high precision) timestamp of when the file was last used.
+		// 文件最后使用时间戳
 		time_point last_use;
 	};
 
