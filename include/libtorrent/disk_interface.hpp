@@ -174,20 +174,47 @@ namespace file_open_mode {
 		time_point last_use;
 	};
 
+	// 磁盘作业标志，用来控制磁盘操作行为
 	using disk_job_flags_t = flags::bitfield_flag<std::uint8_t, struct disk_job_flags_tag>;
 
+	// 磁盘接口 (disk_interface)
+	//
 	// The disk_interface is the customization point for disk I/O in libtorrent.
 	// implement this interface and provide a factory function to the session constructor
 	// use custom disk I/O. All functions on the disk subsystem (implementing
 	// disk_interface) are called from within libtorrent's network thread. For
 	// disk I/O to be performed in a separate thread, the disk subsystem has to
 	// manage that itself.
+	// disk_interface 是 libtorrent 中磁盘 I/O 的定制点。
+	// 实现此接口，并向会话构造函数提供一个工厂函数，以使用自定义磁盘 I/O。
+	// 磁盘子系统（实现 disk_interface）中的所有函数都在 libtorrent 的网络线程内被调用（即 session 的主线程）。
+	// 若要让磁盘 I/O 在单独的线程中执行（以避免阻塞网络线程），磁盘子系统需要自己负责线程的创建、管理和同步。
 	//
 	// Although the functions are called ``async_*``, they do not technically
 	// *have* to be asynchronous, but they support being asynchronous, by
 	// expecting the result passed back into a callback. The callbacks must be
 	// posted back onto the network thread via the io_context object passed into
 	// the constructor. The callbacks will be run in the network thread.
+	// 尽管这些函数名为 async_*，但从技术上讲，它们不一定必须是异步的，不过它们支持异步操作，
+	// 其实现方式是通过回调函数来返回操作结果。
+	// 回调必须返回网络线程（通过 io_context 提交），否则会破坏 libtorrent 的线程安全。
+	// 回调函数将在网络线程（即 session 的主线程）中运行。
+	// 通过 io_context 提交回调函数的例子：
+	// ```cpp
+	// void my_disk_io::async_read(handler, ...) {
+    //     // 在后台线程执行读取，这里是直接开一个新线程，更好的是使用线程池处理，主线程添加读取任务，I/O线程池自动提取任务执行。
+    //     std::thread([=] {
+    //         char* buf = read_from_disk(...);
+    //         // 回调必须回到网络线程！
+    //         m_io_context.post([=] { handler(lt::disk_buffer_holder(*this, buf, r.length), error); });
+    //     }).detach();
+	// }
+	//```
+	//
+	// libtorrent 的 默认磁盘子系统 (mmap_disk_io 或 posix_disk_io) 是 多线程设计：
+	// - 网络线程（主线程）： 是 单线程 的，负责核心网络事件循环，
+	//                      包括接收/发送 Peer 数据、调度任务，调用 disk_interface 方法（如 async_read/async_write）。
+	// - 磁盘 I/O 线程（后台线程）：默认有一个 专用线程池 处理实际的文件读写、哈希计算等耗时操作，避免阻塞网络线程。
 	struct TORRENT_EXPORT disk_interface
 	{
 		// force making a copy of the cached block, rather than getting a
@@ -214,6 +241,7 @@ namespace file_open_mode {
 		// it should be flushed to disk
 		static constexpr disk_job_flags_t flush_piece = 7_bit;
 
+		// 为新 torrent 创建存储
 		// this is called when a new torrent is added. The shared_ptr can be
 		// used to hold the internal torrent object alive as long as there are
 		// outstanding disk operations on the storage.
@@ -221,12 +249,14 @@ namespace file_open_mode {
 		// storage that was just created. It is fundamentally a storage_index_t
 		virtual storage_holder new_torrent(storage_params const& p
 			, std::shared_ptr<void> const& torrent) = 0;
-
+		
+		// 移除 torrent 存储
 		// remove the storage with the specified index. This is not expected to
 		// delete any files from disk, just to clean up any resources associated
 		// with the specified storage.
 		virtual void remove_torrent(storage_index_t) = 0;
 
+		// 异步读取
 		// perform a read or write operation from/to the specified storage
 		// index and the specified request. When the operation completes, call
 		// handler possibly with a disk_buffer_holder, holding the buffer with
@@ -247,11 +277,14 @@ namespace file_open_mode {
 		virtual void async_read(storage_index_t storage, peer_request const& r
 			, std::function<void(disk_buffer_holder, storage_error const&)> handler
 			, disk_job_flags_t flags = {}) = 0;
+
+		// 异步写入
 		virtual bool async_write(storage_index_t storage, peer_request const& r
 			, char const* buf, std::shared_ptr<disk_observer> o
 			, std::function<void(storage_error const&)> handler
 			, disk_job_flags_t flags = {}) = 0;
 
+		// 计算指定 piece 的哈希
 		// Compute hash(es) for the specified piece. Unless the v1_hash flag is
 		// set (in ``flags``), the SHA-1 hash of the whole piece does not need
 		// to be computed.
@@ -264,11 +297,13 @@ namespace file_open_mode {
 			, disk_job_flags_t flags
 			, std::function<void(piece_index_t, sha1_hash const&, storage_error const&)> handler) = 0;
 
+		// 计算单个 block 的 v2 哈希
 		// computes the v2 hash (SHA-256) of a single block. The block at
 		// ``offset`` in piece ``piece``.
 		virtual void async_hash2(storage_index_t storage, piece_index_t piece, int offset, disk_job_flags_t flags
 			, std::function<void(piece_index_t, sha256_hash const&, storage_error const&)> handler) = 0;
 
+		// 移动文件位置
 		// called to request the files for the specified storage/torrent be
 		// moved to a new location. It is the disk I/O object's responsibility
 		// to synchronize this with any currently outstanding disk operations to
@@ -277,6 +312,7 @@ namespace file_open_mode {
 		virtual void async_move_storage(storage_index_t storage, std::string p, move_flags_t flags
 			, std::function<void(status_t, std::string const&, storage_error const&)> handler) = 0;
 
+		// 释放文件
 		// This is called on disk I/O objects to request they close all open
 		// files for the specified storage/torrent. If file handles are not
 		// pooled/cached, it can be a no-op. For truly asynchronous disk I/O,
@@ -287,6 +323,7 @@ namespace file_open_mode {
 		virtual void async_release_files(storage_index_t storage
 			, std::function<void()> handler = std::function<void()>()) = 0;
 
+		// 检查文件完整性
 		// this is called when torrents are added to validate their resume data
 		// against the files on disk. This function is expected to do a few things:
 		//
@@ -320,6 +357,7 @@ namespace file_open_mode {
 		virtual void async_stop_torrent(storage_index_t storage
 			, std::function<void()> handler = std::function<void()>()) = 0;
 
+		// 重命名文件
 		// This function is called when the name of a file in the specified
 		// storage has been requested to be renamed. The disk I/O object is
 		// responsible for renaming the file without racing with other
@@ -329,6 +367,7 @@ namespace file_open_mode {
 			, file_index_t index, std::string name
 			, std::function<void(std::string const&, file_index_t, storage_error const&)> handler) = 0;
 
+		// 删除文件
 		// This function is called when some file(s) on disk have been requested
 		// to be removed by the client. ``storage`` indicates which torrent is
 		// referred to. See session_handle for ``remove_flags_t`` flags
@@ -338,6 +377,7 @@ namespace file_open_mode {
 		virtual void async_delete_files(storage_index_t storage, remove_flags_t options
 			, std::function<void(storage_error const&)> handler) = 0;
 
+		// 设置文件优先级
 		// This is called to set the priority of some or all files. Changing the
 		// priority from or to 0 may involve moving data to and from the
 		// partfile. The disk I/O object is responsible for correctly
@@ -352,6 +392,7 @@ namespace file_open_mode {
 			, std::function<void(storage_error const&
 				, aux::vector<download_priority_t, file_index_t>)> handler) = 0;
 
+		// 清除指定的 piece 数据
 		// This is called when a piece fails the hash check, to ensure there are
 		// no outstanding disk operations to the piece before blocks are
 		// re-requested from peers to overwrite the existing blocks. The disk I/O
@@ -361,18 +402,21 @@ namespace file_open_mode {
 		virtual void async_clear_piece(storage_index_t storage, piece_index_t index
 			, std::function<void(piece_index_t)> handler) = 0;
 
+		// 更新统计计数器
 		// update_stats_counters() is called to give the disk storage an
 		// opportunity to update gauges in the ``c`` stats counters, that aren't
 		// updated continuously as operations are performed. This is called
 		// before a snapshot of the counters are passed to the client.
 		virtual void update_stats_counters(counters& c) const = 0;
 
+		// 获取打开文件状态
 		// Return a list of all the files that are currently open for the
 		// specified storage/torrent. This is is just used for the client to
 		// query the currently open files, and which modes those files are open
 		// in.
 		virtual std::vector<open_file_state> get_status(storage_index_t) const = 0;
 
+		// 中止操作
 		// this is called when the session is starting to shut down. The disk
 		// I/O object is expected to flush any outstanding write jobs, cancel
 		// hash jobs and initiate tearing down of any internal threads. If
@@ -382,6 +426,7 @@ namespace file_open_mode {
 		// destructed.
 		virtual void abort(bool wait) = 0;
 
+		// 提交作业
 		// This will be called after a batch of disk jobs has been issues (via
 		// the ``async_*`` ). It gives the disk I/O object an opportunity to
 		// notify any potential condition variables to wake up the disk
@@ -390,6 +435,7 @@ namespace file_open_mode {
 		// issuing the notification once for a collection of jobs.
 		virtual void submit_jobs() = 0;
 
+		// 设置更新通知
 		// This is called to notify the disk I/O object that the settings have
 		// been updated. In the disk io constructor, a settings_interface
 		// reference is passed in. Whenever these settings are updated, this
@@ -401,12 +447,19 @@ namespace file_open_mode {
 		virtual ~disk_interface() {}
 	};
 
+	// 存储持有者
+	// 这是一个 RAII (资源获取即初始化) 包装器，用于管理 torrent 存储的生命周期，
+	// 确保当 torrent 被移除时，存储会被正确清理。
+	// 
 	// a unique, owning, reference to the storage of a torrent in a disk io
 	// subsystem (class that implements disk_interface). This is held by the
 	// internal libtorrent torrent object to tie the storage object allocated
 	// for a torrent to the lifetime of the internal torrent object. When a
 	// torrent is removed from the session, this holder is destructed and will
 	// inform the disk object.
+	// 这是对磁盘 I/O 子系统（实现 disk_interface 的类）中某个 torrent 存储的唯一、具有所有权的引用。
+	// libtorrent 的内部 torrent 对象持有该引用，目的是将为某个 torrent 分配的存储对象与内部 torrent 对象的生命周期关联起来。
+	// 当某个 torrent 从会话中移除时，这个持有者对象会被销毁，并且会通知磁盘对象。
 	struct TORRENT_EXPORT storage_holder
 	{
 		storage_holder() = default;
