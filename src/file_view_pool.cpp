@@ -401,6 +401,9 @@ namespace libtorrent { namespace aux {
 		m_deferred_destruction.clear();
 	}
 
+	/**
+	 * 用于释放指定 storage_index_t 的存储对象（对应一个 torrent）关联的所有文件映射。
+	 */
 	void file_view_pool::release(storage_index_t const st)
 	{
 		std::vector<std::shared_ptr<file_mapping>> defer_destruction;

@@ -132,6 +132,8 @@ namespace aux {
 #else
 		file_handle m_file;
 #endif
+		// this is the memory-mapped file. It's nullptr if the file is not
+		// memory-mapped
 		void* m_mapping;
 	};
 } // aux

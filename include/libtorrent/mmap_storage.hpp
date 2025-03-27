@@ -160,6 +160,9 @@ namespace aux {
 			tick();
 		}
 
+		/**
+		 * 关联 storage 与 torrent。
+		 */
 		void set_owner(std::shared_ptr<void> const& tor) { m_torrent = tor; }
 
 		storage_index_t storage_index() const { return m_storage_index; }

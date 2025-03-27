@@ -222,47 +222,77 @@ namespace file_open_mode {
 		// reference to a block already in the cache. This is used the block is
 		// expected to be overwritten very soon, by async_write()`, and we need
 		// access to the previous content.
+		// 强制对缓存块进行复制，而不是获取对已存在于缓存中的块的引用。
+		// 当预计该块很快会被 async_write() 方法覆盖，并且我们需要访问其先前的内容时，会使用此操作。
 		static constexpr disk_job_flags_t force_copy = 0_bit;
 
 		// hint that there may be more disk operations with sequential access to
 		// the file
+		// 给出提示信息，表明对该文件可能会有更多的顺序访问磁盘操作。
 		static constexpr disk_job_flags_t sequential_access = 3_bit;
 
 		// don't keep the read block in cache. This is a hint that this block is
 		// unlikely to be read again anytime soon, and caching it would be
 		// wasteful.
+		// 不要将读取的块保留在缓存中。
+		// 这是一个提示信息，表明该块在短期内不太可能再次被读取，将其缓存起来会造成资源浪费。
 		static constexpr disk_job_flags_t volatile_read = 4_bit;
 
 		// compute a v1 piece hash. This is only used by the async_hash() call.
 		// If this flag is not set in the async_hash() call, the SHA-1 piece
 		// hash does not need to be computed.
+		// 计算一个 v1 版本的片段哈希值。
+		// 此操作仅在 async_hash() 调用时使用。如果在 async_hash() 调用中未设置此标志，
+		// 则无需计算 SHA - 1 片段哈希值。
 		static constexpr disk_job_flags_t v1_hash = 5_bit;
 
 		// this flag instructs a hash job that we just completed this piece, and
 		// it should be flushed to disk
+		// 此标志指示一个哈希任务，表明我们刚刚完成了这个片段的处理，并且该片段应被刷新到磁盘。
 		static constexpr disk_job_flags_t flush_piece = 7_bit;
 
-		// 为新 torrent 创建存储
+		// 该函数定义了如何为新增的 torrent 创建存储后端。
+		// - 核心作用：为每个新添加的 torrent 创建专属的存储对象（mmap_storage）
+		// - 所有权管理：返回的 storage_holder 是一个 RAII（资源获取即初始化）包装器，
+		//              存放 disk_interface 引用和 storage 的在 disk_interface 的 idx。
+		// - 线程安全：允许存储操作在 session 移除 shared_ptr<torrent> 对象后仍能安全执行，
+		//            disk_interface 也存放这 storage，storage 中存放着shared_ptr<torrent> 对象，
+		//            当storage_holder 析构时，会调用 disk_interface::remove_torrent(storage_index_t) 
+		//            从存储中移除 storage，从而真正释放 torrent 对象。
+		//
 		// this is called when a new torrent is added. The shared_ptr can be
 		// used to hold the internal torrent object alive as long as there are
 		// outstanding disk operations on the storage.
 		// The returned storage_holder is an owning reference to the underlying
 		// storage that was just created. It is fundamentally a storage_index_t
+		// 当添加一个新的种子文件时会调用此函数。
+		// 只要 storage 上还有未完成的磁盘操作，这个 shared_ptr 就可以用来保证 storage 内部的 torrent 对象存活。
+		// 函数返回的 storage_holder 是对刚刚创建的底层 storage 的一个拥有所有权的引用，
+		//（通过记录 storage 在 disk_io 中的 index）。
+		// 从根本上来说，它是一个 storage_index_t 类型。
 		virtual storage_holder new_torrent(storage_params const& p
 			, std::shared_ptr<void> const& torrent) = 0;
 		
-		// 移除 torrent 存储
+		// 移除 torrent 的 storage
+		//
 		// remove the storage with the specified index. This is not expected to
 		// delete any files from disk, just to clean up any resources associated
 		// with the specified storage.
+		// 移除具有指定索引的 storage。预计此操作不会从磁盘删除任何文件，
+		// 仅清理与指定 storage 相关的任何资源
 		virtual void remove_torrent(storage_index_t) = 0;
 
-		// 异步读取
+		// 异步从指定存储（对应一个 torrent）中读取数据块，完成后通过回调通知。
+		// 它通过 disk_buffer_holder 直接管理内存缓冲区，实现零拷贝优化。
+		//
 		// perform a read or write operation from/to the specified storage
 		// index and the specified request. When the operation completes, call
 		// handler possibly with a disk_buffer_holder, holding the buffer with
 		// the result. Flags may be set to affect the read operation. See
 		// disk_job_flags_t.
+		// 对指定 storage_index_t 和指定请求执行读或写操作。操作完成后，可能会调用 handler 函数，
+		// 并传入一个 disk_buffer_holder 对象，该对象持有包含操作结果的缓冲区。
+		// 可以设置标志来影响读操作，具体请参考 disk_job_flags_t。
 		//
 		// The disk_observer is a callback to indicate that
 		// the store buffer/disk write queue is below the watermark to let peers
@@ -270,11 +300,17 @@ namespace file_open_mode {
 		// ``true``, indicating the write queue is full, the peer will stop
 		// further writes and wait for the passed-in ``disk_observer`` to be
 		// notified before resuming.
+		// disk_observer 是一个回调函数，用于指示存储缓冲区 / 磁盘写入队列已低于阈值，
+		// 从而允许对等节点再次开始将缓冲区写入磁盘。
+		// 当 async_write() 返回 true 时，表示写入队列已满，对等节点将停止进一步的写入操作，
+		// 并等待传入的 disk_observer 被通知后再恢复写入。
 		//
 		// Note that for ``async_read``, the peer_request (``r``) is not
 		// necessarily aligned to blocks (but it is most of the time). However,
 		// all writes (passed to ``async_write``) are guaranteed to be block
 		// aligned.
+		// 请注意，对于 async_read 操作，peer_request（r）不一定与块对齐（尽管大多数情况下是对齐的）。
+		// 然而，所有传递给 async_write 的写入操作都保证是块对齐的。
 		virtual void async_read(storage_index_t storage, peer_request const& r
 			, std::function<void(disk_buffer_holder, storage_error const&)> handler
 			, disk_job_flags_t flags = {}) = 0;
@@ -286,34 +322,46 @@ namespace file_open_mode {
 			, disk_job_flags_t flags = {}) = 0;
 
 		// 计算指定 piece 的哈希
+		//
 		// Compute hash(es) for the specified piece. Unless the v1_hash flag is
 		// set (in ``flags``), the SHA-1 hash of the whole piece does not need
 		// to be computed.
+		// 为指定的 piece 计算哈希值。除非在 flags 中设置了 v1_hash 标志，
+		// 否则无需计算整个 piece 的 SHA-1 哈希值。
 		//
 		// The `v2` span is optional and can be empty, which means v2 hashes
 		// should not be computed. If v2 is non-empty it must be at least large
 		// enough to hold all v2 blocks in the piece, and this function will
 		// fill in the span with the SHA-256 block hashes of the piece.
+		// v2 范围（span）是可选的，可以为空，这意味着不应计算 v2 哈希值。
+		// 如果 v2 不为空，那么它必须有足够的空间来存储该片段中所有 v2 块的 SHA-56 hash 值，
+		// 并且此函数将使用该 piece 的 SHA-256 block hashes 填充该范围。
 		virtual void async_hash(storage_index_t storage, piece_index_t piece, span<sha256_hash> v2
 			, disk_job_flags_t flags
 			, std::function<void(piece_index_t, sha1_hash const&, storage_error const&)> handler) = 0;
 
 		// 计算单个 block 的 v2 哈希
+		//
 		// computes the v2 hash (SHA-256) of a single block. The block at
 		// ``offset`` in piece ``piece``.
 		virtual void async_hash2(storage_index_t storage, piece_index_t piece, int offset, disk_job_flags_t flags
 			, std::function<void(piece_index_t, sha256_hash const&, storage_error const&)> handler) = 0;
 
 		// 移动文件位置
+		//
 		// called to request the files for the specified storage/torrent be
 		// moved to a new location. It is the disk I/O object's responsibility
 		// to synchronize this with any currently outstanding disk operations to
 		// the storage. Whether files are replaced at the destination path or
 		// not is controlled by ``flags`` (see move_flags_t).
+		// 调用此函数是为了请求将指定 storage/torrent 的相关文件移动到新的位置。
+		// disk I/O object 有责任将此操作与当前对该 storage 进行的所有未完成磁盘操作进行同步。
+		// 目标路径下的文件是否被替换由 flags 参数控制（参见 move_flags_t）。
 		virtual void async_move_storage(storage_index_t storage, std::string p, move_flags_t flags
 			, std::function<void(status_t, std::string const&, storage_error const&)> handler) = 0;
 
 		// 释放文件
+		//
 		// This is called on disk I/O objects to request they close all open
 		// files for the specified storage/torrent. If file handles are not
 		// pooled/cached, it can be a no-op. For truly asynchronous disk I/O,
@@ -321,6 +369,10 @@ namespace file_open_mode {
 		// closed. It is possible that later asynchronous operations will
 		// re-open some of the files, by the time this completion handler is
 		// called, that's fine.
+		// 此操作会在磁盘 I/O 对象上被调用，用于请求关闭指定 storage/torrent 对应的所有已打开文件。
+		// 如果文件句柄没有被 pooled/cached，那么该操作可以为空操作。
+		// 对于真正的异步磁盘 I/O，此操作应至少确保在某一时刻所有文件都处于关闭状态。
+		// 可能后续的异步操作会重新打开部分文件，当调用此完成处理程序时，出现这种情况是正常的。
 		virtual void async_release_files(storage_index_t storage
 			, std::function<void()> handler = std::function<void()>()) = 0;
 
@@ -450,7 +502,8 @@ namespace file_open_mode {
 
 	// 存储持有者
 	// 这是一个 RAII (资源获取即初始化) 包装器，用于管理 torrent 存储的生命周期，
-	// 确保当 torrent 被移除时，存储会被正确清理。
+	// 当 storage_holder 析构时，会调用 disk_interface::remove_torrent(m_idx)，
+	// 来确保当 torrent 被移除时，存储会被正确清理。
 	// 
 	// a unique, owning, reference to the storage of a torrent in a disk io
 	// subsystem (class that implements disk_interface). This is held by the

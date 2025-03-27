@@ -250,7 +250,10 @@ void file_mapping::close()
 	if (m_mapping == nullptr) return;
 	flush();
 	std::lock_guard<std::mutex> l(*m_open_unmap_lock);
+
+	// 解映射文件视图，释放内存映射占用的资源
 	UnmapViewOfFile(m_mapping);
+
 	m_mapping = nullptr;
 }
 #endif
