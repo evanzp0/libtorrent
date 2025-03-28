@@ -1,0 +1,65 @@
+@startuml libtorrent_async_read_sequence
+
+participant "Peer" as peer
+participant "disk_io" as disk_io
+participant "Storage" as storage
+participant "file_view_pool" as pool
+participant "mmap_storage" as mmap
+participant "BufferPool" as bufpool
+participant "Kernel" as kernel
+
+== 初始化阶段 ==
+peer -> disk_io : async_read(storage_idx, request, handler)
+activate disk_io
+
+disk_io -> storage : lookup(storage_idx)
+activate storage
+storage --> disk_io : mmap_storage&
+deactivate storage
+
+== 缓存检查阶段 ==
+disk_io -> bufpool : try_get_buffer(request.length)
+activate bufpool
+alt 缓存命中
+    bufpool --> disk_io : pre-filled buffer
+    disk_io -> peer : handler(buffer, no_error)
+    deactivate disk_io
+else 缓存未命中
+    bufpool --> disk_io : nullptr
+    deactivate bufpool
+
+    == 文件映射阶段 ==
+    disk_io -> mmap : map_piece_to_file(request)
+    activate mmap
+    mmap --> disk_io : file_index, offset
+    deactivate mmap
+
+    disk_io -> pool : get_file_view(file_index)
+    activate pool
+    pool -> kernel : mmap(file)
+    activate kernel
+    kernel --> pool : mapped_region
+    deactivate kernel
+    pool --> disk_io : file_mapping*
+    deactivate pool
+
+    == 读取执行阶段 ==
+    disk_io -> bufpool : allocate_buffer(request.length)
+    activate bufpool
+    bufpool --> disk_io : buffer_ptr
+    deactivate bufpool
+
+    disk_io -> kernel : pread(mapped_fd, buffer, offset)
+    activate kernel
+    kernel --> disk_io : read_bytes
+    deactivate kernel
+
+    == 结果返回 ==
+    disk_io -> peer : handler(disk_buffer_holder(buffer), error)
+    deactivate disk_io
+
+    == 清理阶段 ==
+    pool <-> kernel : unmap (异步延迟执行)
+end
+
+@enduml

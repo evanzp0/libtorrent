@@ -379,6 +379,7 @@ namespace file_open_mode {
 		// 检查文件完整性
 		// this is called when torrents are added to validate their resume data
 		// against the files on disk. This function is expected to do a few things:
+		// 当添加种子文件时会调用此函数，用于根据磁盘上的文件验证其恢复数据。此函数预期完成以下几件事：
 		//
 		// if ``links`` is non-empty, it contains a string for each file in the
 		// torrent. The string being a path to an existing identical file. The
@@ -387,55 +388,83 @@ namespace file_open_mode {
 		// string indicates that there is no known identical file. This is part
 		// of the "mutable torrent" feature, where files can be reused from
 		// other torrents.
+		// 如果 links 不为空，它为种子文件中的每个文件包含一个字符串。
+		// 该字符串是一个指向现有相同文件的路径。
+		// 默认行为是将这些文件创建硬链接到新种子文件的存储位置（由 storage 指定）。
+		// 空字符串表示不存在已知的相同文件。
+		// 这是 “可变种子文件” 功能的一部分，在该功能中，文件可以从其他种子文件中复用。
 		//
 		// The ``resume_data`` points the resume data passed in by the client.
+		// resume_data 指向客户端传入的恢复数据。
 		//
 		// If the ``resume_data->flags`` field has the seed_mode flag set, all
 		// files/pieces are expected to be on disk already. This should be
 		// verified. Not just the existence of the file, but also that it has
 		// the correct size.
+		// 如果 resume_data->flags 字段设置了 seed_mode 标志，
+		// 则预期所有文件 / 片段都已存在于磁盘上。这一点需要进行验证，
+		// 不仅要验证文件是否存在，还要验证其大小是否正确。
 		//
 		// Any file with a piece set in the ``resume_data->have_pieces`` bitmask
 		// should exist on disk, this should be verified. Pad files and files
 		// with zero priority may be skipped.
+		// resume_data->have_pieces 位掩码中设置了片段的任何文件都应该存在于磁盘上，
+		// 这一点也需要进行验证。填充文件和优先级为零的文件可以跳过验证。
 		virtual void async_check_files(storage_index_t storage
 			, add_torrent_params const* resume_data
 			, aux::vector<std::string, file_index_t> links
 			, std::function<void(status_t, storage_error const&)> handler) = 0;
 
+		// 停止 torrent
+		//
 		// This is called when a torrent is stopped. It gives the disk I/O
 		// object an opportunity to flush any data to disk that's currently kept
 		// cached. This function should at least do the same thing as
 		// async_release_files().
+		// 当一个种子文件停止下载或做种时会调用此函数。
+		// 它为磁盘 I/O 对象提供了一个机会，将当前缓存中的任何数据刷新到磁盘上。
+		// 此函数至少应执行与 async_release_files() 函数相同的操作。
 		virtual void async_stop_torrent(storage_index_t storage
 			, std::function<void()> handler = std::function<void()>()) = 0;
 
 		// 重命名文件
+		//
 		// This function is called when the name of a file in the specified
 		// storage has been requested to be renamed. The disk I/O object is
 		// responsible for renaming the file without racing with other
 		// potentially outstanding operations against the file (such as read,
 		// write, move, etc.).
+		// 当请求对指定存储中的某个文件进行重命名时，会调用此函数。
+		// 磁盘 I/O 对象负责对文件进行重命名操作，
+		// 同时要避免与其他可能正在对该文件进行的未完成操作（如读取、写入、移动等）发生竞态条件。
 		virtual void async_rename_file(storage_index_t storage
 			, file_index_t index, std::string name
 			, std::function<void(std::string const&, file_index_t, storage_error const&)> handler) = 0;
 
 		// 删除文件
+		//
 		// This function is called when some file(s) on disk have been requested
 		// to be removed by the client. ``storage`` indicates which torrent is
 		// referred to. See session_handle for ``remove_flags_t`` flags
 		// indicating which files are to be removed.
 		// e.g. session_handle::delete_files - delete all files
 		// session_handle::delete_partfile - only delete part file.
+		// 当客户端请求删除磁盘上的某些文件时，会调用此函数。
+		// storage 参数指明了所涉及的是哪个种子文件。
+		// 有关指示要删除哪些文件的 remove_flags_t 标志，请参考 session_handle。
 		virtual void async_delete_files(storage_index_t storage, remove_flags_t options
 			, std::function<void(storage_error const&)> handler) = 0;
 
 		// 设置文件优先级
+		//
 		// This is called to set the priority of some or all files. Changing the
 		// priority from or to 0 may involve moving data to and from the
 		// partfile. The disk I/O object is responsible for correctly
 		// synchronizing this work to not race with any potentially outstanding
 		// asynchronous operations affecting these files.
+		// 此函数用于设置部分或全部文件的优先级。
+		// 将文件优先级设置为 0 或者从 0 更改优先级时，可能需要在部分文件（partfile）和正常存储之间移动数据。
+		// 磁盘 I/O 对象需要正确同步此操作，避免与任何可能正在进行的、影响这些文件的异步操作产生竞态条件。
 		//
 		// ``prio`` is a vector of the file priority for all files. If it's
 		// shorter than the total number of files in the torrent, they are
@@ -446,30 +475,41 @@ namespace file_open_mode {
 				, aux::vector<download_priority_t, file_index_t>)> handler) = 0;
 
 		// 清除指定的 piece 数据
+		//
 		// This is called when a piece fails the hash check, to ensure there are
 		// no outstanding disk operations to the piece before blocks are
 		// re-requested from peers to overwrite the existing blocks. The disk I/O
 		// object does not need to perform any action other than synchronize
 		// with all outstanding disk operations to the specified piece before
 		// posting the result back.
+		// 当一个片段的哈希校验失败时会调用此函数，
+		// 以确保在向对等节点重新请求数据块来覆盖现有数据块之前，针对该片段没有未完成的磁盘操作。
+		// 磁盘 I/O 对象除了在返回结果之前与针对指定片段的所有未完成磁盘操作进行同步之外，无需执行其他操作。
 		virtual void async_clear_piece(storage_index_t storage, piece_index_t index
 			, std::function<void(piece_index_t)> handler) = 0;
 
 		// 更新统计计数器
+		//
 		// update_stats_counters() is called to give the disk storage an
 		// opportunity to update gauges in the ``c`` stats counters, that aren't
 		// updated continuously as operations are performed. This is called
 		// before a snapshot of the counters are passed to the client.
+		// 调用 update_stats_counters() 函数是为了让磁盘存储模块有机会更新 c counters 里，
+		// 那些不会在操作执行时持续更新的指标。此函数会在将计数器的快照传递给客户端之前被调用。
 		virtual void update_stats_counters(counters& c) const = 0;
 
 		// 获取打开文件状态
+		//
 		// Return a list of all the files that are currently open for the
 		// specified storage/torrent. This is is just used for the client to
 		// query the currently open files, and which modes those files are open
 		// in.
+		// 返回指定 storage/torrent 当前已打开的所有文件的列表。
+		// 此功能仅用于供客户端查询当前已打开的文件以及这些文件的打开模式。
 		virtual std::vector<open_file_state> get_status(storage_index_t) const = 0;
 
 		// 中止操作
+		//
 		// this is called when the session is starting to shut down. The disk
 		// I/O object is expected to flush any outstanding write jobs, cancel
 		// hash jobs and initiate tearing down of any internal threads. If
@@ -477,23 +517,37 @@ namespace file_open_mode {
 		// not return until all threads have stopped and all jobs have either
 		// been aborted or completed and the disk I/O object is ready to be
 		// destructed.
+		// 当会话开始关闭时会调用此函数。
+		// 期望磁盘 I/O 对象刷新所有未完成的写入任务，取消哈希计算任务，并启动内部线程的清理工作。
+		// 如果 wait 为 true，则该操作应该是同步的。
+		// 也就是说，在所有线程停止、所有任务要么被中止要么完成，并且磁盘 I/O 对象准备好被销毁之前，此调用不应返回。
 		virtual void abort(bool wait) = 0;
 
 		// 提交作业
+		//
 		// This will be called after a batch of disk jobs has been issues (via
 		// the ``async_*`` ). It gives the disk I/O object an opportunity to
 		// notify any potential condition variables to wake up the disk
 		// thread(s). The ``async_*`` calls can of course also notify condition
 		// variables, but doing it in this call allows for batching jobs, by
 		// issuing the notification once for a collection of jobs.
+		// 在一批磁盘作业被发出（通过 async_* 系列函数）之后会调用此函数。
+		// 它为磁盘 I/O 对象提供了一个机会，使其能够通知任何潜在的条件变量，从而唤醒磁盘线程。
+		// 当然，async_* 系列调用也能够通知条件变量，但在这个函数调用中进行通知，
+		// 可以通过为一批作业仅发出一次通知来实现作业的批处理。
 		virtual void submit_jobs() = 0;
 
 		// 设置更新通知
+		//
 		// This is called to notify the disk I/O object that the settings have
 		// been updated. In the disk io constructor, a settings_interface
 		// reference is passed in. Whenever these settings are updated, this
 		// function is called to allow the disk I/O object to react to any
 		// changed settings relevant to its operations.
+		// 调用此函数是为了通知磁盘 I/O 对象，设置已更新。
+		// 在磁盘 I/O 的构造函数中，会传入一个 settings_interface 引用。
+		// 每当这些设置被更新时，就会调用此函数，
+		// 以便磁盘 I/O 对象能够对任何与其操作相关的更改设置做出反应。
 		virtual void settings_updated() = 0;
 
 		// hidden
