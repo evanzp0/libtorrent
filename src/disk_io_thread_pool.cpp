@@ -208,6 +208,9 @@ namespace aux {
 			}
 
 			// 创建 disk_io 工作线程，并加入到 m_threads。
+			// 它会创建一个新的线程，并将 pool_thread_interface::thread_fun 作为线程的入口函数。
+			// 这个新线程会使用 m_thread_iface 作为线程接口对象，*this 作为线程池的引用，
+			// 并且使用 make_work_guard(m_ioc) 来确保 m_ioc 在线程运行期间保持有效。
 			// 
 			// work keeps the io_context::run() call blocked from returning.
 			// When shutting down, it's possible that the event queue is drained

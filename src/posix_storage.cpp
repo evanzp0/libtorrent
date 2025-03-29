@@ -170,8 +170,8 @@ namespace aux {
 #ifdef TORRENT_SIMULATE_SLOW_READ
 		std::this_thread::sleep_for(milliseconds(rand() % 2000));
 #endif
-		return readwrite(files(), buffer, piece, offset, error
-			, [this](file_index_t const file_index
+		return readwrite(files(), buffer, piece, offset, error, 
+			[this](file_index_t const file_index
 				, std::int64_t const file_offset
 				, span<char> buf, storage_error& ec)
 		{
