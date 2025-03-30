@@ -558,6 +558,10 @@ namespace {
 		}
 	}
 
+	/**
+	 * 
+	 * @param ios 这个就是 session_impl 中的 m_io_context
+	 */
 	TORRENT_EXPORT std::unique_ptr<disk_interface> default_disk_io_constructor(
 		io_context& ios, settings_interface const& sett, counters& cnt)
 	{
