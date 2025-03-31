@@ -5395,10 +5395,17 @@ namespace libtorrent {
 				if (read_mode == settings_pack::disable_os_cache)
 					flags |= disk_interface::volatile_read;
 
-				m_disk_thread.async_read(t->storage(), r
-					, [conn = self(), r](disk_buffer_holder buf, storage_error const& ec)
-					{ conn->wrap(&peer_connection::on_disk_read_complete, std::move(buf), ec, r, clock_type::now()); }
-					, flags);
+				// 如果是 mmap_disk_io 模式，那么 async_read 会向 mmap_disk_io_thread_pool 中添加任务，因此需要手动调用 deferred_submit_jobs()，唤醒 io 线程取出并执行任务。
+				// 如果是 posix_disk_io 模式，那么 async_read 是同步读取文件后向 io_context 事件循环，提交此处的 callback handler（lambda）, 因此 on_disk_read_complete 会在下一个事件周期被调用。
+				m_disk_thread.async_read(
+					t->storage(), 
+					r, 
+					// callback handler
+					[conn = self(), r](disk_buffer_holder buf, storage_error const& ec){ 
+						conn->wrap(&peer_connection::on_disk_read_complete, std::move(buf), ec, r, clock_type::now()); 
+					}, 
+					flags
+				);
 			}
 			m_last_sent_payload.set(m_connect, clock_type::now());
 			m_requests.erase(m_requests.begin() + i);
@@ -5408,6 +5415,9 @@ namespace libtorrent {
 
 			--i;
 		}
+
+		// 对于 mmap_disk_io 才有意义，因为 m_disk_thread.async_read() 会在 mmap_disk_io_thread_pool 中添加任务，
+		// 然后需要 m_ses.deferred_submit_jobs() 去 notify_all() 来通知 IO 线程取出任务执行。
 		m_ses.deferred_submit_jobs();
 
 #ifndef TORRENT_DISABLE_SHARE_MODE

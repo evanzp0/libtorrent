@@ -538,6 +538,8 @@ bool ssl_server_name_callback(ssl::stream_handle_type stream_handle, std::string
 			, *this
 #endif
 			)
+		// 因为此处有 m_io_context 的 wrok_guard，所以 session::start() 中 s->run() 执行后不会直接退出工作线程。
+		// 另外，如果 session_impl 析构了，但是又线程中的 m_io_context 的 wrok_guard 没有析构，则 session::start() 中 s->run() 不会退出。
 		, m_work(make_work_guard(m_io_context))
 #if TORRENT_USE_I2P
 		, m_i2p_conn(m_io_context)
@@ -1431,7 +1433,9 @@ namespace {
 		if (m_deferred_submit_disk_jobs) return;
 		m_deferred_submit_disk_jobs = true;
 
-		// 通过 post 将实际提交操作延迟到 I/O 事件循环的下一个周期。
+		// 延时一个周期调用 submit_disk_jobs
+		//
+		// 通过 post 将实际提交操作延迟到 I/O 事件循环的下一个周期（io_context 事件循环）。
 		// 在同步代码快速连续调用时，所有请求会被合并到一个事件循环周期内处理。
 		post(m_io_context, make_handler(
 			[this] { wrap(&session_impl::submit_disk_jobs); }

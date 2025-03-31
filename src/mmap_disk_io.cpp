@@ -247,6 +247,8 @@ private:
 			m_job_cond.notify_all();
 		}
 
+		// 每一个 thread 入口函数都有 work_guard ，是为了在 session_impl（它也持有 work_guard） 销毁后，但是有线程没执行完，
+		// 那么，io_context::run() 不会退出，直到所有线程都执行完（work_guard 都析构）。
 		void thread_fun(aux::disk_io_thread_pool& pool, executor_work_guard<io_context::executor_type> work) override
 		{
 			ADD_OUTSTANDING_ASYNC("mmap_disk_io::work");

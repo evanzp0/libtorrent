@@ -112,6 +112,9 @@ namespace aux {
 		// this should be called whenever new jobs are queued
 		// queue_size is the current size of the job queue
 		// not thread safe
+		// 每当有新作业被加入队列时，都应调用此代码
+		// queue_size 表示作业队列的当前长度
+		// 此代码不具备线程安全性
 		void job_queued(int queue_size);
 
 	private:
