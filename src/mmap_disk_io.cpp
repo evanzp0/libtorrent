@@ -1541,6 +1541,9 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 		return false;
 	}
 
+	/**
+	 * 每个 thread_fun 中都有无限循环，保证所在的线程不会退出。
+	 */
 	void mmap_disk_io::thread_fun(job_queue& queue, aux::disk_io_thread_pool& pool)
 	{
 		std::thread::id const thread_id = std::this_thread::get_id();
