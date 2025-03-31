@@ -140,6 +140,8 @@ namespace aux {
 	}
 
 	/**
+	 * 构造时仅初始化成员变量，不立即创建线程（空池设计），当有新任务加入时触发线程创建
+	 * 
 	 * libtorrent 中磁盘 I/O 线程池的动态扩缩容核心逻辑，
 	 * 根据队列任务数 (queue_size) 动态调整线程池规模：
 	 * - 缩减待退出线程数（避免过度收缩）
@@ -187,6 +189,8 @@ namespace aux {
 			// 否则不修改 m_threads_to_exit，但会将 to_exit 更新为 m_threads_to_exit 的当前实际值，并返回 false。
 		;
 
+		// 此处创建线程
+		//
 		// now start threads until we either have enough to service
 		// all queued jobs without blocking or hit the max
 		// 现在开始创建新线程，直至满足以下两个条件之一：
@@ -228,11 +232,8 @@ namespace aux {
 			// 如果该事件引用了一个磁盘缓冲区，它会尝试释放该缓冲区，但此时缓冲区池已不存在，从而导致程序崩溃。
 			// 而 work 机制能防止这种情况发生。
 			//
-			// make_work_guard(m_ioc) 创建了 executor_work_guard 对象，阻塞 io_context::run() 会保持阻塞，
-			// 确保所有异步回调完成前，io_context::run() 事件循环不提前退出。
-			//
-			// 没有 guard 时，可能遇到：
-			// 磁盘线程投递任务A（引用缓冲区X）=> 主线程销毁 io_context → 缓冲区池被释放 => 任务A最终执行时访问已释放的X → 崩溃
+			// make_work_guard(m_ioc) 创建了 executor_work_guard 对象，确保所有有 work_guard 的线程完成前，
+			// io_context::run() 事件循环不提前退出。
 			m_threads.emplace_back(&pool_thread_interface::thread_fun 	// 线程入口函数，这是线程启动后执行的核心函数
 				, &m_thread_iface										// 线程接口对象，实现 pool_thread_interface 的实例
 				, std::ref(*this)					  					// 线程池引用
