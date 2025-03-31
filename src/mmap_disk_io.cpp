@@ -475,12 +475,15 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 
 		// first make sure queued jobs have been submitted
 		// otherwise the queue may not get processed
+		// submit_job 就是调用 condvar.notify_all()，唤醒线程处理 job，
+		// 如果不 submit job 那么 queue 中的 job 可能就不会被处理。
 		submit_jobs();
 
 		// abuse the job mutex to make setting m_abort and checking the thread count atomic
 		// see also the comment in thread_fun
+		// 利用 m_job_mutex 互斥锁，来设置 m_abort 变量和检查线程数量的操作具备原子性
 		std::unique_lock<std::mutex> l(m_job_mutex);
-		if (m_abort.exchange(true)) return;
+		if (m_abort.exchange(true)) return; // 确保 abort() 只执行一次
 		bool const no_threads = m_generic_threads.num_threads() == 0
 			&& m_hash_threads.num_threads() == 0;
 		// abort outstanding jobs belonging to this torrent
@@ -492,6 +495,7 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 
 		// if there are no disk threads, we can't wait for the jobs here, because
 		// we'd stall indefinitely
+		// 如果没有磁盘线程，我们就不能在此处等待作业完成，因为这样会导致程序无限期阻塞。
 		if (no_threads)
 		{
 			abort_jobs();
@@ -1691,6 +1695,8 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 		DLOG("mmap_disk_io::abort_jobs\n");
 
 		TORRENT_ASSERT(m_magic == 0x1337);
+
+		// 如果已经中止，则返回
 		if (m_jobs_aborted.test_and_set()) return;
 
 		// close all files. This may take a long
@@ -1698,6 +1704,9 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 		// that's why it's important to do this in
 		// the disk thread in parallel with stopping
 		// trackers.
+		// 关闭所有文件。在某些操作系统（如 macOS）上，这可能会花费很长时间。
+		// 因此，在磁盘线程总关闭文件的同时，可以并行地停止跟踪器，
+		// 由于这两个操作相互独立，能减少总的执行时间。
 		m_file_pool.release();
 		TORRENT_ASSERT(m_magic == 0x1337);
 	}
