@@ -812,6 +812,8 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 				// only one side of the read request was found in the store
 				// buffer, and we need to issue a partial read for the remaining
 				// bytes
+				//
+				// 生成 job 对象，job->action = job_action_t::partial_read
 				aux::mmap_disk_job* j = m_job_pool.allocate_job(aux::job_action_t::partial_read);
 				j->argument = std::move(buffer);
 				j->storage = m_torrents[storage]->shared_from_this();
@@ -848,6 +850,7 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 			}
 		}
 
+		// 生成 job 对象，job->action = job_action_t::read
 		aux::mmap_disk_job* j = m_job_pool.allocate_job(aux::job_action_t::read);
 		j->storage = m_torrents[storage]->shared_from_this();
 		j->piece = r.piece;
