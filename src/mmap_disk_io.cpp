@@ -375,6 +375,8 @@ private:
 	// most jobs are posted to m_generic_io_jobs
 	// but hash jobs are posted to m_hash_io_jobs if m_hash_threads
 	// has a non-zero maximum thread count
+	//
+	// m_generic_io_jobs 是一个实现了 disk_io_thread_pool::pool_thread_interface 的 对象
 	job_queue m_generic_io_jobs;
 	aux::disk_io_thread_pool m_generic_threads;
 	job_queue m_hash_io_jobs;
@@ -400,6 +402,7 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 		, m_stats_counters(cnt)
 		, m_ios(ios)
 		, m_generic_io_jobs(*this)
+		// 生成 disk_io_thread_pool对象 ，构造函数： disk_io_thread_pool对象(pool_thread_interface&, io_context&);
 		, m_generic_threads(m_generic_io_jobs, ios)
 		, m_hash_io_jobs(*this)
 		, m_hash_threads(m_hash_io_jobs, ios)

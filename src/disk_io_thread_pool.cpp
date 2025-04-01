@@ -234,6 +234,8 @@ namespace aux {
 			//
 			// make_work_guard(m_ioc) 创建了 executor_work_guard 对象，确保所有有 work_guard 的线程完成前，
 			// io_context::run() 事件循环不提前退出。
+			//
+			// 线程生成后，会立刻运行 job_queue (也就是 m_thread_iface) 对象的 thread_fun 函数。
 			m_threads.emplace_back(&pool_thread_interface::thread_fun 	// 线程入口函数，这是线程启动后执行的核心函数
 				, &m_thread_iface										// 线程接口对象，实现 pool_thread_interface 的实例
 				, std::ref(*this)					  					// 线程池引用
