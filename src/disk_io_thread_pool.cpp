@@ -237,7 +237,7 @@ namespace aux {
 			//
 			// 线程生成后，会立刻运行 job_queue (也就是 m_thread_iface) 对象的 thread_fun 函数。
 			m_threads.emplace_back(&pool_thread_interface::thread_fun 	// 线程入口函数，这是线程启动后执行的核心函数
-				, &m_thread_iface										// 线程接口对象，实现 pool_thread_interface 的实例
+				, &m_thread_iface										// 线程接口对象，实现 pool_thread_interface 的 job_queue 实例
 				, std::ref(*this)					  					// 线程池引用
 				, make_work_guard(m_ioc));								// 关键：工作守卫
 		}
