@@ -376,9 +376,11 @@ private:
 	// but hash jobs are posted to m_hash_io_jobs if m_hash_threads
 	// has a non-zero maximum thread count
 	//
-	// m_generic_io_jobs 是一个实现了 disk_io_thread_pool::pool_thread_interface 的 对象
+	// m_generic_io_jobs 是一个实现了 disk_io_thread_pool::pool_thread_interface 的 job_queue 对象
 	job_queue m_generic_io_jobs;
 	aux::disk_io_thread_pool m_generic_threads;
+
+	// m_hash_io_jobs 是一个实现了 disk_io_thread_pool::pool_thread_interface 的 job_queue 对象
 	job_queue m_hash_io_jobs;
 	aux::disk_io_thread_pool m_hash_threads;
 
