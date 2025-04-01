@@ -569,6 +569,9 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 
 	} // anonymous namespace
 
+	/**
+	 * 执行 job_functions[mmap_disk_job->action] 函数
+	 */
 	void mmap_disk_io::perform_job(aux::mmap_disk_job* j, jobqueue_t& completed_jobs)
 	{
 		TORRENT_ASSERT(j->next == nullptr);
@@ -599,6 +602,7 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 		try
 		{
 			int const idx = static_cast<int>(j->action);
+			// 执行 job_functions[idx] 函数
 			ret = (this->*(job_functions[static_cast<std::size_t>(idx)]))(j);
 		}
 		catch (boost::system::system_error const& err)
@@ -1646,6 +1650,7 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 #endif
 			}
 
+			// 会调用 disk_io_thread_pool::job_queued() 生成线程，并执行 job。
 			execute_job(j);
 
 			l.lock();
