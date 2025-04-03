@@ -49,7 +49,11 @@ namespace libtorrent {
 namespace aux {
 
 	struct disk_io_thread_pool;
-
+	
+	/**
+	 * pool_thread_interface 接口定义和实现在不同的地方，为的就是 pool 可以通用化，
+	 * 比如：在 mmap_disk_io 中，定义的 job_queue 实现了本接口，job_queue 中针对的就都是 mmap_disk_io job 。
+	 */
 	struct pool_thread_interface
 	{
 		virtual ~pool_thread_interface() {}

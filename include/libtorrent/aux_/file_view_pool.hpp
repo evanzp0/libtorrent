@@ -76,6 +76,9 @@ namespace aux {
 	TORRENT_EXTRA_EXPORT file_open_mode_t to_file_open_mode(open_mode_t, bool const mmapped);
 
 	// this is an internal cache of open file mappings.
+	/**
+	 * 用于管理 memory mappings 文件的缓存池
+	 */
 	struct TORRENT_EXTRA_EXPORT file_view_pool
 	{
 		// ``size`` specifies the number of allowed files handles
@@ -174,6 +177,7 @@ namespace aux {
 
 		struct wait_open_entry
 		{
+			// 必须有的钩子成员
 			boost::intrusive::list_member_hook<> list_hook;
 
 			std::condition_variable cond;
@@ -197,12 +201,18 @@ namespace aux {
 			// the open mode for the file the thread is opening. A thread
 			// needing a file opened in read-write mode should not wait for a
 			// thread opening the file in read mode
+			// 线程正在打开的文件的打开模式。
+			// 当一个线程需要以读写模式打开文件时，它不应该等待另一个以只读模式打开该文件的线程。
 			open_mode_t mode{};
 
-			boost::intrusive::list<wait_open_entry
-				, boost::intrusive::member_hook<wait_open_entry
-				, boost::intrusive::list_member_hook<>
-				, &wait_open_entry::list_hook>
+			// 定义了一个名为 waiters 的侵入式链表
+			boost::intrusive::list<
+				wait_open_entry,                          // 链表元素类型
+				boost::intrusive::member_hook<            // 指定如何获取元素的链接点
+					wait_open_entry,                      	// 元素类型
+					boost::intrusive::list_member_hook<>, 	// 使用的钩子类型
+					&wait_open_entry::list_hook           	// 指向元素中钩子成员的指针
+				>
 			> waiters;
 		};
 

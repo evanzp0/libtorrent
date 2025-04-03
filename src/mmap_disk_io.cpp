@@ -412,6 +412,9 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 		settings_updated();
 	}
 
+	/**
+	 * 获取当前被 libtorrent 打开的 torrent 中的文件状态。
+	 */
 	std::vector<open_file_state> mmap_disk_io::get_status(storage_index_t const st) const
 	{
 		return m_file_pool.get_status(st);
@@ -514,18 +517,30 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 		m_hash_threads.abort(wait);
 	}
 
+	// 当设置更新时，调整 mmap_disk_io 的配置
 	void mmap_disk_io::settings_updated()
 	{
-		TORRENT_ASSERT(m_magic == 0x1337);
-		m_buffer_pool.set_settings(m_settings);
-		m_file_pool.resize(m_settings.get_int(settings_pack::file_pool_size));
-
-		int const num_threads = m_settings.get_int(settings_pack::aio_threads);
-		int const num_hash_threads = m_settings.get_int(settings_pack::hashing_threads);
-		DLOG("set max threads(%d, %d)\n", num_threads, num_hash_threads);
-
-		m_generic_threads.set_max_threads(num_threads);
-		m_hash_threads.set_max_threads(num_hash_threads);
+		// 在 libtorrent 的 mmap_disk_io 类中，m_magic 成员变量被设置为 0x1337 是一种常见的调试技术，它的主要作用是：内存完整性检查。
+	    // 在关键位置（如构造函数中）将 m_magic 初始化为 0x1337，后续通过 TORRENT_ASSERT 检查该值是否被意外修改。
+		// 如果值不匹配，可能意味着发生了内存越界、野指针访问或对象生命周期问题（如 use-after-free）。
+	    TORRENT_ASSERT(m_magic == 0x1337);
+	    
+	    // 更新缓冲池的设置
+	    m_buffer_pool.set_settings(m_settings);
+	    
+	    // 调整文件池的大小
+	    m_file_pool.resize(m_settings.get_int(settings_pack::file_pool_size));
+	
+	    // 获取异步I/O线程和哈希线程的数量设置
+	    int const num_threads = m_settings.get_int(settings_pack::aio_threads);
+	    int const num_hash_threads = m_settings.get_int(settings_pack::hashing_threads);
+	    
+	    // 输出日志信息
+	    DLOG("set max threads(%d, %d)\n", num_threads, num_hash_threads);
+	
+	    // 设置通用线程池和哈希线程池的最大线程数
+	    m_generic_threads.set_max_threads(num_threads);
+	    m_hash_threads.set_max_threads(num_hash_threads);
 	}
 
 	void mmap_disk_io::fail_jobs_impl(storage_error const& e, jobqueue_t& src, jobqueue_t& dst)
@@ -1431,7 +1446,9 @@ TORRENT_EXPORT std::unique_ptr<disk_interface> mmap_disk_io_constructor(
 
 		TORRENT_ASSERT((j->flags & aux::mmap_disk_job::in_progress) || !j->storage);
 
+		// 根据 j->action 的类型，使用 hash_queued_jobs 或 generic_queued_job
 		job_queue& q = queue_for_job(j);
+
 		q.m_queued_jobs.push_back(j);
 		// if we literally have 0 disk threads, we have to execute the jobs
 		// immediately. If add job is called internally by the mmap_disk_io,

@@ -62,23 +62,26 @@ namespace aux {
 namespace {
 
 	// this is posted to the network thread
+	// 用于通知观察者磁盘缓冲区可用，它是在网络线程中执行的回调函数
 	void watermark_callback(std::vector<std::weak_ptr<disk_observer>> const& cbs)
 	{
 		for (auto const& i : cbs)
 		{
 			std::shared_ptr<disk_observer> o = i.lock();
+			// 调用观察者的回调函数
 			if (o) o->on_disk();
 		}
 	}
 
 } // anonymous namespace
 
+	// 磁盘缓冲区池构造函数
 	disk_buffer_pool::disk_buffer_pool(io_context& ios)
-		: m_in_use(0)
-		, m_max_use(64)
-		, m_low_watermark(std::max(m_max_use - 32, 0))
-		, m_exceeded_max_size(false)
-		, m_ios(ios)
+		: m_in_use(0)                      // 当前使用中的缓冲区数量
+		, m_max_use(64)                    // 默认最大缓冲区数量
+		, m_low_watermark(std::max(m_max_use - 32, 0))  // 低水位线(最大数量-32)
+		, m_exceeded_max_size(false)       // 是否超过最大大小的标志
+		, m_ios(ios)                       // io_context 引用
 	{}
 
 	disk_buffer_pool::~disk_buffer_pool()
@@ -93,9 +96,17 @@ namespace {
 	// and if we're in fact below the low watermark. If so, we need to
 	// post the notification messages to the peers that are waiting for
 	// more buffers to received data into
+	// 检查缓冲区水位线，必要时通知观察者
 	void disk_buffer_pool::check_buffer_level(std::unique_lock<std::mutex>& l)
 	{
 		TORRENT_ASSERT(l.owns_lock());
+
+		/**
+		 * 水位线机制：
+		 * - 当使用量 超过高水位线 时，会设置 m_exceeded_max_size = true 并开始拒绝/延迟请求,
+		 * - 只有当使用量 回落到低水位线以下 时才认为真正解除紧张状态（m_exceeded_max_size = false）,
+		 * - 滞后设计 (hysteresis) 避免了在边界值附近频繁切换状态。
+		 */
 		if (!m_exceeded_max_size || m_in_use > m_low_watermark) return;
 
 		m_exceeded_max_size = false;

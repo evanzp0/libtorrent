@@ -120,22 +120,40 @@ namespace libtorrent {
 namespace aux {
 
 #ifdef TORRENT_WINDOWS
-	int pread_all(handle_type const fd
-		, span<char> const buf
-		, std::int64_t const offset
-		, error_code& ec)
+	/**
+	 * 从指定文件描述符中读取数据到缓冲区。
+	 * 
+	 * 该函数尝试从文件中读取所有请求的字节到提供的缓冲区中，考虑到偏移量。
+	 * 它使用Windows API函数ReadFile来执行异步读取操作。
+	 * 
+	 * @param fd 文件描述符，表示要读取的文件。
+	 * @param buf 一个字符缓冲区，用于存储读取的数据。
+	 * @param offset 文件中的偏移量，表示开始读取的位置。
+	 * @param ec 一个错误代码对象，用于存储操作中可能发生的错误。
+	 * @return 成功时，返回实际读取的字节数。失败时，返回-1，并设置ec为相应的错误代码。
+	 * 
+	 * 注意：该函数主要适用于Windows平台，并使用了Windows特定的API进行文件操作。
+	 */
+	int pread_all(handle_type const fd, span<char> const buf, std::int64_t const offset, error_code& ec)
 	{
-		OVERLAPPED ol{};
-		ol.Offset = offset & 0xffffffff;
-		ol.OffsetHigh = offset >> 32;
-		DWORD bytes_read = 0;
-		if (ReadFile(fd, buf.data(), DWORD(buf.size()), &bytes_read, &ol) == FALSE)
-		{
-			ec = error_code(::GetLastError(), system_category());
-			return -1;
-		}
-
-		return int(bytes_read);
+	    // 初始化OVERLAPPED结构体，用于异步读取操作。
+	    OVERLAPPED ol{};
+	    ol.Offset = offset & 0xffffffff;
+	    ol.OffsetHigh = offset >> 32;
+	    
+	    // 定义一个变量来存储读取的字节数。
+	    DWORD bytes_read = 0;
+	    
+	    // 使用ReadFile函数执行异步读取操作。
+	    if (ReadFile(fd, buf.data(), DWORD(buf.size()), &bytes_read, &ol) == FALSE)
+	    {
+	        // 如果读取失败，设置错误代码并返回-1。
+	        ec = error_code(::GetLastError(), system_category());
+	        return -1;
+	    }
+	    
+	    // 返回实际读取的字节数。
+	    return int(bytes_read);
 	}
 
 	int pwrite_all(handle_type const fd
@@ -212,6 +230,7 @@ namespace {
 #ifdef TORRENT_WINDOWS
 	// returns true if the given file has any regions that are
 	// sparse, i.e. not allocated.
+	// 如果给定的文件存在任何稀疏区域（即未分配的区域），则返回 true。
 	bool is_sparse(HANDLE file)
 	{
 		LARGE_INTEGER file_size;
