@@ -77,7 +77,7 @@ namespace {
 
 	// 磁盘缓冲区池构造函数
 	disk_buffer_pool::disk_buffer_pool(io_context& ios)
-		: m_in_use(0)                      // 当前使用中的缓冲区数量
+		: m_in_use(0)                      // 当前使用中的缓冲区内存块，每个缓冲区的固定大小由 default_block_size 定义（通常是 16 KiB，但可通过配置调整）。
 		, m_max_use(64)                    // 默认最大缓冲区数量
 		, m_low_watermark(std::max(m_max_use - 32, 0))  // 低水位线(最大数量-32)
 		, m_exceeded_max_size(false)       // 是否超过最大大小的标志
@@ -109,20 +109,28 @@ namespace {
 		 */
 		if (!m_exceeded_max_size || m_in_use > m_low_watermark) return;
 
+		// 解除 "超过高水位线" 标志
 		m_exceeded_max_size = false;
 
+		// 交换出观察者列表，准备通知
 		std::vector<std::weak_ptr<disk_observer>> cbs;
 		m_observers.swap(cbs);
 		l.unlock();
+		// 异步通知观察者
 		post(m_ios, std::bind(&watermark_callback, std::move(cbs)));
 	}
 
+	// 分配缓冲区(基础版本)
 	char* disk_buffer_pool::allocate_buffer(char const* category)
 	{
 		std::unique_lock<std::mutex> l(m_pool_mutex);
+		// 调用实际实现
 		return allocate_buffer_impl(l, category);
 	}
 
+	
+	// 分配缓冲区(带通知机制的版本)
+	//
 	// we allow allocating more blocks even after we exceed the max size,
 	// but communicate back to the allocator (typically the peer_connection)
 	// that we have exceeded the limit via the out-parameter "exceeded". The
@@ -130,19 +138,37 @@ namespace {
 	// until the disk_observer object (passed in as "o") is invoked, indicating
 	// that there's more room in the pool now. This caps the amount of over-
 	// allocation to one block per peer connection.
+	// 即使超过最大限制后，我们仍允许分配更多缓冲区块，
+	// 但会通过输出参数 "exceeded" 通知分配者（通常是 peer_connection）当前已超过限制。
+	// 调用方应遵守此限制，在 disk_observer 对象（参数 "o"）被通知（通过 watermark_callback 回调）缓冲池中有可用空间前，
+	// 不得再分配更多缓冲区（通过检查 "exceeded"）。
+	// 这种设计将超额分配的量限制为：每个 peer_connection 最多一个缓冲区块。
+	//
+	// 典型工作流程：
+	// 1. 首次分配时未超限 → 正常分配
+	// 2. 后续分配导致超限 → 设置exceeded=true
+	// 3. peer_connection 收到 exceeded 信号后暂停请求
+	// 4. 当缓冲区被释放（使用量回落）→ 触发observer回调
+	// 5. peer_connection 收到回调后恢复请求
 	char* disk_buffer_pool::allocate_buffer(bool& exceeded
 		, std::shared_ptr<disk_observer> o, char const* category)
 	{
 		std::unique_lock<std::mutex> l(m_pool_mutex);
+		// 分配缓冲区
 		char* ret = allocate_buffer_impl(l, category);
+
+		// 如果超过高水位线
 		if (m_exceeded_max_size)
 		{
+			// 设置超出标志
 			exceeded = true;
+			// 注册观察者，等水位降到低水位线后，需要通知观察者
 			if (o) m_observers.push_back(std::move(o));
 		}
 		return ret;
 	}
 
+	// 实际的缓冲区分配实现
 	char* disk_buffer_pool::allocate_buffer_impl(std::unique_lock<std::mutex>& l
 		, char const*)
 	{
@@ -151,14 +177,16 @@ namespace {
 		TORRENT_ASSERT(l.owns_lock());
 		TORRENT_UNUSED(l);
 
+		// 分配内存块(默认块大小)
 		char* ret = static_cast<char*>(std::malloc(default_block_size));
 
-		if (ret == nullptr)
+		if (ret == nullptr) // 分配失败
 		{
-			m_exceeded_max_size = true;
+			m_exceeded_max_size = true;	// 标记为超出限制
 			return nullptr;
 		}
 
+		// 增加使用计数
 		++m_in_use;
 
 #if TORRENT_USE_INVARIANT_CHECKS
@@ -174,8 +202,11 @@ namespace {
 		}
 #endif
 
-		if (m_in_use >= m_low_watermark + (m_max_use - m_low_watermark)
-			/ 2 && !m_exceeded_max_size)
+		// 检查是否需要触发高水位线标志
+		//
+		// 提前预警触发点 = 低水位线 + (高水位线 - 低水位线) / 2 。
+		// 提前预警设计的目的：是为系统预留时间反应，避免突然达到100%导致剧烈节流
+		if (m_in_use >= m_low_watermark + (m_max_use - m_low_watermark) / 2 && !m_exceeded_max_size)
 		{
 			m_exceeded_max_size = true;
 		}
@@ -183,36 +214,47 @@ namespace {
 		return ret;
 	}
 
+	// 释放多个缓冲区
 	void disk_buffer_pool::free_multiple_buffers(span<char*> bufvec)
 	{
 		// sort the pointers in order to maximize cache hits
+		// 对指针排序以提高缓存命中率
 		std::sort(bufvec.begin(), bufvec.end());
 
 		std::unique_lock<std::mutex> l(m_pool_mutex);
 		for (char* buf : bufvec)
-		{
+		{	
+			// 从跟踪集合中移除(调试用)
 			remove_buffer_in_use(buf);
+
+			// 实际释放
 			free_buffer_impl(buf, l);
 		}
 
+		// 检查水位线
 		check_buffer_level(l);
 	}
 
+	// 释放单个缓冲区
 	void disk_buffer_pool::free_buffer(char* buf)
 	{
 		std::unique_lock<std::mutex> l(m_pool_mutex);
-		remove_buffer_in_use(buf);
-		free_buffer_impl(buf, l);
-		check_buffer_level(l);
+		remove_buffer_in_use(buf);	// 从跟踪集合中移除(调试用)
+		free_buffer_impl(buf, l);	// 实际释放
+		check_buffer_level(l);		// 检查水位线
 	}
 
+	// 更新设置
 	void disk_buffer_pool::set_settings(settings_interface const& sett)
 	{
 		std::unique_lock<std::mutex> l(m_pool_mutex);
 
+		// 计算新的池大小(基于设置的磁盘队列字节数)
 		int const pool_size = std::max(1, sett.get_int(settings_pack::max_queued_disk_bytes) / default_block_size);
-		m_max_use = pool_size;
-		m_low_watermark = m_max_use / 2;
+		m_max_use = pool_size;				// 设置新的高水位线
+		m_low_watermark = m_max_use / 2;	// 低水位线设为一半
+
+		// 检查当前状态是否需要更新标志
 		if (m_in_use >= m_max_use && !m_exceeded_max_size)
 		{
 			m_exceeded_max_size = true;
@@ -223,6 +265,7 @@ namespace {
 #endif
 	}
 
+	// 从跟踪集合中移除缓冲区(调试用)
 	void disk_buffer_pool::remove_buffer_in_use(char* buf)
 	{
 		TORRENT_UNUSED(buf);
@@ -233,6 +276,7 @@ namespace {
 #endif
 	}
 
+	// 实际的缓冲区释放实现
 	void disk_buffer_pool::free_buffer_impl(char* buf, std::unique_lock<std::mutex>& l)
 	{
 		TORRENT_ASSERT(buf);
@@ -241,8 +285,10 @@ namespace {
 		TORRENT_ASSERT(l.owns_lock());
 		TORRENT_UNUSED(l);
 
+		// 释放内存
 		std::free(buf);
 
+		// 减少使用计数
 		--m_in_use;
 	}
 
