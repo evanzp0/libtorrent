@@ -117,13 +117,13 @@ namespace {
 		}
 
 		void abort(bool) override {}
-		
+
 		/**
 		 * @brief 异步读取指定存储块的数据
 		 * 
 		 * @param storage 存储索引，标识要操作的torrent存储位置
-		 * @param r 读取请求参数，包含piece索引、偏移量和长度等信息
-		 * @param handler 读取完成后的回调函数，接收数据缓冲区和错误信息
+		 * @param r 读取文件数据依据的 peer_request 参数，包含piece索引、偏移量和长度等信息
+		 * @param handler 读取完成后的回调函数，该回调函数的参数为：接收数据缓冲区、错误信息
 		 * @param flags 磁盘作业标志位(当前未使用)
 		 * 
 		 * @return void 异步操作无直接返回值，结果通过回调函数返回
@@ -131,13 +131,10 @@ namespace {
 		 * @note 该函数执行流程：
 		 * 1. 从缓冲池分配内存缓冲区
 		 * 2. 执行同步读取操作
-		 * 3. 通过io_context异步返回结果
+		 * 3. 通过 io_context 异步返回结果
 		 * 4. 自动更新读取统计计数器
 		 * 
-		 * @warning 回调函数将在io_context所在的线程执行
-		 * 
-		 * @see posix_storage::read()
-		 * @see disk_buffer_pool
+		 * @note 回调函数将在 io_context 所在的线程执行
 		 */
 		void async_read(storage_index_t storage, peer_request const& r
 			, std::function<void(disk_buffer_holder block, storage_error const& se)> handler
@@ -169,8 +166,11 @@ namespace {
 				m_stats_counters.inc_stats_counter(counters::disk_job_time, read_time);
 			}
 
-			post(m_ios, [h = std::move(handler), b = std::move(buffer), error] () mutable
-				{ h(std::move(b), error); });
+			post(m_ios, 
+				[h = std::move(handler), b = std::move(buffer), error] () mutable { 
+					h(std::move(b), error); 
+				}
+			);
 		}
 
 		bool async_write(storage_index_t storage, peer_request const& r
