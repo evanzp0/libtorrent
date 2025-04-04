@@ -140,13 +140,24 @@ namespace {
 			, std::function<void(disk_buffer_holder block, storage_error const& se)> handler
 			, disk_job_flags_t) override
 		{
-			disk_buffer_holder buffer = disk_buffer_holder(m_buffer_pool, m_buffer_pool.allocate_buffer("send buffer"), default_block_size);
+			// 从缓冲池分配缓冲区，默认 16 KiB 的块
+			disk_buffer_holder buffer = disk_buffer_holder(m_buffer_pool, 
+				m_buffer_pool.allocate_buffer("send buffer"), 
+				default_block_size);
+
+			// 缓冲区分配失败处理
 			storage_error error;
 			if (!buffer)
 			{
 				error.ec = errors::no_memory;
 				error.operation = operation_t::alloc_cache_piece;
-				post(m_ios, [this, error, h = std::move(handler)]{ h(disk_buffer_holder(m_buffer_pool, nullptr, 0), error); });
+
+				// 通过 io_context 异步返回错误
+				post(m_ios, 
+					[this, error, h = std::move(handler)] {
+						h(disk_buffer_holder(m_buffer_pool, nullptr, 0), error);
+					}
+				);
 				return;
 			}
 
