@@ -40,17 +40,36 @@ namespace libtorrent {
 
 	// represents a byte range within a piece. Internally this is is used for
 	// incoming piece requests.
+	/**
+	 * @brief 描述一个数据块请求的范围信息
+	 * 
+	 * @note 内部用于表示收到的piece请求数据范围
+	 * @note 所有字段使用网络字节序(大端序)
+	 */
 	struct TORRENT_EXPORT peer_request
 	{
 		// The index of the piece in which the range starts.
+		// 数据块索引(piece索引，从0开始)
 		piece_index_t piece;
+
 		// The byte offset within that piece where the range starts.
+		// 块内起始字节偏移量，必须小于piece_size
 		int start;
+
 		// The size of the range, in bytes.
+		// 请求的字节长度，start + length <= piece_size
 		int length;
 
 		// returns true if the right hand side peer_request refers to the same
 		// range as this does.
+		/**
+		 * @brief 判断两个请求是否指向相同数据范围
+		 * 
+		 * @param r 要比较的另一个peer_request
+		 * 
+		 * @return true  所有字段完全相同
+		 *         false 任一字段不同
+		 */
 		bool operator==(peer_request const& r) const
 		{ return piece == r.piece && start == r.start && length == r.length; }
 	};

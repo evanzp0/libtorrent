@@ -75,26 +75,70 @@ namespace {
 			m_buffer_pool.set_settings(m_settings);
 		}
 
+		/**
+		 * 创建新的 torrent 存储，分配存储索引
+		 * 
+		 * @param params 包含创建存储所需的所有参数(如文件路径、文件大小等)
+		 * 
+		 * @return 返回 storage_holder 对象，用于管理存储的生命周期
+		 */
 		storage_holder new_torrent(storage_params const& params
 			, std::shared_ptr<void> const&) override
 		{
 			// make sure we can remove this torrent without causing a memory
 			// allocation, by causing the allocation now instead
+			// 使用 m_free_slots (空闲槽位管理器)获取一个可用索引，
+			// 如果没有空闲槽位，则返回 m_torrents.end_index() 表示需要新增。
 			storage_index_t const idx = m_free_slots.new_index(m_torrents.end_index());
+
+			// 创建一个新的 posix_storage 对象
 			auto storage = std::make_unique<posix_storage>(params);
-			if (idx == m_torrents.end_index()) m_torrents.emplace_back(std::move(storage));
-			else m_torrents[idx] = std::move(storage);
+
+			if (idx == m_torrents.end_index()) 
+				// 如果索引是新的(end_index)，则添加到 m_torrents 向量末尾
+				m_torrents.emplace_back(std::move(storage));
+			else
+				// 如果是重用现有槽位，则替换指定位置的存储对象
+				m_torrents[idx] = std::move(storage);
+
 			return storage_holder(idx, *this);
 		}
 
+		/**
+		 * // 移除指定索引的 torrent storage
+		 */
 		void remove_torrent(storage_index_t const idx) override
 		{
+			// 释放指定索引位置的存储对象
 			m_torrents[idx].reset();
+
+			// 将索引加入空闲槽位列表，供后续new_torrent复用
 			m_free_slots.add(idx);
 		}
 
 		void abort(bool) override {}
-
+		
+		/**
+		 * @brief 异步读取指定存储块的数据
+		 * 
+		 * @param storage 存储索引，标识要操作的torrent存储位置
+		 * @param r 读取请求参数，包含piece索引、偏移量和长度等信息
+		 * @param handler 读取完成后的回调函数，接收数据缓冲区和错误信息
+		 * @param flags 磁盘作业标志位(当前未使用)
+		 * 
+		 * @return void 异步操作无直接返回值，结果通过回调函数返回
+		 * 
+		 * @note 该函数执行流程：
+		 * 1. 从缓冲池分配内存缓冲区
+		 * 2. 执行同步读取操作
+		 * 3. 通过io_context异步返回结果
+		 * 4. 自动更新读取统计计数器
+		 * 
+		 * @warning 回调函数将在io_context所在的线程执行
+		 * 
+		 * @see posix_storage::read()
+		 * @see disk_buffer_pool
+		 */
 		void async_read(storage_index_t storage, peer_request const& r
 			, std::function<void(disk_buffer_holder block, storage_error const& se)> handler
 			, disk_job_flags_t) override
@@ -291,6 +335,9 @@ namespace {
 			post(m_ios, [=, h = std::move(handler)]{ h(error); });
 		}
 
+		/**
+		 * 检查文件状态，用于恢复下载
+		 */
 		void async_check_files(storage_index_t storage
 			, add_torrent_params const* resume_data
 			, aux::vector<std::string, file_index_t> links
@@ -351,6 +398,9 @@ namespace {
 			post(m_ios, std::move(handler));
 		}
 
+		/**
+		 * 设置文件下载优先级
+		 */
 		void async_set_file_priority(storage_index_t const storage
 			, aux::vector<download_priority_t, file_index_t> prio
 			, std::function<void(storage_error const&
