@@ -152,7 +152,7 @@ namespace {
 				error.ec = errors::no_memory;
 				error.operation = operation_t::alloc_cache_piece;
 
-				// 通过 io_context 异步返回错误
+				// 通过 io_context 异步返回错误，错误最终在 peer_connection::on_disk_read_complete 被处理
 				post(m_ios, 
 					[this, error, h = std::move(handler)] {
 						h(disk_buffer_holder(m_buffer_pool, nullptr, 0), error);
@@ -161,22 +161,29 @@ namespace {
 				return;
 			}
 
+			// 记录操作开始时间(用于性能统计)
 			time_point const start_time = clock_type::now();
 
+			// 准备数据读取的缓冲区视图
 			span<char> const buf = {buffer.data(), r.length};
-
+			
+			// 根据 peer_request 的要求，通过 posix_storage 读取数据到 buf
 			m_torrents[storage]->read(m_settings, buf, r.piece, r.start, error);
 
+			// 成功读取时的统计更新
 			if (!error.ec)
 			{
+				// 计算读取耗时(微秒)
 				std::int64_t const read_time = total_microseconds(clock_type::now() - start_time);
 
-				m_stats_counters.inc_stats_counter(counters::num_blocks_read);
-				m_stats_counters.inc_stats_counter(counters::num_read_ops);
-				m_stats_counters.inc_stats_counter(counters::disk_read_time, read_time);
-				m_stats_counters.inc_stats_counter(counters::disk_job_time, read_time);
+				// 更新各种统计计数器
+				m_stats_counters.inc_stats_counter(counters::num_blocks_read);				// 读取块数
+				m_stats_counters.inc_stats_counter(counters::num_read_ops);					// 读取操作次数
+				m_stats_counters.inc_stats_counter(counters::disk_read_time, read_time);	// 读取总时间
+				m_stats_counters.inc_stats_counter(counters::disk_job_time, read_time);		// 磁盘作业总时
 			}
 
+			// 通过 io_context 异步返回结果
 			post(m_ios, 
 				[h = std::move(handler), b = std::move(buffer), error] () mutable { 
 					h(std::move(b), error); 

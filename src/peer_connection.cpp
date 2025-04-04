@@ -5401,7 +5401,7 @@ namespace libtorrent {
 					t->storage(), 
 					r, 
 					// callback handler
-					[conn = self(), r](disk_buffer_holder buf, storage_error const& ec){ 
+					[conn = self(), r](disk_buffer_holder buf, storage_error const& ec) { 
 						conn->wrap(&peer_connection::on_disk_read_complete, std::move(buf), ec, r, clock_type::now()); 
 					}, 
 					flags
@@ -5608,6 +5608,8 @@ namespace libtorrent {
 		m_reading_bytes -= r.length;
 
 		std::shared_ptr<torrent> t = m_torrent.lock();
+
+		// 回调中有错误，则在此处处理
 		if (error)
 		{
 			if (!t)
