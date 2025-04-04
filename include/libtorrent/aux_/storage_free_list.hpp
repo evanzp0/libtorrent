@@ -39,17 +39,33 @@ POSSIBILITY OF SUCH DAMAGE.
 namespace libtorrent {
 namespace aux {
 
+	/**
+	 * storage_free_list 是一个简单的自由列表（free list）实现，
+	 * 用于管理存储索引（storage_index_t）的分配和回收。
+	 * 在 libtorrent 这样的 BitTorrent 客户端中，它用于管理 storage 对象的分配。
+	 */
 	struct storage_free_list
 	{
 		// if we don't already have any free slots, use next
+		/**
+		 * 获取一个新的存储索引
+		 * 
+		 * @param next 是当 m_free_slots 为空时，应该返回的默认索引
+		 */
 		storage_index_t new_index(storage_index_t const next)
 		{
+			// 确保 m_free_slots 有足够容量
+			//
 			// make sure we can remove this torrent without causing a memory
 			// allocation, by triggering the allocation now instead
+			// 通过现在就触发内存分配，确保我们在移除这个种子文件时不会引发额外的内存分配。
 			m_free_slots.reserve(static_cast<std::uint32_t>(next) + 1);
 			return m_free_slots.empty() ? next : pop();
 		}
 
+		/**
+		 * 将不再使用的索引返回到自由列表
+		 */
 		void add(storage_index_t const i) { m_free_slots.push_back(i); }
 
 		std::size_t size() const { return m_free_slots.size(); }

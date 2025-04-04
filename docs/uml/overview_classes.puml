@@ -44,6 +44,17 @@
 
     mmap_disk_io *-- disk_job_pool
 
+    posix_disk_io *-- storage_free_list
+    posix_disk_io *-- settings_interface
+    posix_disk_io *-- disk_buffer_pool
+    posix_disk_io o-- counters
+    posix_disk_io o-- io_context
+    posix_disk_io ..> disk_buffer_holder
+
+    buffer_allocator_interface <|.. disk_buffer_pool
+
+    disk_buffer_holder o-- buffer_allocator_interface
+
     dht_storage_interface <|.. dht_default_storage
 
     class torrent_list<T> {
