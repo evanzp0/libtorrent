@@ -51,6 +51,19 @@ namespace aux {
 
 	struct session_settings;
 
+	/**
+	 * @brief POSIX文件存储实现类
+	 * 
+	 * 该类实现了基于POSIX文件系统的存储操作，用于管理torrent文件在磁盘上的存储和访问。
+	 * 支持 Piece-based Storage、Partial Files / Partfile、File Priority 等特性。
+	 * 
+	 * - Partfile:
+	 *   1. Libtorrent 将所有未完成块 集中存储在一个全局的临时文件中。
+	 *      当某个文件的未下载完成时，该文件的所有 piece 数据会被追加到全局 partfile 中。
+	 *      partfile 内部通过 逻辑映射 记录每个块属于哪个文件/偏移。
+	 *   2. 当某个文件的所有块下载完成时，Libtorrent 会从 partfile 中提取该文件的全部块。
+	 *      按顺序合并到最终的目标文件中，并删除 partfile 中对应的块数据。
+	 */
 	struct TORRENT_EXTRA_EXPORT posix_storage
 	{
 		explicit posix_storage(storage_params const& p);
@@ -111,6 +124,15 @@ namespace aux {
 		// those files have their slot set to false in this vector.
 		// note that the vector is *sparse*, it's only allocated if a file has its
 		// entry set to false, and only indices up to that entry.
+		//
+		// 这是一个由文件索引进行索引的数组。数组中的每个元素表示对应文件是否启用了 part-file（部分文件）功能。
+		// 这是为了与旧版本（支持部分文件功能之前版本）的 libtorrent 保持向后兼容性。
+		// 如果这个向量为空，默认情况下所有文件都 会 使用 part-file。
+		// 在启动时，如果发现某个优先级为 0 的文件处于其原始位置，
+		// 那么该文件会被视为旧格式（支持 part-file 功能之前的格式）的种子存储文件，
+		// 并且在这个向量中，这些文件对应的元素会被设为 false。
+		// 请注意，这个向量是 稀疏的，只有当某个文件对应的元素被设为 false 时，才会为该向量分配内存，
+		// 并且只会分配到该元素对应的索引位置。
 		aux::vector<bool, file_index_t> m_use_partfile;
 
 		std::string m_part_file_name;
