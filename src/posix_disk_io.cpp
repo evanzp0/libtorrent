@@ -191,6 +191,20 @@ namespace {
 			);
 		}
 
+		/**
+		 * @brief 异步写入数据块到存储中
+		 * 
+		 * 该函数将指定的数据异步写入到 torrent 存储中，并统计写入操作的性能指标。
+		 * 操作完成后通过回调函数通知调用方结果。
+		 * 
+		 * @param storage 存储索引，标识要写入的目标 torrent 存储
+		 * @param r 写入请求信息，包含块位置和大小等
+		 * @param buf 要写入的数据缓冲区指针
+		 * @param 磁盘观察者对象(未使用)
+		 * @param handler 写入完成后的回调函数
+		 * @param 磁盘作业标志(未使用)
+		 * @return bool 总是返回 false，表示操作已异步处理
+		 */
 		bool async_write(storage_index_t storage, peer_request const& r
 			, char const* buf, std::shared_ptr<disk_observer>
 			, std::function<void(storage_error const&)> handler
