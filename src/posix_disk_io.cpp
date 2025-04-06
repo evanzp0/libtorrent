@@ -210,24 +210,32 @@ namespace {
 			, std::function<void(storage_error const&)> handler
 			, disk_job_flags_t) override
 		{
+			// 准备数据视图（避免拷贝，直接引用原始缓冲区）
 			span<char> const b = { const_cast<char*>(buf), r.length };
 
+			// 记录操作开始时间（用于计算写入耗时）
 			time_point const start_time = clock_type::now();
 
+			// 执行实际同步写入操作
 			storage_error error;
 			m_torrents[storage]->write(m_settings, b, r.piece, r.start, error);
 
 			if (!error.ec)
 			{
+				// 计算写入耗时（微秒级精度）
 				std::int64_t const write_time = total_microseconds(clock_type::now() - start_time);
 
-				m_stats_counters.inc_stats_counter(counters::num_blocks_written);
-				m_stats_counters.inc_stats_counter(counters::num_write_ops);
-				m_stats_counters.inc_stats_counter(counters::disk_write_time, write_time);
-				m_stats_counters.inc_stats_counter(counters::disk_job_time, write_time);
+				// 更新各种统计指标
+				m_stats_counters.inc_stats_counter(counters::num_blocks_written);			// 写入块数+1
+				m_stats_counters.inc_stats_counter(counters::num_write_ops);				// 写入操作次数+1
+				m_stats_counters.inc_stats_counter(counters::disk_write_time, write_time);	// 累计写入时间
+				m_stats_counters.inc_stats_counter(counters::disk_job_time, write_time);	// 累计磁盘作业时间
 			}
 
+			// 通过 io_context 异步返回结果，使用 post 确保回调在网络线程中执行
 			post(m_ios, [=, h = std::move(handler)]{ h(error); });
+
+			// 历史遗留返回值，始终返回false（无实际意义）
 			return false;
 		}
 

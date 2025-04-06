@@ -2984,6 +2984,7 @@ namespace libtorrent {
 		bool const exceeded = m_disk_thread.async_write(t->storage(), p, data, self()
 			, [conn = self(), p, t] (storage_error const& e)
 			{ conn->wrap(&peer_connection::on_disk_write_complete, e, p, t); });
+
 		m_ses.deferred_submit_jobs();
 
 		// every peer is entitled to have two disk blocks allocated at any given
@@ -3126,7 +3127,7 @@ namespace libtorrent {
 		if (request_a_block(*t, *this))
 			m_counters.inc_stats_counter(counters::incoming_piece_picks);
 		send_block_requests();
-	}
+	} // end of incoming_piece
 
 	void peer_connection::check_graceful_pause()
 	{
