@@ -474,7 +474,11 @@ namespace file_open_mode {
 			, std::function<void(storage_error const&
 				, aux::vector<download_priority_t, file_index_t>)> handler) = 0;
 
-		// 清除指定的 piece 数据
+		// 用于主动释放指定piece的磁盘/内存缓存
+		// 场景：
+		// - 手动释放内存
+		// - 校验失败后重置数据
+		// - 磁盘空间回收
 		//
 		// This is called when a piece fails the hash check, to ensure there are
 		// no outstanding disk operations to the piece before blocks are

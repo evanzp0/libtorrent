@@ -623,10 +623,32 @@ namespace {
 			post(m_ios, [error, ret, h = std::move(handler)]{ h(ret, error); });
 		}
 
-		void async_rename_file(storage_index_t const storage
-			, file_index_t const idx
-			, std::string name
-			, std::function<void(std::string const&, file_index_t, storage_error const&)> handler) override
+		/**
+		 * @brief 异步重命名种子内的单个文件
+		 * 
+		 * 该函数用于修改种子内指定文件的文件名，适用于：
+		 * - 用户手动修改文件名
+		 * - 自动规范化文件命名
+		 * - 解决文件名冲突
+		 * 
+		 * @param storage 存储索引，标识目标种子
+		 * @param idx 文件索引，标识要重命名的文件
+		 * @param name 新文件名（不含路径）
+		 * @param handler 操作结果回调，参数包含：
+		 *                - std::string 最终生效的文件名（可能被调整）
+		 *                - file_index_t 文件索引（与输入一致）
+		 *                - storage_error 错误信息
+		 * 
+		 * @note 实现特性：
+		 * 1. 文件名规范化：自动处理非法字符/长度限制
+		 * 2. 线程安全：实际文件操作在存储线程执行
+		 * 3. 原子性：通过系统级rename操作保证
+		 */
+		void async_rename_file(
+			storage_index_t const storage, 
+			file_index_t const idx, 
+			std::string name, 
+			std::function<void(std::string const&, file_index_t, storage_error const&)> handler) override
 		{
 			posix_storage* st = m_torrents[storage].get();
 			storage_error error;
@@ -635,6 +657,24 @@ namespace {
 				{ h(std::move(n), idx, error); });
 		}
 
+		/**
+		 * @brief 异步停止指定种子的所有存储活动
+		 * 
+		 * 该函数用于安全终止种子的磁盘I/O操作，典型场景：
+		 * - 用户手动暂停种子
+		 * - 客户端关闭前的资源清理
+		 * - 种子错误状态恢复
+		 * 
+		 * @note 停止行为包括：
+		 * 1. 中止正在进行的文件读写
+		 * 2. 释放文件描述符
+		 * 3. 清空内存缓存（可选）
+		 * 
+		 * @warning 注意事项：
+		 * - 不会删除任何文件数据
+		 * - 再次启动时需要重新初始化存储
+		 * - 必须在析构存储对象前调用
+		 */
 		void async_stop_torrent(storage_index_t, std::function<void()> handler) override
 		{
 			if (!handler) return;
@@ -642,7 +682,21 @@ namespace {
 		}
 
 		/**
-		 * 设置文件下载优先级
+		 * @brief 该函数用于动态调整种子内各文件的下载优先级，实现：
+		 * - 用户手动设置文件优先级
+		 * - 智能下载策略自动调整
+		 * - 文件组批量优先级修改
+		 * 
+		 * @param storage 存储索引
+		 * @param prio 优先级向量（索引对应file_index_t）
+		 * @param handler 结果回调，返回：
+		 *                - 错误信息
+		 *                - 实际生效的优先级向量
+		 * 
+		 * @note 优先级标准：
+		 * - 0：跳过下载
+		 * - 1：普通优先级
+		 * - 6：最高优先级（立即下载）
 		 */
 		void async_set_file_priority(storage_index_t const storage
 			, aux::vector<download_priority_t, file_index_t> prio
@@ -674,11 +728,13 @@ namespace {
 		aux::vector<std::unique_ptr<posix_storage>, storage_index_t> m_torrents;
 
 		// slots that are unused in the m_torrents vector
+		// 记录所有 m_torrents 中可用存储位置的空闲槽位索引，
+		// 提供快速的索引分配/回收操作
 		aux::storage_free_list m_free_slots;
 
 		settings_interface const& m_settings;
 
-		// disk cache
+		// disk cache（一个内存分配的高低水位记录器，调用方使用时用它分配内存，用完调用方自己释放内存）
 		aux::disk_buffer_pool m_buffer_pool;
 
 		counters& m_stats_counters;
