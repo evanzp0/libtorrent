@@ -511,11 +511,35 @@ namespace {
 
 			// 同步执行文件资源释放， 立即关闭文件句柄和清理缓存
 			st->release_files();
-			
+
 			if (!handler) return;
 			post(m_ios, [=]{ handler(); });
 		}
 
+		/**
+		 * @brief 异步删除指定种子关联的物理文件
+		 * 
+		 * 该函数用于永久移除磁盘上与种子关联的所有数据文件，适用于：
+		 * - 用户手动删除下载任务
+		 * - 自动清理已完成种子
+		 * - 磁盘空间回收操作
+		 * 
+		 * @param storage 存储索引，标识目标种子
+		 * @param options 删除选项标志位，可选值：
+		 *                - remove_flags_t::files      删除数据文件
+		 *                - remove_flags_t::partfile   删除部分下载文件
+		 *                - remove_flags_t::directories 删除空目录
+		 * @param handler 操作结果回调，携带错误信息
+		 * 
+		 * @warning 危险操作
+		 * - 删除后不可恢复（不同于移到回收站）
+		 * - 会终止该种子的所有活动
+		 * 
+		 * @note 实际行为取决于存储实现：
+		 * - 多文件种子：递归删除整个目录树
+		 * - 单文件种子：仅删除目标文件
+		 * - 支持保留部分文件（通过options控制）
+		 */
 		void async_delete_files(storage_index_t storage, remove_flags_t const options
 			, std::function<void(storage_error const&)> handler) override
 		{
@@ -526,7 +550,28 @@ namespace {
 		}
 
 		/**
-		 * 检查文件状态，用于恢复下载
+		 * @brief 异步校验种子文件完整性
+		 * 
+		 * 该函数用于验证本地文件与种子元数据的匹配情况，主要场景：
+		 * - 启动时检查已下载文件的完整性
+		 * - 恢复下载时校验续传数据有效性
+		 * - 手动触发文件重新校验
+		 * 
+		 * @param storage 存储索引，标识目标种子
+		 * @param resume_data 续传数据指针（可为空）
+		 * @param links 文件硬链接路径列表（可选）
+		 * @param handler 校验结果回调，包含：
+		 *                - status_t 校验状态
+		 *                - storage_error 错误信息
+		 * 
+		 * @note 校验逻辑：
+		 * 1. 初始化存储系统
+		 * 2. 验证续传数据有效性
+		 * 3. 根据策略决定是否需要完整校验
+		 * 
+		 * @warning 性能影响：
+		 * - 完整校验会扫描所有文件内容
+		 * - 大种子校验可能耗时较长
 		 */
 		void async_check_files(storage_index_t storage
 			, add_torrent_params const* resume_data
@@ -535,18 +580,24 @@ namespace {
 		{
 			posix_storage* st = m_torrents[storage].get();
 
+			// 处理空续传数据情况
 			add_torrent_params tmp;
 			add_torrent_params const* rd = resume_data ? resume_data : &tmp;
 
 			storage_error error;
+
+			// 核心校验逻辑（立即执行的 lambda）
 			status_t const ret = [&]
 			{
+				// 初始化存储
 				auto const ret_flag = st->initialize(m_settings, error);
 				if (error) return status_t::fatal_disk_error | ret_flag;
 
+				// 验证续传数据
 				bool const verify_success = st->verify_resume_data(*rd
 					, std::move(links), error);
 
+				// 检查是否跳过校验（根据设置）
 				if (m_settings.get_bool(settings_pack::no_recheck_incomplete_resume))
 					return status_t::no_error | ret_flag;
 
@@ -554,6 +605,7 @@ namespace {
 				{
 					// if we don't have any resume data, we still may need to trigger a
 					// full re-check, if there are *any* files.
+					// 无续传数据时，存在的任何文件，都要完整校验
 					storage_error ignore;
 					return ((st->has_any_file(ignore))
 						? status_t::need_full_check
@@ -561,9 +613,10 @@ namespace {
 						| ret_flag;
 				}
 
+				// 根据验证结果返回状态
 				return (verify_success
 					? status_t::no_error
-					: status_t::need_full_check)
+					: status_t::need_full_check) // 当快速验证失败时，要求后续流程执行全量哈希校验
 					| ret_flag;
 			}();
 
