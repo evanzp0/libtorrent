@@ -267,7 +267,7 @@ namespace {
 			bool const v1 = bool(flags & disk_interface::v1_hash);
 			bool const v2 = !block_hashes.empty();
 
-			// 分配临时缓冲区（默认16KB块大小）
+			// 分配临时缓冲区（默认16KB块大小），用于存放 v1 hash
 			disk_buffer_holder buffer = disk_buffer_holder(m_buffer_pool, m_buffer_pool.allocate_buffer("hash buffer"), default_block_size);
 			storage_error error;
 			// 内存分配失败处理
@@ -360,12 +360,46 @@ namespace {
 			post(m_ios, [=, h = std::move(handler)]{ h(piece, hash, error); });
 		}
 
+		/**
+		 * @brief 异步计算指定数据块的SHA-256哈希值（BitTorrent v2协议专用）
+		 * 
+		 * @param storage 存储索引，标识目标torrent
+		 * @param piece 数据块索引
+		 * @param offset 块内偏移量（字节）
+		 * @param flags 磁盘操作标志位（保留参数）
+		 * @param handler 异步回调函数，包含三个参数：
+		 *                - piece_index_t: 原始数据块索引
+		 *                - sha256_hash: 计算出的哈希值
+		 *                - storage_error: 错误信息
+		 * 
+		 * @note 函数特性：
+		 * 1. 采用16KB固定缓冲区（0x4000字节）
+		 * 2. 自动处理边界条件（末块截断）
+		 * 3. 内置性能统计（耗时/吞吐量）
+		 * 4. 线程安全（通过IOService派发结果）
+		 * 
+		 * @warning 内存分配失败会立即触发错误回调
+		 * 
+		 * @par 典型调用流程：
+		 * 1. 分配缓冲区
+		 * 2. 读取磁盘数据
+		 * 3. 计算SHA-256
+		 * 4. 更新统计信息
+		 * 5. 异步返回结果
+		 * 
+		 * @see async_hash() v1版本哈希函数
+		 * @see posix_storage::read() 底层读取实现
+		 */
 		void async_hash2(storage_index_t storage, piece_index_t const piece, int offset, disk_job_flags_t
 			, std::function<void(piece_index_t, sha256_hash const&, storage_error const&)> handler) override
 		{
+			// 记录起始时间点（用于耗时统计）
 			time_point const start_time = clock_type::now();
 
+			// 申请16KB对齐的内存缓冲区，用于存放 v2 hash
 			disk_buffer_holder buffer = disk_buffer_holder(m_buffer_pool, m_buffer_pool.allocate_buffer("hash buffer"), 0x4000);
+
+			// 内存分配失败处理
 			storage_error error;
 			if (!buffer)
 			{
@@ -375,31 +409,42 @@ namespace {
 				return;
 			}
 
+			// 获取对应 torrent 的存储接口
 			posix_storage* st = m_torrents[storage].get();
-
 			int const piece_size = st->files().piece_size2(piece);
 
+			// 计算有效数据长度（防止越界），取最小值：默认块大小 vs 剩余数据长度
 			std::ptrdiff_t const len = std::min(default_block_size, piece_size - offset);
 
+			// SHA-256哈希计算器实例
 			hasher256 ph;
+
+			// 创建受限数据切片
 			span<char> const b = {buffer.data(), len};
+
+			// 执行同步磁盘读取
 			int const ret = st->read(m_settings, b, piece, offset, error);
+
+			// 仅当成功读取时才更新哈希
 			if (ret > 0)
 				ph.update(b.first(ret));
 
+			// 最终化哈希值
 			sha256_hash const hash = ph.final();
 
+			// 更新指标
 			if (!error.ec)
 			{
 				std::int64_t const read_time = total_microseconds(clock_type::now() - start_time);
 
-				m_stats_counters.inc_stats_counter(counters::num_read_back);
-				m_stats_counters.inc_stats_counter(counters::num_blocks_read);
-				m_stats_counters.inc_stats_counter(counters::num_read_ops);
-				m_stats_counters.inc_stats_counter(counters::disk_hash_time, read_time);
-				m_stats_counters.inc_stats_counter(counters::disk_job_time, read_time);
+				m_stats_counters.inc_stats_counter(counters::num_read_back);	// 回读计数
+				m_stats_counters.inc_stats_counter(counters::num_blocks_read);	// 块读取计数
+				m_stats_counters.inc_stats_counter(counters::num_read_ops);		// 操作次数
+				m_stats_counters.inc_stats_counter(counters::disk_hash_time, read_time);	// 纯哈希耗时（µs）
+				m_stats_counters.inc_stats_counter(counters::disk_job_time, read_time);		// 总耗时（µs）
 			}
 
+			// 通过 io_context 异步返回结果
 			post(m_ios, [=, h = std::move(handler)]{ h(piece, hash, error); });
 		}
 
