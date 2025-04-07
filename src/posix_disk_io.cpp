@@ -448,22 +448,70 @@ namespace {
 			post(m_ios, [=, h = std::move(handler)]{ h(piece, hash, error); });
 		}
 
-
+		/**
+		 * @brief 异步移动或重命名种子文件的存储位置
+		 * 
+		 * 该函数用于将指定种子的存储目录整体迁移到新路径，支持异步回调返回操作结果。
+		 * 典型场景：用户手动更改下载保存路径，或客户端自动整理文件存储结构。
+		 * 
+		 * @param storage 存储索引，用于定位目标种子
+		 * @param p 目标路径字符串，可以是绝对路径或相对路径
+		 * @param flags 移动标志位，控制具体操作行为：
+		 *              - move_flags_t::overwrite_existing 覆盖已存在文件
+		 *              - move_flags_t::fail_if_exist 目标存在时失败
+		 *              - move_flags_t::dont_replace 保留原文件（默认）
+		 * @param handler 操作结果回调函数，包含三个参数：
+		 *                - status_t 操作状态码
+		 *                - std::string 最终生效的存储路径（可能与输入不同）
+		 *                - storage_error 错误详细信息
+		 * 
+		 * @warning 重要限制：
+		 * - 移动过程中会暂停该种子的所有I/O操作
+		 * - 对多文件种子（即包含文件夹的种子）必须确保目标路径存在
+		 * - Windows系统下可能需要管理员权限才能跨磁盘移动
+		 */
 		void async_move_storage(storage_index_t const storage, std::string p
 			, move_flags_t const flags
 			, std::function<void(status_t, std::string const&, storage_error const&)> handler) override
 		{
+			// 获取对应的存储对象
 			posix_storage* st = m_torrents[storage].get();
+
+			// 准备错误收集器和状态码
 			storage_error ec;
 			status_t ret;
+
+			// 执行实际的存储移动操作
+    		// 注意：返回的路径 p 可能被调整（如添加了数字后缀解决冲突）
 			std::tie(ret, p) = st->move_storage(p, flags, ec);
+
+			// 通过 io_context 异步返回结果
 			post(m_ios, [=, h = std::move(handler)]{ h(ret, p, ec); });
 		}
 
+		/**
+		 * @brief 异步释放指定种子的文件句柄和资源
+		 * 
+		 * 该函数用于主动释放种子关联的文件系统资源，通常在以下场景调用：
+		 * - 种子暂停下载时减少资源占用
+		 * - 客户端退出前清理资源
+		 * - 做种时遇到磁盘错误需要重置状态
+		 * 
+		 * @param storage 存储索引，标识目标种子
+		 * @param handler 操作完成后的回调函数（可为空）
+		 * 
+		 * @note 资源释放行为：
+		 * - 关闭所有打开的文件描述符
+		 * - 清空内存缓存（如有）
+		 * - 保持文件内容完整性（不会删除文件）
+		 */
 		void async_release_files(storage_index_t storage, std::function<void()> handler) override
 		{
 			posix_storage* st = m_torrents[storage].get();
+
+			// 同步执行文件资源释放， 立即关闭文件句柄和清理缓存
 			st->release_files();
+			
 			if (!handler) return;
 			post(m_ios, [=]{ handler(); });
 		}
