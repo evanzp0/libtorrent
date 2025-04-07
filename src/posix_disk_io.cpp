@@ -239,17 +239,38 @@ namespace {
 			return false;
 		}
 
-		void async_hash(storage_index_t storage, piece_index_t const piece
-			, span<sha256_hash> block_hashes, disk_job_flags_t flags
-			, std::function<void(piece_index_t, sha1_hash const&, storage_error const&)> handler) override
+		/**
+		 * @brief 计算指定 piece 的哈希值（支持同时计算 v1 和 v2），在创建 .torrent 文件时会使用。
+		 * 
+		 * @param storage 存储索引，标识目标torrent存储
+		 * @param piece 需要校验的piece索引
+		 * @param block_hashes [v2专用] 输出参数，存储每个16KB块的SHA-256哈希
+		 * @param flags 控制标志，指定是否计算v1/v2哈希
+		 * @param handler 完成回调，返回piece索引、v1哈希和错误信息
+		 */
+		void async_hash(
+			storage_index_t storage,           
+			piece_index_t const piece,         
+			span<sha256_hash> block_hashes,    
+			disk_job_flags_t flags,
+			std::function<void(
+				piece_index_t, 			// 原 piece 索引
+				sha1_hash const&,		// v1 哈希结果
+				storage_error const&	// 错误信息
+			)> handler
+		) override
 		{
+			// 记录开始时间用于性能统计
 			time_point const start_time = clock_type::now();
 
+			// 解析标志位决定校验模式
 			bool const v1 = bool(flags & disk_interface::v1_hash);
 			bool const v2 = !block_hashes.empty();
 
+			// 分配临时缓冲区（默认16KB块大小）
 			disk_buffer_holder buffer = disk_buffer_holder(m_buffer_pool, m_buffer_pool.allocate_buffer("hash buffer"), default_block_size);
 			storage_error error;
+			// 内存分配失败处理
 			if (!buffer)
 			{
 				error.ec = errors::no_memory;
@@ -257,49 +278,85 @@ namespace {
 				post(m_ios, [=, h = std::move(handler)]{ h(piece, sha1_hash{}, error); });
 				return;
 			}
+
+			// v1 SHA-1哈希计算器
 			hasher ph;
 
 			posix_storage* st = m_torrents[storage].get();
 
-			int const piece_size = v1 ? st->files().piece_size(piece) : 0;
-			int const piece_size2 = v2 ? st->files().piece_size2(piece) : 0;
-			int const blocks_in_piece = v1 ? (piece_size + default_block_size - 1) / default_block_size : 0;
-			int const blocks_in_piece2 = v2 ? st->files().blocks_in_piece2(piece) : 0;
+			// 获取piece尺寸信息
+			int const piece_size = v1 ? st->files().piece_size(piece) : 0;		// v1 piece大小
+			int const piece_size2 = v2 ? st->files().piece_size2(piece) : 0;	// v2 piece大小
+			int const blocks_in_piece = v1 ? (piece_size + default_block_size - 1) / default_block_size : 0; // v1块数，向上取整
+			int const blocks_in_piece2 = v2 ? st->files().blocks_in_piece2(piece) : 0;	// v2块数
 
 			TORRENT_ASSERT(!v2 || int(block_hashes.size()) >= blocks_in_piece2);
+
+			// 分块读取和哈希计算 ---------
 
 			int offset = 0;
 			int const blocks_to_read = std::max(blocks_in_piece, blocks_in_piece2);
 			for (int i = 0; i < blocks_to_read; ++i)
 			{
-				bool const v2_block = i < blocks_in_piece2;
+				// 当前块是否需要v2计算
+				bool const v2_block = i < blocks_in_piece2; 
 
+				// 计算当前块的有效长度
+				// - 正常情况（当前块不是最后一个块），piece_size - offset >= default_block_size，所以 len = default_block_size（16KB）。
+				// - 最后一个块（剩余数据不足 16KB），比如 piece_size = 260KB，offset = 256KB，剩余 260 - 256 = 4KB。此时 len = std::min(16KB, 4KB) = 4KB，避免读取越界。
 				auto const len = v1 ? std::min(default_block_size, piece_size - offset) : 0;
 				auto const len2 = v2_block ? std::min(default_block_size, piece_size2 - offset) : 0;
 
-				span<char> const b = {buffer.data(), std::max(len, len2)};
+				// span<char> b 是对 buffer 的一个切片，它并不重新分配内存，而是限制当前操作的读写范围。
+				// 如果当前块是 最后一个块，len 或 len2 可能小于 default_block_size（比如只剩 4KB 数据）。
+				span<char> const b = {
+					buffer.data(), 
+					std::max(len, len2) // 确保缓冲区足够大，能同时满足 v1 和 v2 的计算需求。
+				};
+
+				// 从存储读取数据块
 				int const ret = st->read(m_settings, b, piece, offset, error);
 				offset += default_block_size;
+
+				// 读取失败或EOF
 				if (ret <= 0) break;
+
+				// v1哈希更新（累积计算）
 				if (v1)
-					ph.update(b.first(std::min(ret, len)));
+					ph.update(b.first(std::min(ret, len))); // 正常读取（ret == len），读取失败或 EOF（ret < len）
+
+				// v2块哈希计算（独立计算每个块）
 				if (v2_block)
 					block_hashes[i] = hasher256(b.first(std::min(ret, len2))).final();
 			}
 
+			// 最终化v1哈希
 			sha1_hash const hash = v1 ? ph.final() : sha1_hash();
 
+			// 更新统计计数器（成功时）
 			if (!error.ec)
 			{
+				// 计算本次哈希操作的耗时（微秒）
 				std::int64_t const read_time = total_microseconds(clock_type::now() - start_time);
 
+				// 1. 记录回读块数量（用于统计缓存命中率等）
+				// 在BitTorrent客户端中，"回读"（read-back）指的是 从磁盘重新读取已下载但未被缓存的数据块。这种情况通常发生在：
+				// - 缓存失效：之前下载的数据块已被移出内存缓存
+				// - 哈希校验：需要重新读取数据块以验证完整性
+				// - 做种上传：为其他peer提供数据时需要从磁盘读取
+				// 结合num_blocks_read可计算缓存命中率：缓存命中率 = 1 - (num_read_back / num_blocks_read)
 				m_stats_counters.inc_stats_counter(counters::num_read_back, blocks_to_read);
+				// 2. 记录实际读取的块数量（用于I/O吞吐量统计）
 				m_stats_counters.inc_stats_counter(counters::num_blocks_read, blocks_to_read);
+				// 3. 记录读操作次数（用于磁盘负载评估）
 				m_stats_counters.inc_stats_counter(counters::num_read_ops, blocks_to_read);
+				// 4. 记录哈希计算耗时（用于性能分析）
 				m_stats_counters.inc_stats_counter(counters::disk_hash_time, read_time);
+				// 5. 记录总任务耗时（用于整体性能监控）
 				m_stats_counters.inc_stats_counter(counters::disk_job_time, read_time);
 			}
 
+			// 异步返回结果
 			post(m_ios, [=, h = std::move(handler)]{ h(piece, hash, error); });
 		}
 

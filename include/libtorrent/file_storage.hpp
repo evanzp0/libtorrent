@@ -218,7 +218,8 @@ namespace aux {
 	// The ``file_storage`` class represents a file list and the piece
 	// size. Everything necessary to interpret a regular bittorrent storage
 	// file structure.
-	// file_storage 类用于表示一个文件列表以及片段大小。它包含了解析常规 BitTorrent 存储文件结构所需的所有信息。
+	// file_storage 类用于表示一个文件列表以及片段大小。
+	// 它包含了解析常规 BitTorrent 存储文件结构所需的所有信息。
 	class TORRENT_EXPORT file_storage
 	{
 	public:

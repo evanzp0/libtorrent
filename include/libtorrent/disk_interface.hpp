@@ -334,8 +334,8 @@ namespace file_open_mode {
 		// enough to hold all v2 blocks in the piece, and this function will
 		// fill in the span with the SHA-256 block hashes of the piece.
 		// v2 范围（span）是可选的，可以为空，这意味着不应计算 v2 哈希值。
-		// 如果 v2 不为空，那么它必须有足够的空间来存储该片段中所有 v2 块的 SHA-56 hash 值，
-		// 并且此函数将使用该 piece 的 SHA-256 block hashes 填充该范围。
+		// 如果 v2 不为空，那么它必须有足够的空间来存储该片段中所有 v2 块的 SHA-256 hash 值，
+		// 并且此函数将使用该 piece 的 SHA-256 block hashes 填充该范围（v2 span）。
 		virtual void async_hash(storage_index_t storage, piece_index_t piece, span<sha256_hash> v2
 			, disk_job_flags_t flags
 			, std::function<void(piece_index_t, sha1_hash const&, storage_error const&)> handler) = 0;
