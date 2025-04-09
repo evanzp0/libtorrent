@@ -625,21 +625,33 @@ namespace aux {
 		// The ``mtime()`` is the modification time is the posix
 		// time when a file was last modified when the torrent
 		// was created, or 0 if it was not included in the torrent file.
+		// mtime()函数：torrent 中某个文件的最后修改时间。
+		// 这里的 “最后修改时间” 指的是在创建种子文件的那个时刻，该文件最后一次被修改的时间点。
+		// 如果 torrent 中未包含该修改时间信息，则返回 0。
 		//
 		// ``file_path()`` returns the full path to a file.
+		// file_path() 函数返回文件的完整路径。
 		//
 		// ``file_size()`` returns the size of a file.
+		// file_size() 函数返回文件的大小。
 		//
 		// ``pad_file_at()`` returns true if the file at the given
 		// index is a pad-file.
+		// pad_file_at() 函数用于判断给定索引位置的文件是否为填充文件，如果是则返回 true。
 		//
-		// ``file_name()`` returns *just* the name of the file, whereas
+		// ``file_name()`` returns *just* the name of the file.
+		// file_name() 函数仅返回文件名。
+		//
 		// ``file_path()`` returns the path (inside the torrent file) with
 		// the filename appended.
+		// file_path() 函数返回的是（torrent内的）路径加上 filename。
 		//
 		// ``file_offset()`` returns the byte offset within the torrent file
 		// where this file starts. It can be used to map the file to a piece
 		// index (given the piece size).
+		// file_offset() 函数返回文件在 torrent 内的字节偏移量，
+		// 也就是该文件在 torrent 中起始的字节位置。
+		// 结合已知的 piece 大小，这个偏移量可用于将文件映射到具体的 piece 索引。
 		sha1_hash hash(file_index_t index) const;
 		sha256_hash root(file_index_t index) const;
 		char const* root_ptr(file_index_t const index) const;
