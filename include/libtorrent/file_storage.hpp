@@ -135,15 +135,16 @@ namespace aux {
 		void set_name(string_view n, bool borrow_string = false);
 		string_view filename() const;
 
-		// 这个枚举中：
-		// - name_is_owned 用于 name_len 的特殊值，表示 name 的字符串是 file_entry 自己管理的（'\0' 结尾），不是引用外部的字符串。
-		// - not_a_symlink 用于 symlink_index 的特殊值，表示该文件不是符号链接。
 		enum {
+			// 用于 name_len 的特殊值，表示 name 的字符串是 file_entry 自己管理的。
 			name_is_owned = (1 << 12) - 1,
+			// 用于 symlink_index 的特殊值，表示该文件不是符号链接。
 			not_a_symlink = (1 << 15) - 1,
 		};
 
+		// 常量，表示 name 中只有文件名，没有路径。
 		static constexpr aux::path_index_t no_path{(1 << 30) - 1};
+		// 常量，表示 name 是绝对路径。
 		static constexpr aux::path_index_t path_is_absolute{(1 << 30) - 2};
 
 		// the offset of this file inside the torrent
@@ -154,7 +155,8 @@ namespace aux {
 		// if this is not a symlink
 		// 取值为两种：
 		// - not_a_symlink，表示当前对象代表的文件是普通文件，不是 symlink 。
-		// - file_storage::m_symlinks 中的索引值，表示当前文件是一个 symlink，对应的符号连接在 m_symlinks[symlink_index] 中。
+		// - file_storage::m_symlinks 中的索引值，表示当前文件是一个 symlink，
+		//   对应的符号连接在 m_symlinks[symlink_index] 中。
 		//   m_symlinks 是一个字符串数组，保存每个符号链接的目标路径（如 "../target_file"）。
 		std::uint64_t symlink_index:15;
 
