@@ -187,7 +187,7 @@ namespace aux {
 	private:
 		// This string is not necessarily 0-terminated!
 		// that's why it's private, to keep people away from it
-		// 如果不为空，则为文件名（不含目录名）
+		// 如果不为空（\0），则为文件名（不含目录名）
 		char const* name = nullptr;
 
 	public:
@@ -205,34 +205,41 @@ namespace aux {
 		// path_is_absolute means the filename
 		// in this field contains the full, absolute path
 		// to the file
-		// 它是 file_storage::m_paths 数组的索引。
-		// 要获取此文件的完整路径，需将该数组中的路径与本结构体中的 name 字段拼接起来。
-		// path_index 的取值含义如下：
-		//- no_path 表示没有路径（即单文件种子文件的情况）。
-		//- path_is_absolute 表示此字段中的文件名包含了该文件完整的绝对路径。
-		// 
-		// 路径与文件名分离存储（path_index + name）
+		// 取值如下：
+		// - no_path，表示只有文件名，没有路径部分，通常出现在 单文件种子 中。此时文件名直接存储在 name 字段，无需拼接路径。
+		// - path_is_absolute，表示 name 字段直接存储 完整绝对路径，无需拼接 m_paths 中的路径。
+		// - file_storage::m_paths 数组的索引，表示文件的目录部分。需与 name（文件名部分）拼接生成完整路径。
 		aux::path_index_t path_index = file_entry::no_path;
 	};
 
 } // aux namespace
 
 	// represents a window of a file in a torrent.
+	// 表示种子文件中某个文件的一个数据窗口。
 	//
 	// The ``file_index`` refers to the index of the file (in the torrent_info).
 	// To get the path and filename, use ``file_path()`` and give the ``file_index``
 	// as argument. The ``offset`` is the byte offset in the file where the range
 	// starts, and ``size`` is the number of bytes this range is. The size + offset
 	// will never be greater than the file size.
+	// 其中：
+	// - file_index，是当前文件在 torrent_info 中的索引。若要获取文件的路径和文件名，
+	//   可调用 file_path() 函数并将 file_index 作为参数传入。
+	// - offset，是该窗口范围在文件中起始位置的字节偏移量。
+	// - size，是该窗口范围包含的字节数。
+	// 注意：size 与 offset 之和绝不会大于文件的大小。
 	struct TORRENT_EXPORT file_slice
 	{
 		// the index of the file
+		// 当前文件在 torrent_info 中的索引
 		file_index_t file_index;
 
 		// the offset from the start of the file, in bytes
+		// 该窗口范围在文件中起始位置的字节偏移量
 		std::int64_t offset;
 
 		// the size of the window, in bytes
+		// 该窗口范围包含的字节数
 		std::int64_t size;
 	};
 
