@@ -596,14 +596,19 @@ namespace aux {
 
 		// arrange files and padding to match the canonical form required
 		// by BEP 52
+		// 对文件和填充数据进行整理，使其符合 BEP 52 所规定的规范形式。
 		void canonicalize();
 
 		// These functions are used to query attributes of files at
 		// a given index.
+		// 这些函数用于查询指定索引的文件的属性。
 		//
 		// The ``hash()`` is a SHA-1 hash of the file, or 0 if none was
 		// provided in the torrent file. This can potentially be used to
 		// join a bittorrent network with other file sharing networks.
+		// hash() 函数：返回文件的 SHA-1 哈希值。
+		// 如果 torrent 中没有提供该文件的 SHA-1 哈希值，就返回 0。
+		// 这个哈希值有可能被用来将 BitTorrent 网络与其他文件共享网络连接起来。
 		//
 		// ``root()`` returns the SHA-256 merkle tree root of the specified file,
 		// in case this is a v2 torrent. Otherwise returns zeros.
@@ -611,6 +616,11 @@ namespace aux {
 		// for the specified file. The pointer points into storage referred to
 		// when the file was added, it is not owned by this object. Torrents
 		// that are not v2 torrents return nullptr.
+		// root() 函数：如果这是一个 v2 版本的种子文件，
+		// 返回指定文件的 SHA-256 默克尔树的根哈希值；否则返回全零值。
+		// merkle tree 常用于验证指定文件内容的完整性。
+		// 该指针指向添加文件时所引用的存储区域，它并不为该对象所拥有。
+		// 对于非 v2 版本的种子文件，将返回空指针（nullptr）。
 		//
 		// The ``mtime()`` is the modification time is the posix
 		// time when a file was last modified when the torrent
