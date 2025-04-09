@@ -108,8 +108,12 @@ namespace aux {
 		bool use_partfile(file_index_t index) const;
 		void use_partfile(file_index_t index, bool b);
 
+		// 文件存储对象
 		file_storage const& m_files;
+
+		// 映射的文件存储对象（可选）
 		std::unique_ptr<file_storage> m_mapped_files;
+
 		std::string m_save_path;
 		stat_cache m_stat_cache;
 

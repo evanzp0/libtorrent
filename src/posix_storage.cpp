@@ -59,16 +59,21 @@ namespace libtorrent {
 namespace aux {
 
 	posix_storage::posix_storage(storage_params const& p)
-		: m_files(p.files)
-		, m_save_path(p.path)
-		, m_file_priority(p.priorities)
-		, m_part_file_name("." + to_hex(p.info_hash) + ".parts")
+		: m_files(p.files)				// 文件存储对象
+		, m_save_path(p.path)			// 保存路径
+		, m_file_priority(p.priorities)	// 文件优先级
+		, m_part_file_name("." + to_hex(p.info_hash) + ".parts") // 部分文件名（用于未完成的下载）
 	{
+		// 如果传入的存储参数 p 中包含 mapped_files（映射文件存储对象），
+		// 则创建一个新的 file_storage 对象，并用 p.mapped_files 的内容初始化它
 		if (p.mapped_files) m_mapped_files.reset(new file_storage(*p.mapped_files));
 	}
 
 	file_storage const& posix_storage::files() const { return m_mapped_files ? *m_mapped_files.get() : m_files; }
 
+	/**
+	 * 析构函数，确 part_file 的元数据被刷新
+	 */
 	posix_storage::~posix_storage()
 	{
 		error_code ec;

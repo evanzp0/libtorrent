@@ -135,6 +135,9 @@ namespace aux {
 		void set_name(string_view n, bool borrow_string = false);
 		string_view filename() const;
 
+		// 这个枚举中：
+		// - name_is_owned 用于 name_len 的特殊值，表示 name 的字符串是 file_entry 自己管理的（'\0' 结尾），不是引用外部的字符串。
+		// - not_a_symlink 用于 symlink_index 的特殊值，表示该文件不是符号链接。
 		enum {
 			name_is_owned = (1 << 12) - 1,
 			not_a_symlink = (1 << 15) - 1,
@@ -144,17 +147,24 @@ namespace aux {
 		static constexpr aux::path_index_t path_is_absolute{(1 << 30) - 2};
 
 		// the offset of this file inside the torrent
+		// 文件在种子内的逻辑偏移量（48位）
 		std::uint64_t offset:48;
 
 		// index into file_storage::m_symlinks or not_a_symlink
 		// if this is not a symlink
+		// 取值为两种：
+		// - not_a_symlink，表示当前对象代表的文件是普通文件，不是 symlink 。
+		// - file_storage::m_symlinks 中的索引值，表示当前文件是一个 symlink，对应的符号连接在 m_symlinks[symlink_index] 中。
+		//   m_symlinks 是一个字符串数组，保存每个符号链接的目标路径（如 "../target_file"）。
 		std::uint64_t symlink_index:15;
 
 		// if this is true, don't include m_name as part of the
 		// path to this file
+		// 是否忽略根目录（用于路径拼接）
 		std::uint64_t no_root_dir:1;
 
 		// the size of this file
+		 // 文件大小（48位，最大支持256TB）
 		std::uint64_t size:48;
 
 		// the number of characters in the name. If this is
@@ -162,11 +172,16 @@ namespace aux {
 		// (i.e. it should be freed in the destructor). If
 		// the len is not name_is_owned, the name pointer does not belong
 		// to this object, and it's not 0-terminated
+		// 取值为两种：
+		// - name 实际的长度，name_len 的值不是 name_is_owned 时，name 指针所指向的字符串不属于当前对象。
+		// - name_is_owned，表示 name 是一个当前对象管理的，以空字符（\0）结尾的字符串。
 		std::uint64_t name_len:12;
-		std::uint64_t pad_file:1;
-		std::uint64_t hidden_attribute:1;
-		std::uint64_t executable_attribute:1;
-		std::uint64_t symlink_attribute:1;
+
+		// 文件属性标志位
+		std::uint64_t pad_file:1;				// 是否为填充文件（全零占位）
+		std::uint64_t hidden_attribute:1;		// 隐藏属性（Windows）
+		std::uint64_t executable_attribute:1;	// 可执行属性（UNIX）
+		std::uint64_t symlink_attribute:1;		// 是否为符号链接
 
 		// make it available for logging
 	private:
@@ -174,9 +189,11 @@ namespace aux {
 		// that's why it's private, to keep people away from it
 		// 如果不为空，则为文件名（不含目录名）
 		char const* name = nullptr;
+
 	public:
 		// the SHA-256 root of the merkle tree for this file
 		// this is a pointer into the .torrent file
+		// v2 种子中文件的 Merkle 树根哈希指针
 		char const* root = nullptr;
 
 		// the index into file_storage::m_paths. To get
@@ -188,6 +205,13 @@ namespace aux {
 		// path_is_absolute means the filename
 		// in this field contains the full, absolute path
 		// to the file
+		// 它是 file_storage::m_paths 数组的索引。
+		// 要获取此文件的完整路径，需将该数组中的路径与本结构体中的 name 字段拼接起来。
+		// path_index 的取值含义如下：
+		//- no_path 表示没有路径（即单文件种子文件的情况）。
+		//- path_is_absolute 表示此字段中的文件名包含了该文件完整的绝对路径。
+		// 
+		// 路径与文件名分离存储（path_index + name）
 		aux::path_index_t path_index = file_entry::no_path;
 	};
 

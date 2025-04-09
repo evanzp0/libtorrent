@@ -54,28 +54,36 @@ namespace libtorrent {
 		// All pieces will be written to their final position, all files will be
 		// allocated in full when the torrent is first started. This mode minimizes
 		// fragmentation but could be a costly operation.
+		// 预分配完整文件空间（减少碎片，但初始化慢）
 		storage_mode_allocate,
 
 		// All pieces will be written to the place where they belong and sparse files
 		// will be used. This is the recommended, and default mode.
+		// 使用稀疏文件（按需分配空间，默认模式）
 		storage_mode_sparse
 	};
 
 	// return values from check_fastresume, and move_storage
 	enum class status_t : std::uint8_t
 	{
+		// 无错误
 		no_error,
+		// 致命磁盘错误
 		fatal_disk_error,
+		// 需要完整检查（如文件校验）
 		need_full_check,
+		// 文件已存在	
 		file_exist,
 
 		// hidden
+		// 掩码（用于隔离基础状态）
 		mask = 0xf,
 
 		// this is not an enum value, but a flag that can be set in the return
 		// from async_check_files, in case an existing file was found larger than
 		// specified in the torrent. i.e. it has garbage at the end
 		// the status_t field is used for this to preserve ABI.
+		// 文件大小超出预期（附加标志）
 		oversized_file = 0x10,
 	};
 
@@ -98,6 +106,7 @@ namespace libtorrent {
 	{
 		// replace any files in the destination when copying
 		// or moving the storage
+		// 始终覆盖目标文件
 		always_replace_files,
 
 		// if any files that we want to copy exist in the destination
@@ -107,18 +116,22 @@ namespace libtorrent {
 		// the operation starts. In between the check and performing
 		// the copy, the destination files may be created, in which
 		// case they are replaced.
+		// 目标文件存在则失败（存在竞态条件）
 		fail_if_exist,
 
 		// if any file exist in the target, take those files instead
 		// of the ones we may have in the source.
+		// 保留目标文件（不覆盖）
 		dont_replace,
 
 		// don't move any source files, just forget about them
 		// and begin checking files at new save path
+		// 仅重置保存路径（不移动文件，需重新检查）
 		reset_save_path,
 
 		// don't move any source files, just change save path
 		// and continue working without any checks
+		// 仅重置路径（不检查文件）
 		reset_save_path_unchecked
 	};
 
@@ -136,17 +149,21 @@ namespace libtorrent {
 	// disk_interface
 	struct TORRENT_EXPORT storage_params
 	{
-		storage_params(file_storage const& f, file_storage const* mf
-			, std::string const& sp, storage_mode_t const sm
-			, aux::vector<download_priority_t, file_index_t> const& prio
-			, sha1_hash const& ih)
-			: files(f)
-			, mapped_files(mf)
-			, path(sp)
-			, mode(sm)
-			, priorities(prio)
-			, info_hash(ih)
+		storage_params(
+			file_storage const& f, 
+			file_storage const* mf, 
+			std::string const& sp, 
+			storage_mode_t const sm, 
+			aux::vector<download_priority_t, file_index_t> const& prio, 
+			sha1_hash const& ih
+		) : files(f), 
+			mapped_files(mf), 
+			path(sp), 
+			mode(sm), 
+			priorities(prio), 
+			info_hash(ih)
 		{}
+		
 		file_storage const& files;
 		file_storage const* mapped_files = nullptr; // optional
 		std::string const& path;
