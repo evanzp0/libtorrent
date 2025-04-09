@@ -669,15 +669,26 @@ namespace aux {
 		// such alignment.
 		// These numbers are used to size and navigate the merkle hash tree for
 		// each file.
+		// 返回位于 index 处的文件所跨越的 pieces 的数量，前提是假设该文件与一个 pieces 的起始位置对齐。
+		// 这仅对 v2 版本的 torrent 有意义，因为在 v2 torrent中，文件能够保证有这样的对齐方式。
 		int file_num_pieces(file_index_t index) const;
+
+		// 返回位于 index 处的文件所跨越的 block 的数量，前提是假设该文件与一个 pieces 的起始位置对齐。
+		// 这仅对 v2 版本的 torrent 有意义，因为在 v2 torrent中，文件能够保证有这样的对齐方式。
 		int file_num_blocks(file_index_t index) const;
+		
 		index_range<piece_index_t::diff_type> file_piece_range(file_index_t) const;
 
 		// index of first piece node in the merkle tree
+		// 用于返回指定 index 的文件在默克尔树中对应第一个 piece 节点的索引。
 		int file_first_piece_node(file_index_t index) const;
+
+		// 返回指定 index 的文件在默克尔树中对应第一个 block 节点的索引。
 		int file_first_block_node(file_index_t index) const;
 
 		// returns the crc32 hash of file_path(index)
+		// 返回 file_path(index) 所指向文件的 CRC32 哈希值。
+		// - save_path：外部指定的存储根路径（会与文件路径拼接）
 		std::uint32_t file_path_hash(file_index_t index, std::string const& save_path) const;
 
 		// this will add the CRC32 hash of all directory entries to the table. No
@@ -686,22 +697,32 @@ namespace aux {
 		// levels. i.e. if one path in the torrent is ``foo/bar/baz``, the CRC32
 		// hashes for ``foo``, ``foo/bar`` and ``foo/bar/baz`` will be added to
 		// the set.
+		// 此函数会将所有目录项的 CRC32 哈希值添加到指定的表中。
+		// 这里不包含文件名，仅处理目录。
+		// 每个层级的目录都会单独添加，以便在各个层级上测试与文件的哈希冲突情况。
+		// 也就是说，如果种子文件中的某条路径为 foo/bar/baz，
+		// 那么 foo、foo/bar 和 foo/bar/baz 的 CRC32 哈希值都会被添加到集合中。
 		void all_path_hashes(std::unordered_set<std::uint32_t>& table) const;
 
 		// the file is a pad file. It's required to contain zeros
 		// at it will not be saved to disk. Its purpose is to make
 		// the following file start on a piece boundary.
+		// 常量，代表该文件是一个 pad file。它必须全由零填充，并且不会被保存到磁盘上。
+		// 它的作用是使后续文件从一个 piece 的边界开始。
 		static constexpr file_flags_t flag_pad_file = 0_bit;
 
 		// this file has the hidden attribute set. This is primarily
 		// a windows attribute
+		// 该标志表示文件被设置了隐藏属性。
 		static constexpr file_flags_t flag_hidden = 1_bit;
 
 		// this file has the executable attribute set.
+		// 该标志表示文件被设置为可执行属性。
 		static constexpr file_flags_t flag_executable = 2_bit;
 
 		// this file is a symbolic link. It should have a link
 		// target string associated with it.
+		// 该标志表示文件是一个符号链接（Symbolic Link）。
 		static constexpr file_flags_t flag_symlink = 3_bit;
 
 		// internal
@@ -711,26 +732,45 @@ namespace aux {
 		// all files.
 		//
 		// 返回 torrent 中所有文件的父目录路径。 这些是扁平的，不是树结构。
+		// 假设：
+		// torrent_name/
+		// ├─ doc/
+		// │  └─ ad/
+		// │      └─ guide.md
+		// └─ src/
+		//    └─ main.cpp
+		// paths() 返回： {"doc/ad", "src"}
 		aux::vector<std::string, aux::path_index_t> const& paths() const { return m_paths; }
 
 		// returns a bitmask of flags from file_flags_t that apply
 		// to file at ``index``.
+		// 返回指定 index 的文件所具有的 bitmask，这些 bitmask 来自 file_flags_t 类型。
 		file_flags_t file_flags(file_index_t index) const;
 
 		// returns true if the file at the specified index has been renamed to
 		// have an absolute path, i.e. is not anchored in the save path of the
 		// torrent.
+		// 如果指定 index 的文件是否已被重命名为绝对路径，则返回 true。
+		// 如果文件的路径仍然是基于种子文件的保存路径，即相对路径，那么函数返回 false。
 		bool file_absolute_path(file_index_t index) const;
 
 		// returns the index of the file at the given offset in the torrent
+		// 根据 torrent 内的 offset，返回对应文件的索引。
+		// 在调用 file_index_at_offset 函数时，offset 并不一定必须是文件数据的起始位置。
+		// 这个函数的目的是找出包含指定偏移量的文件。
 		file_index_t file_index_at_offset(std::int64_t offset) const;
+
+		// 根据 piece index，返回包含该片段的文件的索引。
 		file_index_t file_index_at_piece(piece_index_t piece) const;
 
 		// finds the file with the given root hash and returns its index
 		// if there is no file with the root hash, file_index_t{-1} is returned
+		// 在 torrent 中查找指定 SHA-256 默克尔树的 root_hash 的文件，并返回该文件的索引。
+		// 如果在 torrent 里没有文件的 root_hash 与传入的 root_hash 匹配，就会返回 file_index_t{-1}。
 		file_index_t file_index_for_root(sha256_hash const& root_hash) const;
 
 		// returns the piece index the given file starts at
+		// 返回指定索引的文件在 torrent 中起始的 piece 索引。
 		piece_index_t piece_index_at_file(file_index_t f) const;
 
 #if TORRENT_USE_INVARIANT_CHECKS
@@ -775,43 +815,63 @@ namespace aux {
 		// validate any symlinks, to ensure they all point to
 		// other files or directories inside this storage. Any invalid symlinks
 		// are updated to point to themselves.
+		// 用于验证种子文件中的所有符号链接（symlinks）。
+		// 确保所有符号链接都指向当前存储（如种子文件所关联的文件系统区域）内的其他文件或目录。
+		// 如果存在无效的符号链接（即指向存储之外的目标），会将这些无效的符号链接更新为指向它们自身。
 		void sanitize_symlinks();
 
 		// returns true if this torrent contains v2 metadata.
+		// 检查当前种子文件是否包含 v2 版本的元数据。
 		bool v2() const { return m_v2; }
 
 		// internal
 		// this is an optimization for create_torrent
+		// 一个内部使用的函数，用于 create_torrent 操作的优化。
+		// 它接受一个文件索引 index 作为参数，返回指定索引文件对应的符号链接的目标路径（以常量引用的形式）。
+		// 在创建 torrent 的过程中，可能需要频繁访问符号链接的目标路径，使用该函数可以提高性能。
 		std::string const& internal_symlink(file_index_t index) const;
 
 		// internal
+		// 一个内部使用的函数，用于移除种子文件末尾的填充数据。
 		void remove_tail_padding();
 
 		// internal
+		// 一个内部使用的函数，用于对种子文件进行规范化处理。
 		void canonicalize_impl(bool backwards_compatible);
 
 	private:
 
+		// 获取指定文件的内部路径表示（不包含存储根路径 save_path），
+		// 拼接 m_name + m_paths[path_index] + filename。
 		std::string internal_file_path(file_index_t index) const;
+
+		// 返回最后一个有效文件的索引（num_files() - 1）
 		file_index_t last_file() const noexcept;
 
+		// 路径缓存系统，存在则返回现有索引，不存在则添加新路径。
 		aux::path_index_t get_or_add_path(string_view path);
 
 		// the number of bytes in a regular piece
 		// (i.e. not the potentially truncated last piece)
+		// 标准 piece 大小（字节），必须 ≥16KiB 且为2的幂
 		int m_piece_length = 0;
 
 		// the number of pieces in the torrent
+		// 总 piece 数
 		int m_num_pieces = 0;
 
-		// whether this is a v2 torrent or not. Additional requirements apply to
-		// v2 torrents
+		// whether this is a v2 torrent or not. Additional requirements apply to v2 torrents
+		// 标记是否为 v2 种子。
+		// - true：强制文件对齐 piece 边界，需要填充文件。
+		// - false：传统 v1 模式
 		bool m_v2 = false;
 
-		void update_path_index(aux::file_entry& e, std::string const& path
-			, bool set_name = true);
+		// 更新文件条目的路径索引（处理路径变更或初始化），在 add_file() 时处理用户输入的路径。
+		// set_name=true：自动提取 path 中的文件名更新到 file_entry.name。
+		void update_path_index(aux::file_entry& e, std::string const& path, bool set_name = true);
 
 		// the list of files that this torrent consists of
+		// 存储了当前 torrent 所包含的所有文件（file_entry 类型）的列表（以 file_index_t 类型为索引）。
 		aux::vector<aux::file_entry, file_index_t> m_files;
 
 		// if there are sha1 hashes for each individual file there are as many
@@ -819,21 +879,33 @@ namespace aux {
 		// a corresponding hash pointer in this array. The reason to split it up
 		// in separate arrays is to save memory in case the torrent doesn't have
 		// file hashes
+		// 如果每个单独的文件都有对应的 SHA-1 哈希值，那么这个数组中的元素数量将与 m_files 数组中的元素数量相同。
+		// m_files 数组中的每个条目在这个数组中都有一个对应的哈希指针。
+		// 将它们拆分为单独的数组的原因是，在 torrent 不包含文件哈希值的情况下节省内存。
+		//
 		// the pointers in this vector are pointing into the .torrent file in
 		// memory which is _not_ owned by this file_storage object. It's simply
 		// a non-owning pointer. It is the user's responsibility that the hash
 		// stays valid throughout the lifetime of this file_storage object.
+		// 这个向量中的指针指向内存中的 .torrent 文件，而该内存并非由这个 file_storage 对象所拥有。
+		// 这仅是一个非拥有型指针。
+		// 用户有责任确保在这个 file_storage 对象的整个生命周期内，哈希值保持有效。
 		aux::vector<char const*, file_index_t> m_file_hashes;
 
 		// for files that are symlinks, the symlink
 		// path_index in the aux::file_entry indexes
 		// this vector of strings
+		// 对于那些为符号链接的文件，aux::file_entry 结构体中的 path_index 会被用于索引 m_symlinks 这个字符串向量。
+		// 也就是说，m_symlinks 向量存储了所有符号链接文件所指向的目标路径，
+		// 而 aux::file_entry 中的 path_index 可以帮助我们从 m_symlinks 中找到对应符号链接文件的目标路径。
 		std::vector<std::string> m_symlinks;
 
 		// the modification times of each file. This vector
 		// is empty if no file have a modification time.
 		// each element corresponds to the file with the same
 		// index in m_files
+		// 该向量存储了每个文件的修改时间。若没有文件有修改时间记录，此向量将为空。
+		// 向量中的每个元素对应 m_files 中相同索引位置的文件。
 		aux::vector<std::time_t, file_index_t> m_mtime;
 
 		// all unique paths files have. The aux::file_entry::path_index
@@ -845,7 +917,7 @@ namespace aux {
 		// torrent 中所有文件使用的去重后的路径列表，注意，m_paths 中得路径的开头和结尾都不会是 "/" 。
 		// aux::file_entry::path_index 指向此数组。
 		// 对于包含多个文件的种子文件，路径中不包括根目录名称和文件名。
-		// 需要在这些路径前加上 m_name 字段，并附上特定 file_entry 的 filename，以形成完整的文件路径。
+		// 通过在这些路径前加上 m_name 字段，并附上特定 file_entry::name，就能得到完整的文件路径。
 		// eg: [("path/to", 0), ("dir/a", 1)]
 		aux::vector<std::string, aux::path_index_t> m_paths;
 
@@ -855,17 +927,22 @@ namespace aux {
 		std::string m_name;
 
 		// the sum of all file sizes
+		// 所有文件的合计
 		std::int64_t m_total_size = 0;
 	};
 
 namespace aux {
 
+	// 用于计算给定 file_storage 对象所代表的种子文件中的 pieces 数量
 	TORRENT_EXTRA_EXPORT
 	int calc_num_pieces(file_storage const& fs);
 
 	// this is used when loading v2 torrents that are backwards compatible with
 	// v1 torrents. Both v1 and v2 structures must describe the same file layout,
 	// this compares the two.
+	// 用于检查两个 file_storage 对象 lhs 和 rhs 所代表的文件布局是否兼容。
+	// 主要应用场景是在加载与 v1 版本向后兼容的 v2 种子文件时，
+	// 需要确保 v1 和 v2 结构所描述的文件布局是一致的，此函数就是用来进行这种比较的。
 	TORRENT_EXTRA_EXPORT
 	bool files_compatible(file_storage const& lhs, file_storage const& rhs);
 
@@ -873,12 +950,16 @@ namespace aux {
 	// end piece is one-past the last piece that entirely falls within the file.
 	// i.e. They can conveniently be used as loop boundaries. No edge partial
 	// pieces will be included.
+	// 返回完全位于指定文件内的 piece range，左闭右开区间 [start, end)。
+	// 其中 end 是最后一个完全落在文件内的 piece 的下一个 piece 的索引。不包含任何与文件边界部分重叠的 piece。
 	TORRENT_EXTRA_EXPORT std::tuple<piece_index_t, piece_index_t>
 	file_piece_range_exclusive(file_storage const& fs, file_index_t file);
 
 	// returns the piece range of pieces that overlaps with the specified file.
 	// the end piece is one-past the last piece. i.e. They can conveniently be
 	// used as loop boundaries.
+	// 函数会返回一个 piece range，这个范围涵盖了所有与指定文件有重叠的 piece，左闭右开区间 [start, end)。
+	// 其中 end 是与文件重叠的最后一个 piece 的下一个 piece 的索引。包含所有与文件有部分或全部重叠的 piece。
 	TORRENT_EXTRA_EXPORT std::tuple<piece_index_t, piece_index_t>
 	file_piece_range_inclusive(file_storage const& fs, file_index_t file);
 
