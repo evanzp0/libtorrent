@@ -506,63 +506,92 @@ namespace aux {
 		int num_files() const noexcept;
 
 		// returns the index of the one-past-end file in the file storage
+		// 返回在 file storage 中的文件索引的"尾后迭代器"（one-past-end）位置。（超出最后一个文件索引的位置）
 		file_index_t end_file() const noexcept;
 
 		// returns an implementation-defined type that can be used as the
 		// container in a range-for loop. Where the values are the indices of all
 		// files in the file_storage.
+		// 一个 range，其核心作用是为 file_storage 中的文件索引提供范围式遍历的支持。
 		index_range<file_index_t> file_range() const noexcept;
 
 		// returns the total number of bytes all the files in this torrent spans
+		// 返回 file_storage 中所有文件总大小
 		std::int64_t total_size() const { return m_total_size; }
 
 		// set and get the number of pieces in the torrent
+		// 设置 torrent 中的 piece 数
 		void set_num_pieces(int n) { m_num_pieces = n; }
+
+		// 获取 torrent 中的 piece 数
 		int num_pieces() const { TORRENT_ASSERT(m_piece_length > 0); return m_num_pieces; }
 
 		// returns the index of the one-past-end piece in the file storage
+		// 返回在 file storage 中的 piece 索引的"尾后迭代器"（one-past-end）位置。
 		piece_index_t end_piece() const
 		{ return piece_index_t(m_num_pieces); }
 
 		// returns the index of the last piece in the torrent. The last piece is
 		// special in that it may be smaller than the other pieces (and the other
 		// pieces are all the same size).
+		// 返回种子文件中最后一个片段的索引。
+		// 最后一个片段比较特殊，因为它的大小可能比其他片段小（而其他片段的大小都是相同的）。
 		piece_index_t last_piece() const
 		{ return piece_index_t(m_num_pieces - 1); }
 
 		// returns an implementation-defined type that can be used as the
 		// container in a range-for loop. Where the values are the indices of all
 		// pieces in the file_storage.
+		// 一个 range，其核心作用是为 file_storage 中的 piece 索引提供范围式遍历的支持。
 		index_range<piece_index_t> piece_range() const noexcept;
 
 		// set and get the size of each piece in this torrent. It must be a power of two
 		// and at least 16 kiB.
+		// 设置此 torrent 中每个片段的大小。
+		// 片段大小必须是 2 的幂次方，且至少为 16 KiB（即 16 * 1024 字节）。
 		void set_piece_length(int l)  { m_piece_length = l; }
+		// 设置此 torrent 中每个片段的大小。
 		int piece_length() const { TORRENT_ASSERT(m_piece_length > 0); return m_piece_length; }
 
 		// returns the piece size of ``index``. This will be the same as piece_length(), except
 		// for the last piece, which may be shorter.
+		// 返回指定 index 对应的 piece 的大小。
 		int piece_size(piece_index_t index) const;
 
 		// Returns the size of the given piece. If the piece spans multiple files,
 		// only the first file is considered part of the piece. This is used for
 		// v2 torrents, where all files are piece aligned and padded. i.e. The pad
 		// files are not considered part of the piece for this purpose.
+		// piece_size2 函数用于返回指定 index 对应的 piece 的大小。
+		// 该函数主要用于处理 v2 版本的 torrents。
+		// 在 v2 torrents中，所有文件都是按片段对齐的，并且可能存在 pad files，
+		// 这些填充文件的作用是确保文件边界与片段边界对齐。
+		// 当一个 piece 跨越多个文件时，此函数仅将第一个文件中，
+		// 属于该片段的部分视为该片段的有效部分，填充文件不被视为该片段的一部分。
 		int piece_size2(piece_index_t index) const;
 
 		// returns the number of blocks in the specified piece, for v2 torrents.
+		// 返回 v2 torrents 中指定 index 的 piece 中的 blocks 数。
 		int blocks_in_piece2(piece_index_t index) const;
 
 		// returns the number of blocks there are in the typical piece. There
 		// may be fewer in the last piece)
+		// 返回在一个常规 piece 中所包含的 block 的数量。
+		// 最后一个 piece 可能由于大小不足，包含的块数量会比常规 piece 少。
 		int blocks_per_piece() const;
 
 		// set and get the name of this torrent. For multi-file torrents, this is also
 		// the name of the root directory all the files are stored in.
+		// 设置 torrent 的名称。
+		// 对于多文件的 torrent 而言，这个名称同时也是所有文件存储的根目录的名称。
 		void set_name(std::string const& n) { m_name = n; }
+
+		// 获取 torrent 的名称。
 		std::string const& name() const { return m_name; }
 
 		// swap all content of *this* with *ti*.
+		// 交换当前 file_storage 对象（即 *this）和另一个 file_storage 对象 ti 的所有内容。
+		// 在 C++ 中，交换操作通常用于高效地交换两个对象的状态，避免了复制大对象时可能带来的性能开销。
 		void swap(file_storage& ti) noexcept;
 
 		// arrange files and padding to match the canonical form required
