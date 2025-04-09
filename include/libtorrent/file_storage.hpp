@@ -270,14 +270,15 @@ namespace aux {
 		// We use int to index into file merkle trees, so a file may not contain more
 		// than INT_MAX entries. That means INT_MAX / 2 blocks (leafs) in each
 		// tree.
-		static constexpr std::int64_t max_file_size = (std::min)(
-			(std::int64_t(1) << 48) - 1
-			, std::int64_t((std::numeric_limits<int>::max)() / 2) * default_block_size);
+		// 最大文件大小（48 位或 INT_MAX/2 * 块大小）
+		static constexpr std::int64_t max_file_size = (std::min)((std::int64_t(1) << 48) - 1, std::int64_t((std::numeric_limits<int>::max)() / 2) * default_block_size);
+		// 最大文件偏移量（48位）
 		static constexpr std::int64_t max_file_offset = (std::int64_t(1) << 48) - 1;
 
 		// we use a signed 32 bit integer for piece indices internally, but
 		// frequently need headroom for intermediate calculations, so we limit
 		// the number of pieces 1 bit below the maximum
+		// 最大分块数（30位）
 		static constexpr std::int32_t max_num_pieces = (std::int32_t(1) << 30) - 1;
 
 		// limit the piece length at (2 ^ 30) to get a bit of headroom. We
@@ -288,12 +289,14 @@ namespace aux {
 		// The piece picker (currently) has a limit of no more than (2^15)-1
 		// blocks per piece, which is more restrictive, at a block size of 16
 		// kiB (0x4000).
+		// 最大分块大小（兼容块限制）
 		static constexpr std::int32_t max_piece_size = ((1 << 15) - 1) * 0x4000;
 
 		// returns true if the piece length has been initialized
 		// on the file_storage. This is typically taken as a proxy
 		// of whether the file_storage as a whole is initialized or
 		// not.
+		// 是否有效（分块长度是否已初始化）
 		bool is_valid() const { return m_piece_length > 0; }
 
 #if TORRENT_ABI_VERSION == 1
@@ -307,37 +310,52 @@ namespace aux {
 		// allocates space for ``num_files`` in the internal file list. This can
 		// be used to avoid reallocating the internal file list when the number
 		// of files to be added is known up-front.
+		// 预分配文件列表空间
 		void reserve(int num_files);
 
 		// Adds a file to the file storage. The ``add_file_borrow`` version
 		// expects that ``filename`` is the file name (without a path) of
 		// the file that's being added.
+		// 向文件存储中添加一个文件。add_file_borrow 版本要求 filename 是要添加文件的文件名（不包含路径）。
+		//
 		// This memory is *borrowed*, i.e. it is the caller's
 		// responsibility to make sure it stays valid throughout the lifetime
 		// of this file_storage object or any copy of it. The same thing applies
 		// to ``filehash``, which is an optional pointer to a 20 byte binary
 		// SHA-1 hash of the file.
+		// 这里的内存是 “借用” 的，也就是说，调用者有责任确保在 file_storage 对象及其任何副本的整个生命周期内，
+		// 该内存保持有效。同样的情况也适用于 filehash，它是一个可选的指针，指向文件的 20 字节二进制 SHA - 1 哈希值。
 		//
 		// if ``filename`` is empty, the filename from ``path`` is used and not
 		// borrowed.
+		// 如果 filename 为空，则使用 path 中的文件名，并且该文件名不被借用。
 		//
 		// The ``path`` argument is the full path (in the torrent file) to
 		// the file to add. Note that this is not supposed to be an absolute
 		// path, but it is expected to include the name of the torrent as the
 		// first path element.
+		// path 参数是要添加文件在 torrent 中的完整路径。
+		// 请注意，这不应是绝对路径，但它应该将 torrent 的 name 作为路径的第一个元素。
 		//
 		// ``file_size`` is the size of the file in bytes.
+		// file_size 是文件的大小，以字节为单位。
 		//
 		// The ``file_flags`` argument sets attributes on the file. The file
 		// attributes is an extension and may not work in all bittorrent clients.
+		// file_flags 参数用于设置文件的属性。
+		// 文件属性是一个扩展功能，可能并非在所有 BitTorrent 客户端中都能正常工作。
 		//
 		// For possible file attributes, see file_storage::flags_t.
+		// 有关可能的文件属性，请参阅 file_storage::flags_t。
 		//
 		// The ``mtime`` argument is optional and can be set to 0. If non-zero,
 		// it is the posix time of the last modification time of this file.
+		// mtime 参数是可选的，可以设置为 0。如果不为 0，则它是该文件的最后修改时间的 POSIX 时间。
 		//
 		// ``symlink_path`` is the path the file is a symlink to. To make this a
 		// symlink you also need to set the file_storage::flag_symlink file flag.
+		// symlink_path 是文件所指向的符号链接的路径。
+		// 要使该文件成为符号链接，还需要设置 file_storage::flag_symlink 文件标志。
 		//
 		// ``root_hash`` is an optional pointer to a 32 byte SHA-256 hash, being
 		// the merkle tree root hash for this file. This is only used for v2
@@ -348,40 +366,62 @@ namespace aux {
 		// used when *loading* torrents, that already have their file hashes
 		// computed. When creating torrents, the file hashes will be computed by
 		// the piece hashes.
+		// root_hash 是一个可选的指针，指向 32 字节的 SHA - 256 哈希值，即该文件的默克尔树根哈希。
+		// 这仅用于 v2 torrent。如果为一个文件指定了 root_hash，则必须为所有文件都指定，否则此函数将失败。
 		//
 		// If more files than one are added, certain restrictions to their paths
 		// apply. In a multi-file file storage (torrent), all files must share
 		// the same root directory.
+		// 如果添加的文件不止一个，则对它们的路径有一定的限制。
+		// 在多文件的文件存储（torrent）中，所有文件必须共享相同的根目录。
 		//
 		// That is, the first path element of all files must be the same.
 		// This shared path element is also set to the name of the torrent. It
 		// can be changed by calling ``set_name``.
+		// 也就是说，所有文件路径的第一个元素必须相同。
+		// 这个共享的路径元素也会被设置为种子文件的名称。可以通过调用 set_name 来更改它。
 		//
 		// The overloads that take an `error_code` reference will report failures
 		// via that variable, otherwise `system_error` is thrown.
+		// 接受 error_code 引用的重载函数将通过该变量报告失败情况，否则将抛出 system_error 异常。
 #ifndef BOOST_NO_EXCEPTIONS
-		void add_file_borrow(string_view filename
-			, std::string const& path, std::int64_t file_size
-			, file_flags_t file_flags = {}, char const* filehash = nullptr
-			, std::int64_t mtime = 0, string_view symlink_path = string_view()
+		void add_file_borrow(
+			string_view filename
+			, std::string const& path
+			, std::int64_t file_size
+			, file_flags_t file_flags = {}
+			, char const* filehash = nullptr
+			, std::int64_t mtime = 0
+			, string_view symlink_path = string_view()
 			, char const* root_hash = nullptr);
-		void add_file(std::string const& path, std::int64_t file_size
+		void add_file(
+			std::string const& path
+			, std::int64_t file_size
 			, file_flags_t file_flags = {}
 			, std::time_t mtime = 0, string_view symlink_path = string_view()
 			, char const* root_hash = nullptr);
 #endif // BOOST_NO_EXCEPTIONS
-		void add_file_borrow(error_code& ec, string_view filename
-			, std::string const& path, std::int64_t file_size
-			, file_flags_t file_flags = {}, char const* filehash = nullptr
-			, std::int64_t mtime = 0, string_view symlink_path = string_view()
+		void add_file_borrow(
+			error_code& ec
+			, string_view filename
+			, std::string const& path
+			, std::int64_t file_size
+			, file_flags_t file_flags = {}
+			, char const* filehash = nullptr
+			, std::int64_t mtime = 0
+			, string_view symlink_path = string_view()
 			, char const* root_hash = nullptr);
-		void add_file(error_code& ec, std::string const& path, std::int64_t file_size
+		void add_file(
+			error_code& ec
+			, std::string const& path
+			, std::int64_t file_size
 			, file_flags_t file_flags = {}
 			, std::time_t mtime = 0, string_view symlink_path = string_view()
 			, char const* root_hash = nullptr);
 
 		// renames the file at ``index`` to ``new_filename``. Keep in mind
 		// that filenames are expected to be UTF-8 encoded.
+		// 重命名文件
 		void rename_file(file_index_t index, std::string const& new_filename);
 
 #if TORRENT_ABI_VERSION == 1
@@ -431,28 +471,38 @@ namespace aux {
 #include "libtorrent/aux_/disable_warnings_pop.hpp"
 #endif // TORRENT_ABI_VERSION
 
+		// 指定 piece 中的 blocks 映射为 file_slice 列表。
+		//
 		// returns a list of file_slice objects representing the portions of
 		// files the specified piece index, byte offset and size range overlaps.
 		// this is the inverse mapping of map_file().
+		// 返回一个 file_slice 对象列表，该列表表示指定的片段索引、
+		// 字节偏移量和大小范围所覆盖的文件部分。
+		// 这是 map_file() 函数的反向映射。
 		//
 		// Preconditions of this function is that the input range is within the
-		// torrents address space. ``piece`` may not be negative and
-		//
-		// 	``piece`` * piece_size + ``offset`` + ``size``
-		//
+		// torrents address space. ``piece`` may not be negative and ``piece`` * piece_size + ``offset`` + ``size``
 		// may not exceed the total size of the torrent.
-		std::vector<file_slice> map_block(piece_index_t piece, std::int64_t offset
-			, std::int64_t size) const;
+		// 此函数的前置条件是输入范围必须在 torrent 文件的地址空间内。piece 不能为负数，
+		// 并且 piece * piece_size + offset + size 不能超过 torrent 中文件的总大小。
+		std::vector<file_slice> map_block(piece_index_t piece, std::int64_t offset , std::int64_t size) const;
 
+		// 将文件中的 block 映射为 peer_request。
+		// 
 		// returns a peer_request representing the piece index, byte offset
 		// and size the specified file range overlaps. This is the inverse
 		// mapping over map_block(). Note that the ``peer_request`` return type
 		// is meant to hold bittorrent block requests, which may not be larger
 		// than 16 kiB. Mapping a range larger than that may return an overflown
 		// integer.
+		// 返回一个 peer_request 对象，该对象表示指定文件范围所覆盖的 piece 索引、offset 和 size。
+		// 这是 map_block() 函数的反向映射。
+		// 请注意，返回类型 peer_request 是为了持有 bittorrent 的 block 请求，其大小不能超过 16 KiB。
+		// 映射大于该大小的范围可能会返回溢出的整数。
 		peer_request map_file(file_index_t file, std::int64_t offset, int size) const;
 
 		// returns the number of files in the file_storage
+		// file_storage 中的文件数
 		int num_files() const noexcept;
 
 		// returns the index of the one-past-end file in the file storage
