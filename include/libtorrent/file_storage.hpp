@@ -209,7 +209,8 @@ namespace aux {
 		// to the file
 		// 取值如下：
 		// - no_path，表示只有文件名，没有路径部分，通常出现在 单文件种子 中。此时文件名直接存储在 name 字段，无需拼接路径。
-		// - path_is_absolute，表示 name 字段直接存储 完整绝对路径，无需拼接 m_paths 中的路径。
+		// - path_is_absolute，表示 name 字段直接存储 完整绝对路径，无需拼接 m_paths 中的路径。 
+		//   运行时动态修改路径，和符号链接的目标路径会用到绝对路径。
 		// - file_storage::m_paths 数组的索引，表示文件的目录部分。需与 name（文件名部分）拼接生成完整路径。
 		aux::path_index_t path_index = file_entry::no_path;
 	};
