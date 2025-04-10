@@ -95,7 +95,7 @@ namespace libtorrent {
 	}
 
 	/**
-	 * @brief 计算指定 piece 的字节大小
+	 * @brief 计算指定 piece 的字节大小（不支持 piece 跨文件边界的情况）
 	 * 
 	 * @note 逻辑流程：
 	 * 1. 首先检查piece索引是否有效。
@@ -128,6 +128,11 @@ constexpr aux::path_index_t aux::file_entry::path_is_absolute;
 
 namespace {
 
+	/**
+	 * @brief 比较两个文件条目的偏移量（用于排序）
+	 * 
+	 * @return 如果 lhs 的 offset 小于 rhs 的 offset，则返回 true；否则返回 false。
+	 */
 	bool compare_file_offset(aux::file_entry const& lhs
 		, aux::file_entry const& rhs)
 	{
@@ -136,24 +141,49 @@ namespace {
 
 }
 
+	/**
+	 * @brief 精确计算指定 piece 的字节大小（支持 piece 跨文件边界的情况）
+	 * 
+	 * [ 文件1 ][ 文件2 ][ 填充文件 ]
+	 * └─piece1─┘└─piece2─┘  ← 需要精确计算 piece2 在文件 1 和文件 2 中的分别占的字节数
+	 * 
+	 * @note：
+	 * 当piece跨越多个文件时，准确计算当前文件范围内的 piece 部分大小，
+	 * 例如：piece_size = 16KB，但当前文件只有最后 4KB。
+	 */
 	int file_storage::piece_size2(piece_index_t const index) const
 	{
+		// 前置条件检查：
+		// 1. 确保 piece 索引有效（0 <= index < 总piece数）
+		// 2. 确保计算不会导致整数溢出
 		TORRENT_ASSERT_PRECOND(index >= piece_index_t{} && index < end_piece());
 		TORRENT_ASSERT(max_file_offset / piece_length() > static_cast<int>(index));
+
 		// find the file iterator and file offset
+		// 创建一个目标 file_entry，其 offset 设为该 piece 的起始偏移量
 		aux::file_entry target;
-		TORRENT_ASSERT(max_file_offset / piece_length() > static_cast<int>(index));
 		target.offset = aux::numeric_cast<std::uint64_t>(std::int64_t(piece_length()) * static_cast<int>(index));
+		// 确保目标 offset 不小于第一个文件的 offset（文件已按 offset 排序）
 		TORRENT_ASSERT(!compare_file_offset(target, m_files.front()));
 
+		// 在已排序的文件列表中，查找第一个 offset 大于目标 offset 的文件
 		auto const file_iter = std::upper_bound(
 			m_files.begin(), m_files.end(), target, compare_file_offset);
 
+		// 确保找到的位置不是起始位置（因为目标offset >= 第一个文件offset）
 		TORRENT_ASSERT(file_iter != m_files.begin());
-		if (file_iter == m_files.end()) return piece_size(index);
+
+		// 如果所有文件起始的 offset 都 <= 目标 offset，说明该 piece 在最后一个文件中
+		if (file_iter == m_files.end()) 
+			return piece_size(index); // 回退到简单计算方法
 
 		// this static cast is safe because the resulting value is capped by
 		// piece_length(), which fits in an int
+		// 计算该piece的实际大小：
+		// 取以下两者的较小值：
+		// 1. 标准 piece 大小
+		// 2. 下一个文件的起始offset - 当前 piece 的起始 offset
+		// （这样可以正确处理跨文件边界的piece）
 		return static_cast<int>(
 			std::min(static_cast<std::uint64_t>(piece_length()), file_iter->offset - target.offset));
 	}
