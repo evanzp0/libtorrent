@@ -94,14 +94,27 @@ namespace libtorrent {
 		m_files.reserve(num_files);
 	}
 
+	/**
+	 * @brief 计算指定 piece 的字节大小
+	 * 
+	 * @note 逻辑流程：
+	 * 1. 首先检查piece索引是否有效。
+	 * 2. 如果是最后一个piece：
+	 *  - 计算前面所有完整piece的总大小。
+	 *  - 用文件总大小减去前面piece的总大小，得到最后一个piece的实际大小。
+	 *  - 进行合理性检查（大小必须为正且不超过标准piece大小）。
+	 * 3. 如果不是最后一个piece，直接返回标准piece大小。
+	 */
 	int file_storage::piece_size(piece_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= piece_index_t(0) && index < end_piece());
 		if (index == last_piece())
-		{
-			std::int64_t const size_except_last
-				= (num_pieces() - 1) * std::int64_t(piece_length());
+		// 如果是最后一个 piece 
+		{	
+			// 计算前面所有完整 piece 的大小合计，并用文件总大小减去前面piece的总大小，得到最后一个piece的实际大小。
+			std::int64_t const size_except_last = (num_pieces() - 1) * std::int64_t(piece_length());
 			std::int64_t const size = total_size() - size_except_last;
+
 			TORRENT_ASSERT(size > 0);
 			TORRENT_ASSERT(size <= piece_length());
 			return int(size);
