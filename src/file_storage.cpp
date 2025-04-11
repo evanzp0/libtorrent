@@ -142,10 +142,11 @@ namespace {
 }
 
 	/**
-	 * @brief 精确计算指定 piece 的字节大小（支持 piece 跨文件边界的情况）
+	 * @brief 用来计算指定 piece 所在文件和 piece 头部重叠的区域的字节大小（只支持计算最前面一个重叠的区域）
 	 * 
-	 * [ 文件1 ][ 文件2 ][ 填充文件 ]
-	 * └─piece1─┘└─piece2─┘  ← 需要精确计算 piece2 在文件 1 和文件 2 中的分别占的字节数
+	 * [文件1][  文件2 ][ 填充文件 ]
+	 * └─piece1─┘└─piece2─┘
+	 *           |-----|  ← 只能计算 piece2 在文件 2 和 piece2 重叠的那部分字节数
 	 * 
 	 * @note：
 	 * 当piece跨越多个文件时，准确计算当前文件范围内的 piece 部分大小，
@@ -179,11 +180,10 @@ namespace {
 
 		// this static cast is safe because the resulting value is capped by
 		// piece_length(), which fits in an int
-		// 计算该piece的实际大小：
+		// 计算该 piece 的和重叠的第一个文件的那部分大小：
 		// 取以下两者的较小值：
 		// 1. 标准 piece 大小
 		// 2. 下一个文件的起始offset - 当前 piece 的起始 offset
-		// （这样可以正确处理跨文件边界的piece）
 		return static_cast<int>(
 			std::min(static_cast<std::uint64_t>(piece_length()), file_iter->offset - target.offset));
 	}
