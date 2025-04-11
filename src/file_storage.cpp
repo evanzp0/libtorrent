@@ -188,6 +188,9 @@ namespace {
 			std::min(static_cast<std::uint64_t>(piece_length()), file_iter->offset - target.offset));
 	}
 
+	/**
+	 * 计算指定 piece 头部在当前文件块内覆盖的 block 数量（向上取整）
+	 */
 	int file_storage::blocks_in_piece2(piece_index_t const index) const
 	{
 		// the number of default_block_size in a piece size, rounding up
