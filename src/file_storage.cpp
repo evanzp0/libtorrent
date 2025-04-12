@@ -142,7 +142,8 @@ namespace {
 }
 
 	/**
-	 * @brief 用来计算指定 piece 所在文件和 piece 头部重叠的区域的字节大小（只支持计算最前面一个重叠的区域）
+	 * @brief 用来计算指定 piece 所在文件和 piece 头部重叠的区域的字节大小（只支持计算最前面一个重叠的区域），
+	 * 后续文件中 piece 的大小，使用 piece 剩余大小和文件大小就能计算出
 	 * 
 	 * [文件1][  文件2 ][ 填充文件 ]
 	 * └─piece1─┘└─piece2─┘
@@ -190,6 +191,8 @@ namespace {
 
 	/**
 	 * 计算指定 piece 头部在当前文件块内覆盖的 block 数量（向上取整）
+	 * 
+	 * 后续文件的 block 数量使用 piece 剩余大小和文件大小就能计算出
 	 */
 	int file_storage::blocks_in_piece2(piece_index_t const index) const
 	{
@@ -197,6 +200,9 @@ namespace {
 		return (piece_size2(index) + default_block_size - 1) / default_block_size;
 	}
 
+	/**
+	 * 用于计算每个标准 piece 包含的完整 block 数量（向上取整）。
+	 */
 	int file_storage::blocks_per_piece() const
 	{
 		return (m_piece_length + default_block_size - 1) / default_block_size;
@@ -217,6 +223,8 @@ namespace {
 		, std::string const& path, bool const set_name)
 	{
 		if (is_complete(path))
+		// 如果 path 是绝对路径，则直接将 path 设为 file_entry 文件名，
+		// 并设置 path_index 为 path_is_absolute
 		{
 			TORRENT_ASSERT(set_name);
 			e.set_name(path);
@@ -228,15 +236,15 @@ namespace {
 
 		// split the string into the leaf filename
 		// and the branch path
-		string_view leaf;
-		string_view branch_path;
+		string_view leaf;			// 文件名
+		string_view branch_path;	// 路径
 
 		// branch_path 不能是 "/" 开头
 		std::tie(branch_path, leaf) = rsplit_path(path);
 
 		if (branch_path.empty())
+		// 如果不存在路径，那说明只有文件名，则直接将 path 设为 file_entry 文件名，
 		{
-			// 如果 path 包含文件名，则 leaf 就是该文件名
 			if (set_name) e.set_name(leaf);
 			e.path_index = aux::file_entry::no_path;
 			return;
@@ -509,6 +517,20 @@ namespace aux {
 	}
 #endif
 
+	/**
+	 * 用于根据给定的 torrent 中所有文件的全局偏移量 offset，来确定对应的文件在 m_files 中的索引。
+	 * 
+	 * @example
+	 * 
+	 * 假设:
+	 * 文件0: offset=0KB, size=10KB  → 范围 [0, 10)
+	 * 文件1: offset=10KB, size=8KB   → 范围 [10, 18)
+	 * 文件2: offset=18KB, size=12KB  → 范围 [18, 30)
+	 * 执行流程：
+	 * target.offset = 15KB
+	 * upper_bound 找到第一个 offset > 15KB 的文件 → 文件2 (offset=18KB)
+	 * --file_iter 回退到文件1 (offset=10KB)
+	 */
 	file_index_t file_storage::file_index_at_offset(std::int64_t const offset) const
 	{
 		TORRENT_ASSERT_PRECOND(offset >= 0);
@@ -517,13 +539,20 @@ namespace aux {
 		// find the file iterator and file offset
 		aux::file_entry target;
 		target.offset = aux::numeric_cast<std::uint64_t>(offset);
+		// 确保 target 文件的 offset，大于等于 m_files 中的第一个文件
 		TORRENT_ASSERT(!compare_file_offset(target, m_files.front()));
 
+		// 通过二分查找确定 offset 属于哪个文件，
+		// 文件列表 m_files 必须按 offset 升序排列。
 		auto file_iter = std::upper_bound(
 			m_files.begin(), m_files.end(), target, compare_file_offset);
 
+		// 确保不是第一个文件
 		TORRENT_ASSERT(file_iter != m_files.begin());
+		// 由于 upper_bound 返回的是第一个大于目标的位置，需减 1 得到实际所属文件。
 		--file_iter;
+
+		// 返回
 		return file_index_t{int(file_iter - m_files.begin())};
 	}
 
