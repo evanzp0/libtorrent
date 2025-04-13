@@ -556,11 +556,17 @@ namespace aux {
 		return file_index_t{int(file_iter - m_files.begin())};
 	}
 
+	/**
+	 * 根据 piece 的索引，来确定 piece 对应的文件在 m_files 中的索引。
+	 */
 	file_index_t file_storage::file_index_at_piece(piece_index_t const piece) const
 	{
 		return file_index_at_offset(static_cast<int>(piece) * std::int64_t(piece_length()));
 	}
 
+	/**
+	 * 用于通过文件的 Merkle 根哈希（root_hash）查找对应的文件索引。
+	 */
 	file_index_t file_storage::file_index_for_root(sha256_hash const& root_hash) const
 	{
 		// TODO: maybe it would be nice to have a better index here
@@ -571,6 +577,9 @@ namespace aux {
 		return file_index_t{-1};
 	}
 
+	/**
+	 * 用于根据文件索引计算该文件起始位置所在的 piece 索引。
+	 */
 	piece_index_t file_storage::piece_index_at_file(file_index_t f) const
 	{
 		return piece_index_t{aux::numeric_cast<int>(file_offset(f) / piece_length())};
@@ -1285,6 +1294,9 @@ namespace {
 		return m_files[index].pad_file;
 	}
 
+	/**
+	 * 根据文件索引，在 m_files 中找到该文件，并返回其开始位置的 offset 
+	 */
 	std::int64_t file_storage::file_offset(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t(0) && index < end_file());
