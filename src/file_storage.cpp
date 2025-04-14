@@ -599,12 +599,20 @@ namespace aux {
 	}
 #endif
 
+	/**
+	 * 将 (piece_index, offset, size) 指定的数据块，转换为一系列 file_slice 结构体。
+	 * 
+	 * file_slice 结构体描述：
+	 * - file_index，目标文件索引
+	 * - offset，文件内的起始偏移量
+	 * - size，该文件内连续的数据长度
+	 */
 	std::vector<file_slice> file_storage::map_block(piece_index_t const piece
 		, std::int64_t const offset, std::int64_t size) const
 	{
-		TORRENT_ASSERT_PRECOND(piece >= piece_index_t{0});
-		TORRENT_ASSERT_PRECOND(piece < end_piece());
-		TORRENT_ASSERT_PRECOND(num_files() > 0);
+		TORRENT_ASSERT_PRECOND(piece >= piece_index_t{0}); 	// 检查 piece 索引有效性
+		TORRENT_ASSERT_PRECOND(piece < end_piece());		
+		TORRENT_ASSERT_PRECOND(num_files() > 0);			// 确保文件列表非空
 		TORRENT_ASSERT_PRECOND(size >= 0);
 		std::vector<file_slice> ret;
 
@@ -613,33 +621,60 @@ namespace aux {
 		// find the file iterator and file offset
 		aux::file_entry target;
 		TORRENT_ASSERT(max_file_offset / m_piece_length > static_cast<int>(piece));
+		// 将 piece 内偏移转换为全局偏移量。
 		target.offset = aux::numeric_cast<std::uint64_t>(static_cast<int>(piece) * std::int64_t(m_piece_length) + offset);
+		// 验证偏移量不超过文件总大小
 		TORRENT_ASSERT_PRECOND(std::int64_t(target.offset) <= m_total_size - size);
 		TORRENT_ASSERT(!compare_file_offset(target, m_files.front()));
 
 		// in case the size is past the end, fix it up
+		// 如果请求超出文件末尾，自动截断
 		if (std::int64_t(target.offset) > m_total_size - size)
 			size = m_total_size - std::int64_t(target.offset);
 
+		// 使用 std::upper_bound 二分查找第一个 offset > target.offset 的文件
 		auto file_iter = std::upper_bound(
 			m_files.begin(), m_files.end(), target, compare_file_offset);
 
 		TORRENT_ASSERT(file_iter != m_files.begin());
+		// 回退迭代器得到实际所属文件
 		--file_iter;
 
+		// 计算目标数据块在当前文件内的，相对文件头部的偏移量
 		std::int64_t file_offset = target.offset - file_iter->offset;
+
+		// 循环处理直到请求的 size 被完全满足。
+		// file_offset -= file_iter->size：将偏移量调整到下一个文件的起始位置（跨文件时重置偏移）。
+		//     跨文件时第二次循环 file_offset = file_offset - file_iter->size = 0；
+		// ++file_iter：移动到下一个文件。
 		for (; size > 0; file_offset -= file_iter->size, ++file_iter)
 		{
 			TORRENT_ASSERT(file_iter != m_files.end());
 			if (file_offset < std::int64_t(file_iter->size))
+			// 检查当前文件是否有数据可读
 			{
+				// 要从文件中读取数据的切片
 				file_slice f{};
+
+				// 当前文件索引
 				f.file_index = file_index_t(int(file_iter - m_files.begin()));
+				// 文件内起始偏移量
 				f.offset = file_offset;
-				f.size = std::min(std::int64_t(file_iter->size) - file_offset, std::int64_t(size));
+				
+				f.size = std::min(
+					std::int64_t(file_iter->size) - file_offset, // 当前文件剩余空间
+					std::int64_t(size)	 // piece 剩余请求大小
+				); 
 				TORRENT_ASSERT(f.size <= size);
+
+				// piece 减少剩余需读取量
 				size -= f.size;
+
+				// 移动当前文件内的偏移（连续读取时使用）
+				// 跨文件时，file_offset = file_offset + f.size，就是 file_iter->size（整个文件的大小）
 				file_offset += f.size;
+
+				// 记录本次切片
 				ret.push_back(f);
 			}
 
