@@ -717,30 +717,58 @@ namespace aux {
 	}
 #endif // TORRENT_ABI_VERSION
 
+	/**
+	 * 返回 file_storage 中的文件数量
+	 */
 	int file_storage::num_files() const noexcept
 	{ return int(m_files.size()); }
 
 	// returns the index of the one-past-end file in the file storage
+	/**
+	 * 返回最后一个文件的索引 + 1
+	 */
 	file_index_t file_storage::end_file() const noexcept
 	{ return m_files.end_index(); }
 
+	/**
+	 * 返回最后一个文件的索引
+	 */
 	file_index_t file_storage::last_file() const noexcept
 	{ return --m_files.end_index(); }
 
+	/**
+	 * 返回 m_files 的索引 range
+	 */
 	index_range<file_index_t> file_storage::file_range() const noexcept
 	{ return m_files.range(); }
 
+	/**
+	 * 返回 piece 的索引 range
+	 */
 	index_range<piece_index_t> file_storage::piece_range() const noexcept
 	{ return {piece_index_t{0}, end_piece()}; }
 
-	peer_request file_storage::map_file(file_index_t const file_index
-		, std::int64_t const file_offset, int const size) const
+	/**
+	 * 用于将文件内的局部数据块映射到对应的 peer_request 信息。
+	 * 
+	 * 其内部就是将文件 file_offset 转为 BitTorrent 协议所需的 (piece, offset, length) 三元组。
+	 * 
+	 * @param file_offset 文件内起始偏移量（字节）
+	 * @param size 请求大小（字节）
+	 */
+	peer_request file_storage::map_file(
+		file_index_t const file_index, 
+		std::int64_t const file_offset,
+		int const size
+	) 
+	const
 	{
-		TORRENT_ASSERT_PRECOND(file_index < end_file());
-		TORRENT_ASSERT(m_num_pieces >= 0);
+		TORRENT_ASSERT_PRECOND(file_index < end_file()); 	// 文件索引有效性
+		TORRENT_ASSERT(m_num_pieces >= 0);				 	// piece 数合法性
 
 		peer_request ret{};
 		if (file_index >= end_file())
+		// 返回无效请求
 		{
 			ret.piece = end_piece();
 			ret.start = 0;
@@ -748,9 +776,11 @@ namespace aux {
 			return ret;
 		}
 
+		//  计算全局偏移量
 		std::int64_t const offset = file_offset + this->file_offset(file_index);
 
 		if (offset >= total_size())
+		// 超出 torrent 大小，返回无效请求
 		{
 			ret.piece = end_piece();
 			ret.start = 0;
@@ -758,11 +788,15 @@ namespace aux {
 		}
 		else
 		{
+			// 所属 piece
 			ret.piece = piece_index_t(int(offset / piece_length()));
+			// piece 内偏移
 			ret.start = int(offset % piece_length());
+			// piece 请求长度
 			ret.length = size;
+
 			if (offset + size > total_size())
-				ret.length = int(total_size() - offset);
+				ret.length = int(total_size() - offset); // 截断到文件末尾
 		}
 		return ret;
 	}
