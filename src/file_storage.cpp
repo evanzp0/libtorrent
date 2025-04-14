@@ -645,7 +645,8 @@ namespace aux {
 
 		// 循环处理直到请求的 size 被完全满足。
 		// file_offset -= file_iter->size：将偏移量调整到下一个文件的起始位置（跨文件时重置偏移）。
-		//     跨文件时第二次循环 file_offset = file_offset - file_iter->size = 0；
+		// 注意：
+		//  - 跨文件时第二次循环 file_offset = file_offset - file_iter->size = 0；
 		// ++file_iter：移动到下一个文件。
 		for (; size > 0; file_offset -= file_iter->size, ++file_iter)
 		{
@@ -667,7 +668,7 @@ namespace aux {
 				); 
 				TORRENT_ASSERT(f.size <= size);
 
-				// piece 减少剩余需读取量
+				// piece 减少剩余需读取量，当 size == 0 时，就会退出 for 循环！
 				size -= f.size;
 
 				// 移动当前文件内的偏移（连续读取时使用）
