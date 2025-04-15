@@ -1114,7 +1114,7 @@ namespace aux {
 	}
 
 	/** 
-	 * 获取 m_files 中第 index 文件的根哈希。
+	 * 复制并返回 m_files 中第 index 文件的根哈希（sha256_hash）对象。
 	*/
 	sha256_hash file_storage::root(file_index_t const index) const
 	{
@@ -1123,12 +1123,20 @@ namespace aux {
 		return sha256_hash(m_files[index].root);
 	}
 
+	/** 
+	 * 返回 m_files 中第 index 文件的根哈希（sha256_hash）指针。
+	*/
 	char const* file_storage::root_ptr(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t{} && index < end_file());
 		return m_files[index].root;
 	}
 
+	/**
+	 * 根据给定的文件索引 index，返回该文件对应的符号链接的完整路径。
+	 * 如果该文件不是符号链接，则返回一个空字符串。
+	 * 格式是：torrent_name + "/" + symlink
+	 */
 	std::string file_storage::symlink(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t{} && index < end_file());
@@ -1147,6 +1155,9 @@ namespace aux {
 		return ret;
 	}
 
+	/**
+	 * 根据传入的文件索引 index，返回该文件对应的符号链接的内部路径。
+	 */
 	std::string const& file_storage::internal_symlink(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t{} && index < end_file());
@@ -1156,6 +1167,9 @@ namespace aux {
 		return m_symlinks[fe.symlink_index];
 	}
 
+	/**
+	 * 根据传入的文件索引 index，返回该文件对应的更新时间（mtime）
+	 */
 	std::time_t file_storage::mtime(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t{} && index < end_file());
