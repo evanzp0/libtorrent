@@ -1292,63 +1292,85 @@ namespace {
 
 		boost::crc_optimal<32, 0x1EDC6F41, 0xFFFFFFFF, 0xFFFFFFFF, true, true> crc;
 
-		if (fe.path_index == aux::file_entry::path_is_absolute) // 绝对路径
+		if (fe.path_index == aux::file_entry::path_is_absolute) 
+		// 绝对路径
 		{
-			// 将 fe 的文件名（不含目录）全部转成 小写，并更新到 crc 计算器中。
+			// 将 fe 的绝对路径（含文件名），全部转成 小写，并更新到 crc 计算器中。
 			process_string_lowercase(crc, fe.filename());
 		}
-		else if (fe.path_index == aux::file_entry::no_path) // 无路径
+		else if (fe.path_index == aux::file_entry::no_path)
+		 // 无路径
 		{
 			if (!save_path.empty())
 			{
+				// crc: save_path
 				process_string_lowercase(crc, save_path);
+				// save_path 末尾不含 "/"
 				TORRENT_ASSERT(save_path[save_path.size() - 1] != TORRENT_SEPARATOR);
-				// 不含文件的 path，末尾加 "/"
+				// crc: save_path + "/"
 				crc.process_byte(TORRENT_SEPARATOR);
 			}
+			// crc: save_path + "/" + fe.name
 			process_string_lowercase(crc, fe.filename());
 		}
-		else if (fe.no_root_dir) // 无根目录
+		else if (fe.no_root_dir)
+		// 无根目录
 		{
 			if (!save_path.empty())
 			{
+				// crc: save_path
 				process_string_lowercase(crc, save_path);
 				TORRENT_ASSERT(save_path[save_path.size() - 1] != TORRENT_SEPARATOR);
+				// crc: save_path + "/"
 				crc.process_byte(TORRENT_SEPARATOR);
 			}
+
 			std::string const& p = m_paths[fe.path_index];
 			if (!p.empty())
 			{
+				// crc: save_path + "/" + m_paths[path_index]
 				process_string_lowercase(crc, p);
 				TORRENT_ASSERT(p[p.size() - 1] != TORRENT_SEPARATOR);
+				// crc: save_path + "/" + m_paths[path_index] + "/"
 				crc.process_byte(TORRENT_SEPARATOR);
 			}
+
+			// crc: save_path + "/" + m_paths[path_index] + "/" + fe.name
 			process_string_lowercase(crc, fe.filename());
 		}
-		else // 默认情况
+		else
+		// 有根目录(默认)
 		{
 			if (!save_path.empty())
 			{
+				// crc: save_path
 				process_string_lowercase(crc, save_path);
 				TORRENT_ASSERT(save_path[save_path.size() - 1] != TORRENT_SEPARATOR);
+				// crc: save_path + "/"
 				crc.process_byte(TORRENT_SEPARATOR);
 			}
+			// crc: save_path + "/" + fs.m_name
 			process_string_lowercase(crc, m_name);
 			TORRENT_ASSERT(m_name.size() > 0);
 			TORRENT_ASSERT(m_name[m_name.size() - 1] != TORRENT_SEPARATOR);
+			// crc: save_path + "/" + fs.m_name + "/"
 			crc.process_byte(TORRENT_SEPARATOR);
 
 			std::string const& p = m_paths[fe.path_index];
 			if (!p.empty())
 			{
+				// crc: save_path + "/" + fs.m_name + "/" + m_paths[path_index]
 				process_string_lowercase(crc, p);
 				TORRENT_ASSERT(p.size() > 0);
 				TORRENT_ASSERT(p[p.size() - 1] != TORRENT_SEPARATOR);
+				// crc: save_path + "/" + fs.m_name + "/" + m_paths[path_index] + "/"
 				crc.process_byte(TORRENT_SEPARATOR);
 			}
+			// crc: save_path + "/" + fs.m_name + "/" + m_paths[path_index] + "/" + fe.name
 			process_string_lowercase(crc, fe.filename());
 		}
 
+		// 返回指定文件 file_index 文件(fe 如果非绝对路径，则含 save_path) 的 CRC32 哈希值。
 		return crc.checksum();
 	}
 
