@@ -1282,7 +1282,7 @@ namespace {
 	 * /dir1/file.txt/another_file.txt  # 文件路径中包含与文件名相同的目录名，这是不允许的
 	 * 为了避免这种冲突，函数需要：1.确保文件名不会与任何目录名冲突；2.确保文件名不会与其他文件名冲突。
 	 * 
-	 * @param save_path torrent的保存路径？要么为空，要么为目录路径。非绝对路径时起始字符不可位 "/"。
+	 * @param save_path 本地存储路径。要么为空，要么为目录路径。
 	 */
 	std::uint32_t file_storage::file_path_hash(file_index_t const index
 		, std::string const& save_path) const
@@ -1374,6 +1374,34 @@ namespace {
 		return crc.checksum();
 	}
 
+	/**
+	 * 用于生成文件在本地存储时的完整路径，根据不同的文件路径类型（绝对路径/相对路径/无路径等）进行智能组合。
+	 * 
+	 * @example
+	 * 1. fe 绝对路径（单文件 torrent）: 
+	 * path_index=path_is_absolute, filename="/abc/readme.txt"
+	 * ```cpp
+	 * file_path(0, "/download"); // => /abc/readme.txt
+	 * ```
+	 * 
+	 * 2. fe 无路径（单文件 torrent）: 
+	 * path_index=no_path, filename="readme.txt"
+	 * ```cpp
+	 * file_path(0, "/download"); // => /download/readme.txt
+	 * ```
+	 * 
+	 * 3. fe 有根目录（多文件 torrent）: 
+	 * path_index=1, no_root_dir=false, m_name="docs", m_paths[1]="pdf"
+	 * ```cpp
+	 * file_path(1, "C:\\torrents"); // => C:\torrents\docs\pdf\guide.pdf
+	 * ```
+	 * 
+	 * 4. fe 无根目录: 
+	 * path_index=2, no_root_dir=true, m_paths[2]="images", filename="cover.jpg"
+	 * ```cpp
+	 * file_path(2, "/data"); // => /data/images/cover.jpg
+	 * ```
+	 */
 	std::string file_storage::file_path(file_index_t const index, std::string const& save_path) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t(0) && index < end_file());
@@ -1382,25 +1410,32 @@ namespace {
 		std::string ret;
 
 		if (fe.path_index == aux::file_entry::path_is_absolute)
+		// fe 绝对路径
 		{
+			// ret: fe.name
 			ret = fe.filename().to_string();
 		}
 		else if (fe.path_index == aux::file_entry::no_path)
+		// fe 无路径
 		{
 			ret.reserve(save_path.size() + fe.filename().size() + 1);
 			ret.assign(save_path);
+			// ret: save_path + "/" + fe.name
 			append_path(ret, fe.filename());
 		}
 		else if (fe.no_root_dir)
+		// fe 无根目录
 		{
 			std::string const& p = m_paths[fe.path_index];
 
 			ret.reserve(save_path.size() + p.size() + fe.filename().size() + 2);
 			ret.assign(save_path);
 			append_path(ret, p);
+			// ret: save_path + "/" + m_paths[path_index] + "/" + fe.name
 			append_path(ret, fe.filename());
 		}
 		else
+		// fe 有根目录
 		{
 			std::string const& p = m_paths[fe.path_index];
 
@@ -1408,10 +1443,12 @@ namespace {
 			ret.assign(save_path);
 			append_path(ret, m_name);
 			append_path(ret, p);
+			// ret: save_path + "/" + m_name + "/" + m_paths[path_index] + "/" + fe.name
 			append_path(ret, fe.filename());
 		}
 
 		// a single return statement, just to make NRVO more likely to kick in
+		// （使用）单个返回语句，只是为了让命名返回值优化（NRVO，Named Return Value Optimization）更有可能生效。
 		return ret;
 	}
 
