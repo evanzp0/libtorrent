@@ -611,6 +611,9 @@ namespace {
 		return std::string(f.c_str(), std::size_t(len));
 	}
 
+	/**
+	 * 从给定的文件路径字符串中提取文件名部分
+	 */
 	std::string filename(std::string const& f)
 	{
 		if (f.empty()) return "";

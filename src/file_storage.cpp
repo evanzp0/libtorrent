@@ -217,7 +217,7 @@ namespace {
 	 * 3. 其他值，表明该值是一个索引，指向 m_paths 中的一个路径。
 	 * 
 	 * @param path 文件路径，可以是绝对路径或相对路径，相对路径不能以 "/" 开头。
-	 * @param set_name 是否 path 字段包含了文件名
+	 * @param set_name 是否设置文件名
 	 */
 	void file_storage::update_path_index(aux::file_entry& e
 		, std::string const& path, bool const set_name)
@@ -840,7 +840,8 @@ namespace aux {
 	 * @param path 文件路径，包含了目录和文件名的完整路径。
 	 * 			   如果 torrent 内是单文件（文件路径中不能含有目录名），则 path 为文件名；
 	 * 			   如果 torrent 内是多文件，则 path 为 torrent_name + file_tree 中各级目录 + 文件名。
-	 * @param file_size 文件大小, 对应该文件的 "length" 字段
+	 * 			   另外，torrent 的 m_name 是从 path 中获取的。
+	 * @param file_size 待添加文件的大小, 对应该文件的 "length" 字段
 	 * @param file_flags 文件属性，对应该文件的 "attr" 字段(bep47)
 	 * @param filehash v2 该值为 nullptr; v1 该值对应该文件的 sha1 字段? (bep47)
 	 * @param mtime 文件修改时间，对应该文件的 "mtime" 字段(libtorrent 自定义字段)
@@ -862,6 +863,8 @@ namespace aux {
 			return;
 		}
 
+		// m_total_size：已经添加的文件大小
+		// file_size：待添加的文件大小
 		if (max_file_offset - m_total_size < file_size)
 		{
 			ec = make_error_code(errors::torrent_invalid_length);
@@ -882,17 +885,17 @@ namespace aux {
 			return;
 		}
 
-		// 文件的 path 中没有目录名，说明整个 torrent 内只有一个文件（如果是多文件的话，path 中至少有一个 torrent_name 作为目录）。
-		// 注意：设定 m_name 的值，一旦设定就不会修改了
 		if (!has_parent_path(path)) 
+		// path 中没有父目录，说明 torrent 中只有一个文件。
+		// 注意：设定 m_name 的值，一旦设定就不会修改了
 		{
-			// torrent 内只有一个文件，且第一次调用 add_file_borrow 时，则将 m_name 设为 path（一个文件名）。
-			// 否则断言就会失败，因为第二次调用，如果能进这个分支 m_files.empty() 为 false。
-
 			// you have already added at least one file with a
 			// path to the file (branch_path), which means that
 			// all the other files need to be in the same top
 			// directory as the first file.
+			
+			// torrent 内只有一个文件，且第一次调用 add_file_borrow 时，则将 m_name 设为 path（一个文件名）。
+			// 否则断言就会失败，因为第二次调用，如果能进这个分支 m_files.empty() 为 false。
 			TORRENT_ASSERT_PRECOND(m_files.empty());
 			m_name = path;
 		}
@@ -942,6 +945,10 @@ namespace aux {
 		// if filename is empty, we should copy it. If it isn't, we're borrowing
 		// it and we can save the copy by setting it after this call to
 		// update_path_index().
+		// 最后一个参数用于指定该函数是否还应该设置文件名。
+		// - 如果 filename 为空，那么 update_path_index 函数会从路径（path）中提取出文件名并复制给 file_entry::name。
+		// - 如果 filename 不为空，说明已经有一个单独有效的文件名可供使用，此时函数不会进行复制操作，而是借用这个已有的 filename。
+		//   为了节省复制操作带来的开销，可以在调用 update_path_index() 函数之后再设置文件名。
 		//
 		// 更新 e.path_index 字段
 		update_path_index(e, path, filename.empty());
