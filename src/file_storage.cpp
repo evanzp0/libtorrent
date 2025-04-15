@@ -1061,6 +1061,8 @@ namespace aux {
 	 * 
 	 * remove_tail_padding 是为了向下兼容 libtorrent 2.0.0-2.0.7，
 	 * 因为该版本创建混合种子时，在文件尾部没有创建填充文件。
+	 * 
+	 * 不论早期和当前最新的版本，用这个函数处理后，统一都变成没有填充文件的布局。
 	 */
 	void file_storage::remove_tail_padding()
 	{
@@ -1096,10 +1098,18 @@ namespace aux {
 		// nothing found
 	}
 
+	/**
+	 * 返回指定文件索引对应的文件 sha1_hash 对象。
+	 */
 	sha1_hash file_storage::hash(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t{} && index < end_file());
-		if (index >= m_file_hashes.end_index()) return sha1_hash();
+
+		// m_file_hashes 如果找不到对应的文件索引，则返回一个空的 sha1_hash。
+		if (index >= m_file_hashes.end_index()) 
+			return sha1_hash();
+
+		// 复制 m_file_hashes[index] 的 sha1_hash 对象并返回
 		return sha1_hash(m_file_hashes[index]);
 	}
 
