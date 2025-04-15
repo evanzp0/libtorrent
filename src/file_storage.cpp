@@ -911,22 +911,28 @@ namespace aux {
 
 		// files without a root_hash are assumed to be v1, except symlinks. They
 		// don't have a root hash and can be either v1 or v2
-		//
-		// 这个 if 如果 true ，说明当前是一个真实的文件
+		// 符号链接本身通常不会有根哈希值，但它既可以是 v1 版本的，也可以是 v2 版本的。
+		// 除了符号链接外的文件，如果它的 root_hash 为空，那么可以判定为 v1。
 		if (symlink_path.empty() && file_size > 0)
+		// 当是一个真实的文件时
 		{
+			// 设置是否为 v2
 			bool const v2 = (root_hash != nullptr);
 			// This condition is true of all files we've added so far have been
 			// symlinks. i.e. this is the first "real" file we're adding.
 			// or if m_total_size == 0, all files we've added so far have been
 			// empty (which also are are v1/v2-ambigous)
 			//
-			// 这里的判断作用是：如果root_hash 存在, 且第一次处理真实文件，则 m_v2 就是 true（当前种子是 v2）
+			// 在此之前添加的文件要么是符号链接，要么文件大小为空。
+			// 空文件的 root_hash 为空，所以在判定上存在模糊性，即无法明确添加的是 v1 还是 v2 版本的文件。
 			if (m_files.size() == m_symlinks.size() || m_total_size == 0)
+			// 第一次处理真实文件时
 			{
-				m_v2 = v2;
+				// 设置 m_v2 的是否为 v2
+				m_v2 = v2; // 如果 root_hash 存在，则 m_v2 就是 true（当前种子是 v2 版本）。
 			}
 			else if (m_v2 != v2)
+			// 第 N 次处理真实文件时，如果当前 v2 标志和之前的不一致
 			{
 				// you cannot mix v1 and v2 files when building torrent_storage. Either
 				// all files are v1 or all files are v2
@@ -960,23 +966,32 @@ namespace aux {
 			e.set_name(filename, true);
 
 		e.size = aux::numeric_cast<std::uint64_t>(file_size);
-		e.offset = aux::numeric_cast<std::uint64_t>(m_total_size); // 添加第一个文件时，m_total_size 为 0。
-		e.pad_file = bool(file_flags & file_storage::flag_pad_file);
+		e.offset = aux::numeric_cast<std::uint64_t>(m_total_size);	 	// 添加第一个文件时，m_total_size 为 0。
+		e.pad_file = bool(file_flags & file_storage::flag_pad_file);	// 是否为填充文件
 		e.hidden_attribute = bool(file_flags & file_storage::flag_hidden);
 		e.executable_attribute = bool(file_flags & file_storage::flag_executable);
 		e.symlink_attribute = bool(file_flags & file_storage::flag_symlink);
 		e.root = root_hash;
 
 		if (filehash)
+		// 如果有 v1 的 hash
 		{
-			if (m_file_hashes.size() < m_files.size()) m_file_hashes.resize(m_files.size());
+			if (m_file_hashes.size() < m_files.size()) 
+				m_file_hashes.resize(m_files.size());
+
+			// 将当前 filehash 加入 m_file_hashes 数组中
 			m_file_hashes[last_file()] = filehash;
 		}
 
-		if (!symlink_path.empty()
-			&& m_symlinks.size() < aux::file_entry::not_a_symlink - 1)
+		if (
+			// 确认当前文件是符号链接
+			!symlink_path.empty()
+			// not_a_symlink - 1 表示允许的最大符号链接索引（避免占用 not_a_symlink 标记值）。
+			&& m_symlinks.size() < aux::file_entry::not_a_symlink - 1) 
 		{
+			// 设置 file_entry 的 symlink_index
 			e.symlink_index = m_symlinks.size();
+			// 像 m_symlinks 数组中添加当前符号链接指向的路径
 			m_symlinks.emplace_back(symlink_path.to_string());
 		}
 		else
@@ -986,14 +1001,19 @@ namespace aux {
 
 		if (mtime)
 		{
-			if (m_mtime.size() < m_files.size()) m_mtime.resize(m_files.size());
+			if (m_mtime.size() < m_files.size()) 
+				m_mtime.resize(m_files.size());
 			m_mtime[last_file()] = std::time_t(mtime);
 		}
 
-		m_total_size += e.size; // 更新 m_total_size，下一个 file_entry 的 offset 就是当前 m_total_size 的大小。
+		// 更新 m_total_size，下一个 file_entry 的起始 offset 就是当前 m_total_size 的大小。
+		m_total_size += e.size; 
 
 		// when making v2 torrents, pad the end of each file (if necessary) to
 		// ensure it ends on a piece boundary.
+		// 在制作 v2 版本的种子文件时，如果有必要，会在每个文件的末尾添加填充数据。
+		// 目的是确保每个文件的结束位置刚好处于一个片段（piece）的边界上。
+		// 
 		// we do this at the end of files rather in-front of files to conform to
 		// the BEP52 reference implementation
 		//
@@ -1003,6 +1023,7 @@ namespace aux {
 		// 当一个 piece 从 v1 群里去请求了，就不用从 v2 群里去请求了，
 		// 如果 v1 中的文件没对齐，可能会产生一个 piece 跨两个文件的情况，那么这个 piece 是无法在 v2 群中进行请求的。 
 		if (m_v2 && (m_total_size % piece_length()) != 0)
+		// v2 种子，并且种子添加当前文件后的大小，没有 piece_length 对齐，则需要在文件末尾添加 .pad 文件。
 		{
 			auto const pad_size = piece_length() - (m_total_size % piece_length());
 			TORRENT_ASSERT(int(pad_size) != piece_length());
@@ -1013,17 +1034,20 @@ namespace aux {
 				return;
 			}
 
+			// 在 m_files 数组末尾添加一个填充文件的 file_entry
 			m_files.emplace_back();
 			// e is invalid from here down!
 			auto& pad = m_files.back();
+
 			pad.size = static_cast<std::uint64_t>(pad_size);
 			TORRENT_ASSERT(m_total_size <= max_file_offset);
 			TORRENT_ASSERT(m_total_size > 0);
 			pad.offset = static_cast<std::uint64_t>(m_total_size);
+			// 填充文件所在的目录统一为 ".pad" 目录
 			pad.path_index = get_or_add_path(".pad");
 			char name[30];
-			std::snprintf(name, sizeof(name), "%" PRIu64
-				, pad.size);
+			// 生成填充文件名：填充文件名是填充文件大小。
+			std::snprintf(name, sizeof(name), "%" PRIu64 , pad.size);
 			pad.set_name(name);
 			pad.pad_file = true;
 			m_total_size += pad_size;
