@@ -264,7 +264,7 @@ namespace {
 #endif
 				))
 				branch_path.remove_prefix(1);
-				
+
 			e.no_root_dir = false;
 		}
 		else
@@ -1282,7 +1282,7 @@ namespace {
 	 * /dir1/file.txt/another_file.txt  # 文件路径中包含与文件名相同的目录名，这是不允许的
 	 * 为了避免这种冲突，函数需要：1.确保文件名不会与任何目录名冲突；2.确保文件名不会与其他文件名冲突。
 	 * 
-	 * @param save_path 保存路径？要么为空，要么为目录路径。非绝对路径时起始字符不可位 "/"。
+	 * @param save_path torrent的保存路径？要么为空，要么为目录路径。非绝对路径时起始字符不可位 "/"。
 	 */
 	std::uint32_t file_storage::file_path_hash(file_index_t const index
 		, std::string const& save_path) const
