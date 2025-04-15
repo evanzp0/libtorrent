@@ -836,7 +836,9 @@ namespace aux {
 	/** 
 	 * 将文件加入到 file_storage::m_files 属性中 (v1，v2 )
 	 * 
-	 * @param filename 当前文件名，不含目录名
+	 * @param filename 要添加的文件名，不含目录名。
+	 *                 如果时 file_storage 拥有其所有权，则不为空；
+	 *                 否则为空，需要文件名可以从 path 中提取。
 	 * @param path 文件路径，包含了目录和文件名的完整路径。
 	 * 			   如果 torrent 内是单文件（文件路径中不能含有目录名），则 path 为文件名；
 	 * 			   如果 torrent 内是多文件，则 path 为 torrent_name + file_tree 中各级目录 + 文件名。
