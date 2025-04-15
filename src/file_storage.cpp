@@ -425,7 +425,7 @@ namespace aux {
 	/**
 	 *  给 file_entry 的 name 属性赋值
 	 * 
-	 * @param n – 当前路径文件名（如果绝对路径，则包含路径和文件名；否则只有文件名）
+	 * @param n – 当前路径文件名
 	 * @param borrow_string – 是否借用 n 的内存。如果为 true, 则 n 不会被拷贝；如果为 false, n 会被拷贝。
 	 */
 	void file_entry::set_name(string_view n, bool const borrow_string)
@@ -454,7 +454,7 @@ namespace aux {
 	}
 
 	/**
-	 * 获取 file_entry 的路径文件名（如果绝对路径，则包含路径和文件名；否则只有文件名）
+	 * 获取 file_entry 的路径文件名（fe.name，不含 m_paths，但是如果 fe 为绝对路径，则 fe.name 本身会含有目录字符串）
 	*/
 	string_view file_entry::filename() const
 	{
@@ -1512,6 +1512,9 @@ namespace {
 		}
 	}
 
+	/**
+	 * 返回指定文件 file_index 的文件路径名(fe.name，不含 m_paths)
+	 */
 	string_view file_storage::file_name(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t(0) && index < end_file());
