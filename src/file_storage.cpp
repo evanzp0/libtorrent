@@ -887,9 +887,9 @@ namespace aux {
 			return;
 		}
 
+		// 给 file_storage 对象的 m_name 属性赋值，一旦赋值就不能修改了。
 		if (!has_parent_path(path)) 
-		// path 中没有父目录，说明 torrent 中只有一个文件。
-		// 注意：设定 m_name 的值，一旦设定就不会修改了
+		// 本次添加的文件的 path 没有父目录，说明整个 torrent 中只有一个文件，文件名就是 path。
 		{
 			// you have already added at least one file with a
 			// path to the file (branch_path), which means that
@@ -902,13 +902,12 @@ namespace aux {
 			m_name = path;
 		}
 		else
+		// 本次添加的文件的 path 有父目录，如果是第一次给 file_storage 添加文件，则将 m_name 设为 path 的第一段目录名。
 		{
-			// torrent 有多个文件，且第一次调用 add_file_borrow 时，将 m_name 设为 path 的第一段目录名。
 			if (m_files.empty()) {
 				m_name = lsplit_path(path).first.to_string();
 			}
 		}
-		// 上面绕了半天，其实就是将 ".torrent" 文件的 "name" 字段值，赋值给 file_storage 对象的 m_name 属性
 
 		// files without a root_hash are assumed to be v1, except symlinks. They
 		// don't have a root hash and can be either v1 or v2
