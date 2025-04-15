@@ -1453,7 +1453,39 @@ namespace {
 	}
 
 	/**
-	 * 根据 index ，从 m_files 中取出对应的 torrent 内部文件路径（含文件名，不含 root_dir）
+	 * 用于生成指定文件在 torrent 内部的逻辑路径（不含本地存储路径 save_path 和 torrent 根目录名 m_name）
+	 * 
+	 * @example
+	 * 1. 绝对路径（单文件）
+	 * ```cpp
+	 * m_files = [
+	 *     {path_index=path_is_absolute, filename="/usr/logo.png"}
+	 * ];
+	 *
+	 * internal_file_path(0);  // 返回 "/usr/logo.png"
+	 * ```
+	 * 
+	 * 2. 无路径（单文件）
+	 * ```cpp
+	 * m_files = [
+	 *     {path_index=no_path, filename="data.zip"}
+	 * ];
+	 *
+	 * internal_file_path(0);  // 返回 "data.zip"
+	 * ```
+	 * 
+	 * 3. fe 有路径（多文件）: 
+	 * ```cpp
+	 * m_paths = ["docs", "images"];
+	 * m_files = [
+	 *     {path_index=0, filename="readme.txt"},  // 文件0
+	 *     {path_index=1, filename="cover.jpg"}    // 文件1
+	 * ];
+	 * 
+	 * internal_file_path(0);  // 返回 "docs/readme.txt"
+	 * internal_file_path(1);  // 返回 "images/cover.jpg"
+	 * ```
+	 * 
 	 */
 	std::string file_storage::internal_file_path(file_index_t const index) const
 	{
@@ -1462,16 +1494,20 @@ namespace {
 
 		if (fe.path_index != aux::file_entry::path_is_absolute
 			&& fe.path_index != aux::file_entry::no_path)
+		// 多文件（非绝对路径和无路径，即有路径）
 		{
 			std::string ret;
 			std::string const& p = m_paths[fe.path_index];
 			ret.reserve(p.size() + fe.filename().size() + 2);
 			append_path(ret, p);
+			// ret: m_paths[path_index] + "/" + fe.name
 			append_path(ret, fe.filename());
 			return ret;
 		}
 		else
+		// 单文件（绝对路径，或无路径）
 		{
+			// ret: fe.name
 			return fe.filename().to_string();
 		}
 	}
