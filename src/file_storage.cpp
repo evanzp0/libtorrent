@@ -223,7 +223,7 @@ namespace {
 		, std::string const& path, bool const set_name)
 	{
 		if (is_complete(path))
-		// 如果 path 是绝对路径，则直接将 path 设为 file_entry 文件名，
+		// 如果 path 是绝对路径，则直接将 path 设为 file_entry 的 name 值，
 		// 并设置 path_index 为 path_is_absolute
 		{
 			TORRENT_ASSERT(set_name);
@@ -243,7 +243,7 @@ namespace {
 		std::tie(branch_path, leaf) = rsplit_path(path);
 
 		if (branch_path.empty())
-		// 如果不存在路径，那说明只有文件名，则直接将 path 设为 file_entry 文件名，
+		// 如果不存在路径，那说明只有文件名，则直接将 path 设为 file_entry 的 name 值，
 		{
 			if (set_name) e.set_name(leaf);
 			e.path_index = aux::file_entry::no_path;
@@ -252,18 +252,19 @@ namespace {
 
 		// if the path *does* contain the name of the torrent (as we expect)
 		// strip it before adding it to m_paths
-		//
-		// 规范化 branch_path，branch path 不能以 "/" 开头，如果有则移除。
+		// 如果 branch_path 的第一部分是 m_name，则在将 branch_path 加入 m_paths 前，要从 branch_path 中移除它。
 		if (lsplit_path(branch_path).first == m_name)
 		{
 			branch_path = lsplit_path(branch_path).second;
 			// strip duplicate separators
+			// 规范化 branch_path，branch path 不能以 "/" 开头，如果有则移除。
 			while (!branch_path.empty() && (branch_path.front() == TORRENT_SEPARATOR
 #if defined(TORRENT_WINDOWS) || defined(TORRENT_OS2)
 				|| branch_path.front() == '/'
 #endif
 				))
 				branch_path.remove_prefix(1);
+				
 			e.no_root_dir = false;
 		}
 		else
@@ -424,7 +425,7 @@ namespace aux {
 	/**
 	 *  给 file_entry 的 name 属性赋值
 	 * 
-	 * @param n – 当前文件名（不含目录）
+	 * @param n – 当前路径文件名（如果绝对路径，则包含路径和文件名；否则只有文件名）
 	 * @param borrow_string – 是否借用 n 的内存。如果为 true, 则 n 不会被拷贝；如果为 false, n 会被拷贝。
 	 */
 	void file_entry::set_name(string_view n, bool const borrow_string)
@@ -453,7 +454,7 @@ namespace aux {
 	}
 
 	/**
-	 * 获取 file_entry 的文件名（不含目录）
+	 * 获取 file_entry 的路径文件名（如果绝对路径，则包含路径和文件名；否则只有文件名）
 	*/
 	string_view file_entry::filename() const
 	{
@@ -1271,10 +1272,10 @@ namespace {
 	 * 
 	 * 文件路径分以下几种情况，file_entry 为：
 	 * 1. 绝对路径: crc(file_entry.filename())
-	 * 2. 无路径：crc((save_path + "/") + file_entry.filename())
-	 * 3. 无根目录：crc((save_path + "/") + m_path[file_entry.path_index] + "/" + file_entry.filename())
+	 * 2. 无路径：crc(save_path + "/" + file_entry.filename())
+	 * 3. 无根目录：crc(save_path + "/" + m_path[file_entry.path_index] + "/" + file_entry.filename())
 	 * 4. 默认情况（非绝对路径，有路径，有根目录）：
-	 * 	  crc((save_path + "/") + m_name + "/" + m_paths[file_entry.path_index] + "/" + file_entry.filename())
+	 * 	  crc(save_path + "/" + m_name + "/" + m_paths[file_entry.path_index] + "/" + file_entry.filename())
 	 * 
 	 * 在 .torrent 文件中，文件名和目录名是共享同一个命名空间的。也就是说，文件名不能与目录名相同：
 	 * /dir1/file.txt  # 文件

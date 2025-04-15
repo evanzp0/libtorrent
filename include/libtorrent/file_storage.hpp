@@ -162,7 +162,9 @@ namespace aux {
 
 		// if this is true, don't include m_name as part of the
 		// path to this file
-		// 是否忽略根目录（用于路径拼接）
+		// 路径拼接是否要忽略根目录
+		// - 如果值为 true，则完整的文件路径为： file_storage::mpath[path_index] + name。
+		// - 如果值为 false，则完整的文件路径为：file_storage::m_name + file_storage::mpath[path_index] + name 
 		std::uint64_t no_root_dir:1;
 
 		// the size of this file
@@ -189,7 +191,13 @@ namespace aux {
 	private:
 		// This string is not necessarily 0-terminated!
 		// that's why it's private, to keep people away from it
-		// 如果不为空（\0），则为文件名（不含目录名）
+		// 这个字符串不一定是以空字符（'\0'）结尾的。
+		// 这就是该字符串被设置为私有成员的原因，目的是防止外部代码直接访问和操作这个字符串。
+		// 
+		// 取值：
+		// - 绝对路径，name 包含以根目录开头的绝对路径和文件名, path_index 被设为 file_entry::path_is_absolute
+		// - 单个文件，name 仅包含文件名, path_index 被设为 file_entry::no_path
+		// - 
 		char const* name = nullptr;
 
 	public:
