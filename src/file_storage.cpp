@@ -1056,22 +1056,37 @@ namespace aux {
 
 	// this is here for backwards compatibility with hybrid torrents created
 	// with libtorrent 2.0.0-2.0.7, which would not add tail-padding
+	/**
+	 * 移除文件列表末尾的填充文件（.pad文件）
+	 * 
+	 * remove_tail_padding 是为了向下兼容 libtorrent 2.0.0-2.0.7，
+	 * 因为该版本创建混合种子时，在文件尾部没有创建填充文件。
+	 */
 	void file_storage::remove_tail_padding()
 	{
 		file_index_t f = end_file();
+
+		// 从最后一个文件开始向前查找需要移除的填充文件。
 		while (f > file_index_t{0})
 		{
 			--f;
+
 			// empty files and symlinks are skipped
+			// 跳过空文件和符号链接
 			if (file_size(f) == 0) continue;
+
 			if (pad_file_at(f))
+			// 如果是.pad文件
 			{
-				m_total_size -= file_size(f);
-				m_files.erase(m_files.begin() + int(f));
+				m_total_size -= file_size(f);				// 更新总大小
+				m_files.erase(m_files.begin() + int(f));	// 删除该文件条目
+
+				// 更新后续文件偏移量
 				while (f < end_file())
 				{
 					m_files[f].offset = static_cast<std::uint64_t>(m_total_size);
-					TORRENT_ASSERT(m_files[f].size == 0);
+					// 确保后续是空文件（因为循环中，在处理当前文件前，跳过的的都是空文件和符号链接）
+					TORRENT_ASSERT(m_files[f].size == 0); 
 					++f;
 				}
 			}
