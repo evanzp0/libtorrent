@@ -1620,14 +1620,21 @@ namespace {
 		return merkle_num_nodes(piece_layer_size) - piece_layer_size;
 	}
 
+	/**
+	 * 计算指定文件在块(block) Merkle 树中的第一个 block 节点的位置索引
+	 */
 	int file_storage::file_first_block_node(file_index_t index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t(0) && index < end_file());
 		TORRENT_ASSERT_PRECOND(m_piece_length > 0);
+		// 计算出最底层的 block 数量（2 的幂次方）。
 		int const leaf_layer_size = merkle_num_leafs(file_num_blocks(index));
 		return merkle_num_nodes(leaf_layer_size) - leaf_layer_size;
 	}
 
+	/**
+	 * 用于获取指定文件的属性标志（file flags），返回一个位掩码（bitmask）表示文件的各种特殊属性。
+	 */
 	file_flags_t file_storage::file_flags(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t(0) && index < end_file());
@@ -1638,6 +1645,9 @@ namespace {
 			| (fe.symlink_attribute ? file_storage::flag_symlink : file_flags_t{});
 	}
 
+	/**
+	 * 返回文件是否为的绝对路径。
+	 */
 	bool file_storage::file_absolute_path(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t(0) && index < end_file());
@@ -1707,6 +1717,9 @@ namespace {
 	{ return at_deprecated(int(i - m_files.begin())); }
 #endif // TORRENT_ABI_VERSION
 
+	/**
+	 * 快速交换当前 file_storage 对象与另一个 file_storage 对象的所有内部数据成员。
+	 */
 	void file_storage::swap(file_storage& ti) noexcept
 	{
 		using std::swap;
@@ -1727,6 +1740,16 @@ namespace {
 		canonicalize_impl(false);
 	}
 
+	/**
+	 * 用于规范化文件存储结构的内部实现函数，主要处理文件排序和填充(pad)文件的添加。
+	 * 
+	 * @note
+	 * 功能作用:
+	 * 1. 移除现有填充文件：先清理所有已存在的填充文件
+	 * 2. 文件重新排序：按照路径和文件名对文件进行排序
+	 * 3. 重新计算偏移量：为每个文件计算新的偏移位置
+	 * 4. 添加必要的填充文件：确保每个文件在piece边界对齐
+	 */
 	void file_storage::canonicalize_impl(bool const backwards_compatible)
 	{
 		TORRENT_ASSERT(piece_length() >= 16 * 1024);
@@ -1734,14 +1757,21 @@ namespace {
 		// use this vector to track the new ordering of files
 		// this allows the use of STL algorithms despite them
 		// not supporting a custom swap functor
+		// 使用 new_order 列表来跟踪文件的新排序。
 		aux::vector<file_index_t, file_index_t> new_order(end_file());
+		// 创建文件索引的临时排序向量，并使用 m_files.file_range() 初始化其索引值。
 		for (auto i : file_range())
 			new_order[i] = i;
 
 		// remove any existing pad files
+		// 移除现有填充文件
 		{
-			auto pad_begin = std::partition(new_order.begin(), new_order.end()
-				, [this](file_index_t i) { return !m_files[i].pad_file; });
+			// 使用分区算法将 new_order 中的元素重新排列，将填充文件移到末尾并删除。
+			auto pad_begin = std::partition(
+				new_order.begin(), 
+				new_order.end(), 
+				[this](file_index_t i) { return !m_files[i].pad_file; }
+			);
 			new_order.erase(pad_begin, new_order.end());
 		}
 
@@ -1749,20 +1779,32 @@ namespace {
 		// that a lower path index always meant sorted-before
 
 		// sort files by path/name
-		std::sort(new_order.begin(), new_order.end()
-			, [this](file_index_t l, file_index_t r)
-		{
-			// assuming m_paths are unique!
-			auto const& lf = m_files[l];
-			auto const& rf = m_files[r];
-			if (lf.path_index != rf.path_index)
+		// 按路径和文件名进行字典序排序
+		std::sort(
+			new_order.begin(), 
+			new_order.end(), 
+			[this](file_index_t l, file_index_t r)
 			{
-				int const ret = path_compare(m_paths[lf.path_index], lf.filename()
-					, m_paths[rf.path_index], rf.filename());
-				if (ret != 0) return ret < 0;
+				// assuming m_paths are unique!
+				auto const& lf = m_files[l];
+				auto const& rf = m_files[r];
+
+				if (lf.path_index != rf.path_index)
+				{
+					// 先比较路径索引
+					int const ret = path_compare(
+						m_paths[lf.path_index], 
+						lf.filename(), 
+						m_paths[rf.path_index], 
+						rf.filename()
+					);
+
+					// 再比较文件名
+					if (ret != 0) return ret < 0;
+				}
+				return lf.filename() < rf.filename();
 			}
-			return lf.filename() < rf.filename();
-		});
+		);
 
 		aux::vector<aux::file_entry, file_index_t> new_files;
 		aux::vector<char const*, file_index_t> new_file_hashes;

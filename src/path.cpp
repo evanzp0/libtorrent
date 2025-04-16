@@ -550,14 +550,25 @@ namespace {
 	// <0: lhs < rhs
 	//  0: lhs == rhs
 	// >0: lhs > rhs
+
+	/**
+	 * 逐级比较两个路径的各个部分，直到找到差异为止。
+	 * 
+	 * @note
+	 * 路径由多级目录组成，例如 /a/b/c/file.txt。
+	 * 比较时需要逐级分解路径，先比较顶级目录（如 /a），再比较下一级目录（如 /b），依此类推，直到比较到文件名。
+	 */
 	int path_compare(string_view const lhs, string_view const lfile
 		, string_view const rhs, string_view const rfile)
 	{
+		// 循环一直执行，直到两个路径都被完全分解（即 lhs_elems.first 和 rhs_elems.first 都为空）。
 		for (auto lhs_elems = lsplit_path(lhs), rhs_elems = lsplit_path(rhs);
 			!lhs_elems.first.empty() || !rhs_elems.first.empty();
 			lhs_elems = lsplit_path(lhs_elems.second), rhs_elems = lsplit_path(rhs_elems.second))
 		{
 			if (lhs_elems.first.empty() || rhs_elems.first.empty())
+			// 如果其中一个路径已经分解完（即 lhs_elems.first 或 rhs_elems.first 为空），则用文件名代替当前路径部分。
+			// 然后调用 compare 方法比较两者。
 			{
 				if (lhs_elems.first.empty()) lhs_elems.first = lfile;
 				if (rhs_elems.first.empty()) rhs_elems.first = rfile;
