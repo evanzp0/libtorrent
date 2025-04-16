@@ -120,7 +120,7 @@ namespace libtorrent {
 	/**
 	 * 用于计算 Merkle 树所需的叶子节点数量。
 	 * 
-	 * @param blocks 实际数据块数量。
+	 * @param blocks 实际数据块数量（可以是 block 或者 piece 数）。
 	 * 
 	 * @return 返回所需叶子节点的数量。
 	 * 

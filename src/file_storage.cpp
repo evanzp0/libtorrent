@@ -1595,13 +1595,27 @@ namespace {
 	}
 
 	/**
-	 * 返回指定文件 file_index 的文件。。。todo（仅对 v2 torrents 有效）
+	 * 返回的是当前文件的第一个 piece 在 Merkle 树中的起始位置（仅对 v2 torrents 有效）
+	 * 
+	 * @example
+	 * ```
+	 * Level 3 (Root): [0]             <-- 根节点 R
+	 * Level 2: [1, 2]                 <-- 内部节点 I1, I2
+	 * Level 1: [3, 4, 5, 6]           <-- 内部节点 I3, I4, I5, I6
+	 * Level 0 (Leaves): [7, 8, 9, 10, 11, 12, 13, 14]  <-- 叶子节点 L1 到 L8
+	 * ```
+	 * 最后调用 file_first_piece_node 结果为 7 （0,1,2,3,4,5,6）。
 	 */
 	int file_storage::file_first_piece_node(file_index_t index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t(0) && index < end_file());
 		TORRENT_ASSERT_PRECOND(m_piece_length > 0);
+		// 计算出最底层的 piece 数量（2 的幂次方）。
+		// Merkle 树的叶子层是基于文件的 pieces hash 构建的，而不是基于 blocks data。
 		int const piece_layer_size = merkle_num_leafs(file_num_pieces(index));
+
+		// 非叶子节点数 = 整个 Merkle 树的节点总数 - 最底层的叶子节点数。
+		// 也就是当前文件的第一个 piece 在 Merkle 树中的起始位置。
 		return merkle_num_nodes(piece_layer_size) - piece_layer_size;
 	}
 
