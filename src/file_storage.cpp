@@ -1522,12 +1522,18 @@ namespace {
 		return fe.filename();
 	}
 
+	/**
+	 * 返回指定文件 file_index 的文件大小
+	 */
 	std::int64_t file_storage::file_size(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t(0) && index < end_file());
 		return m_files[index].size;
 	}
 
+	/**
+	 * 返回指定文件 file_index 的文件是否为填充文件
+	 */
 	bool file_storage::pad_file_at(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t(0) && index < end_file());
@@ -1543,6 +1549,9 @@ namespace {
 		return m_files[index].offset;
 	}
 
+	/**
+	 * 返回指定文件 file_index 的文件所占的 piece 数（仅对 v2 torrents 有效）
+	 */
 	int file_storage::file_num_pieces(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t(0) && index < end_file());
@@ -1559,11 +1568,17 @@ namespace {
 			(static_cast<std::int64_t>(f.size) + m_piece_length - 1) / m_piece_length);
 	}
 
+	/**
+	 * 返回指定文件 file_index 的文件所占的 piece 的 range（仅对 v2 torrents 有效）
+	 */
 	index_range<piece_index_t::diff_type> file_storage::file_piece_range(file_index_t const file) const
 	{
 		return {piece_index_t::diff_type{0}, piece_index_t::diff_type{file_num_pieces(file)}};
 	}
 
+	/**
+	 * 返回指定文件 file_index 的文件所占的 block 数（仅对 v2 torrents 有效）
+	 */
 	int file_storage::file_num_blocks(file_index_t const index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t(0) && index < end_file());
@@ -1579,6 +1594,9 @@ namespace {
 		return int((f.size + default_block_size - 1) / default_block_size);
 	}
 
+	/**
+	 * 返回指定文件 file_index 的文件。。。todo（仅对 v2 torrents 有效）
+	 */
 	int file_storage::file_first_piece_node(file_index_t index) const
 	{
 		TORRENT_ASSERT_PRECOND(index >= file_index_t(0) && index < end_file());

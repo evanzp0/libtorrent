@@ -53,6 +53,24 @@ namespace libtorrent {
 		return merkle_layer_start(layer) + offset;
 	}
 
+	/**
+	 * 获取Merkle树中指定节点的父节点
+	 * 
+	 * @param tree_node 当前节点的索引。索引从0开始，0代表根节点。
+	 * 
+	 * @return int 返回父节点的索引。
+	 * 
+	 * @example
+	 * - 假设 tree_node 是 3，父节点索引：(3 - 1) / 2 = 1。
+	 * - 假设 tree_node 是 6，父节点索引：(6 - 1) / 2 = 2。
+	 * 
+	 *         0
+	 *       /   \
+	 *      1      2
+	 *     / \    / \
+	 *    3   4  5   6
+	 * 
+	 */
 	int merkle_get_parent(int const tree_node)
 	{
 		// node 0 doesn't have a parent
@@ -99,21 +117,49 @@ namespace libtorrent {
 		return num_leafs - 1;
 	}
 
+	/**
+	 * 用于计算 Merkle 树所需的叶子节点数量。
+	 * 
+	 * @param blocks 实际数据块数量。
+	 * 
+	 * @return 返回所需叶子节点的数量。
+	 * 
+	 * @note
+	 * - 其核心逻辑是将输入块数(blocks)向上取整到最近的 2 的幂次方。
+	 */
 	int merkle_num_leafs(int const blocks)
 	{
 		TORRENT_ASSERT(blocks > 0);
+		// 防止整数溢出, blocks <= INT_MAX / 2 可以确保最后一次左移后 ret 不会溢出。
 		TORRENT_ASSERT(blocks <= std::numeric_limits<int>::max() / 2);
 		// round up to nearest 2 exponent
+		// 最小的2的幂次方（2^0=1）
 		int ret = 1;
-		while (blocks > ret) ret <<= 1;
+
+		// 左移等价于乘以 2，直到 ret 刚好 >= blocks。
+		while (blocks > ret) 
+			ret <<= 1; 
+
 		return ret;
 	}
 
+	/**
+	 * 计算 Merkle 树的层数。
+	 * 
+	 * @param leaves 叶子节点数（必须为2的幂次方，如1, 2, 4, 8...）
+	 * 
+	 * @return 返回 Merkle 树的层数(log2(leaves))。
+	 */
 	int merkle_num_layers(int leaves)
 	{
 		// leaves must be a power of 2
+		// leaves（叶子节点数）必须是 2 的幂次方。
+		// 2的幂次方的二进制表示只有最高位是1（如 8=1000），因此 leaves & (leaves - 1) 必须为0
 		TORRENT_ASSERT((leaves & (leaves - 1)) == 0);
+
+		// 计算层数
 		int layers = 0;
+		// 右移等价于除以2，通过循环右移统计需要多少次除以 2 才能让 leaves 变为 1。
 		while (leaves > 1)
 		{
 			++layers;
@@ -127,23 +173,95 @@ namespace libtorrent {
 		merkle_fill_tree(tree, num_leafs, merkle_num_nodes(num_leafs) - num_leafs);
 	}
 
+	/**
+	 * 用于填充 Merkle 树的中间哈希节点。
+	 * 
+	 * @param tree 存储Merkle树节点的数组（叶子节点已预先填充）
+	 * @param num_leafs 最底层的叶子节点数（必须 ≥ 1且为2的幂次方）
+	 * @param level_start 当前层的起始的节点的索引，而不是层的索引。
+	 * 
+	 * @note
+	 * 其核心功能是通过叶子节点的哈希值逐层计算父节点哈希，最终生成根哈希。
+	 * 
+	 * @example
+	 * 1. 初始状态
+	 * ```
+	 * Level 0 (Leaves): [0, 1, 2, 3, 4, 5, 6, 7]
+	 * Level 1: []
+	 * Level 2: []
+	 * Level 3 (Root): []
+	 * ```
+	 * 
+	 * 2. 第一次迭代
+	 * level_size = 8, level_start = 0
+	 * 
+	 * ```
+	 * Parent(0,1) -> 8
+	 * Parent(2,3) -> 9
+	 * Parent(4,5) -> 10
+	 * Parent(6,7) -> 11
+	 * 
+	 * Level 0: [0, 1, 2, 3, 4, 5, 6, 7]
+	 * Level 1: [8, 9, 10, 11]
+	 * Level 2: []
+	 * Level 3: []
+	 * ```
+	 * 
+	 * 3. 第二次迭代
+	 * level_size = 4, level_start = 8
+	 * 
+	 * ```
+	 * Parent(8,9) -> 12
+	 * Parent(10,11) -> 13
+	 * 
+	 * Level 0: [0, 1, 2, 3, 4, 5, 6, 7]
+	 * Level 1: [8, 9, 10, 11]
+	 * Level 2: [12, 13]
+	 * Level 3: []
+	 * ```
+	 * 
+	 * 4. 第三次迭代
+	 * level_size = 2, level_start = 12
+	 * 
+	 * ```
+	 * Parent(12,13) -> 14
+	 * 
+	 * Level 0: [0, 1, 2, 3, 4, 5, 6, 7]
+	 * Level 1: [8, 9, 10, 11]
+	 * Level 2: [12, 13]
+	 * Level 3: [14]
+	 * ```
+	 */
 	void merkle_fill_tree(span<sha256_hash> tree, int const num_leafs, int level_start)
 	{
 		TORRENT_ASSERT(level_start >= 0);
 		TORRENT_ASSERT(num_leafs >= 1);
 
+		// 当前层的叶子节点数
 		int level_size = num_leafs;
+
+		// 循环直到根节点，
+		// 每次循环处理当前层的所有节点，并生成上一层的父节点。
 		while (level_size > 1)
 		{
+			//  返回节点 i 的父节点索引（通常为 i/2）
 			int parent = merkle_get_parent(level_start);
+			
+			// 每一次 for 循环，要用该层的所有节点，计算它们的父节点的 hash（即上一层节点）。
 			for (int i = level_start; i < level_start + level_size; i += 2, ++parent)
+			// 循环一次使用 2 个 节点 （i, i + 1）来计算父节点的 tree 哈希值。
 			{
 				hasher256 h;
 				h.update(tree[i]);
 				h.update(tree[i + 1]);
+				// 计算父节点的 hash 值并存入 tree 数组中。
 				tree[parent] = h.final();
 			}
+
+			// 跳到父层起始节点位置
 			level_start = merkle_get_parent(level_start);
+			
+			// 父层的节点数（表明每层的节点数是上一层的一半，这是典型的二叉树结构）。
 			level_size /= 2;
 		}
 		TORRENT_ASSERT(level_size == 1);
