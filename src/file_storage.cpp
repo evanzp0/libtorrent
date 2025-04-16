@@ -1595,7 +1595,8 @@ namespace {
 	}
 
 	/**
-	 * 返回的是当前文件的第一个 piece 在 Merkle 树中的起始位置（仅对 v2 torrents 有效）
+	 * 返回的是当前文件的第一个 piece 在 Merkle 树中的起始位置（仅对 v2 torrents 有效）。
+	 * 注意：root 根的位置为 0。
 	 * 
 	 * @example
 	 * ```
@@ -1604,7 +1605,7 @@ namespace {
 	 * Level 1: [3, 4, 5, 6]           <-- 内部节点 I3, I4, I5, I6
 	 * Level 0 (Leaves): [7, 8, 9, 10, 11, 12, 13, 14]  <-- 叶子节点 L1 到 L8
 	 * ```
-	 * 最后调用 file_first_piece_node 结果为 7 （0,1,2,3,4,5,6）。
+	 * 最后调用 file_first_piece_node 结果为 7。
 	 */
 	int file_storage::file_first_piece_node(file_index_t index) const
 	{
