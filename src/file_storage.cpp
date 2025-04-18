@@ -1749,6 +1749,21 @@ namespace {
 	 * 2. 文件重新排序：按照路径和文件名对文件进行排序
 	 * 3. 重新计算偏移量：为每个文件计算新的偏移位置
 	 * 4. 添加必要的填充文件：确保每个文件在piece边界对齐
+	 * 
+	 * @note
+	 * backwards_compatible = true，是为了兼容 libtorrent 1.1.x（在文件前生成填充文件） 
+	 * 
+	 * @example
+	 * 文件列表：文件A: 18KB，文件B: 20KB，文件C: 30KB，Piece length: 16KB。
+	 * 1. backwards_compatible = true (文件前填充)
+	 * ```
+	 * [文件A(18KB)][填充(14KB)][文件B(20KB)][填充(12KB)][文件C(30KB)]
+	 * ```
+	 * 
+	 * 2. backwards_compatible = false (文件后填充)
+	 * ```
+	 * [文件A(18KB)][填充(14KB)][文件B(20KB)][填充(12KB)][文件C(30KB)][填充(2KB)]
+	 * ```
 	 */
 	void file_storage::canonicalize_impl(bool const backwards_compatible)
 	{
@@ -1759,14 +1774,14 @@ namespace {
 		// not supporting a custom swap functor
 		// 使用 new_order 列表来跟踪文件的新排序。
 		aux::vector<file_index_t, file_index_t> new_order(end_file());
-		// 创建文件索引的临时排序向量，并使用 m_files.file_range() 初始化其索引值。
+		// 初始化 new_order 中的元素，注意 new_order 存放的是 m_file 中的索引。
 		for (auto i : file_range())
 			new_order[i] = i;
 
 		// remove any existing pad files
-		// 移除现有填充文件
+		// 移除 new_order 中现有填充文件索引，剩下只有真实文件的索引
 		{
-			// 使用分区算法将 new_order 中的元素重新排列，将填充文件移到末尾并删除。
+			// 使用分区算法将 new_order 中的元素重新排列，将代表填充文件的索引移到末尾并删除。
 			auto pad_begin = std::partition(
 				new_order.begin(), 
 				new_order.end(), 
@@ -1779,7 +1794,7 @@ namespace {
 		// that a lower path index always meant sorted-before
 
 		// sort files by path/name
-		// 按路径和文件名进行字典序排序
+		// 按路径和文件名的字典序对 new_order 中的索引进行排序
 		std::sort(
 			new_order.begin(), 
 			new_order.end(), 
@@ -1790,8 +1805,9 @@ namespace {
 				auto const& rf = m_files[r];
 
 				if (lf.path_index != rf.path_index)
+				// 如果两者的路径索引不同，则调用 path_compare 函数逐级比较路径。
 				{
-					// 先比较路径索引
+					// path_compare 结果值为：负数、0 或正数，分别表示：第一个路径小于、等于或大于第二个路径。
 					int const ret = path_compare(
 						m_paths[lf.path_index], 
 						lf.filename(), 
@@ -1799,13 +1815,19 @@ namespace {
 						rf.filename()
 					);
 
-					// 再比较文件名
+					// 如果 path_compare 的结果不为 0，则根据结果决定排序顺序：
+					// - ret < 0 表示 l 应该排在 r 前面。
+					// - ret > 0 表示 l 应该排在 r 后面。
 					if (ret != 0) return ret < 0;
 				}
+
+				// 如果路径索引相同（即路径完全一致），则直接比较文件名。
+				// 文件名按字典序比较，返回布尔值表示 l 是否应该排在 r 前面。
 				return lf.filename() < rf.filename();
 			}
 		);
 
+		// 用来临时重新存放文件、hash 和 mtime 的容器
 		aux::vector<aux::file_entry, file_index_t> new_files;
 		aux::vector<char const*, file_index_t> new_file_hashes;
 		aux::vector<std::time_t, file_index_t> new_mtime;
@@ -1819,13 +1841,19 @@ namespace {
 
 		// re-compute offsets and insert pad files as necessary
 		std::int64_t off = 0;
+		
 
+		// 重新计算偏移和添加填充文件
 		auto add_pad_file = [&](file_index_t const i) {
 			if ((off % piece_length()) != 0 && m_files[i].size > 0)
+			// 如果文件起始的偏移量没有对齐 piece_length, 则生成填充文件。
 			{
+				// 计算前一个文件的尾部还缺多少可以对齐 piece_length，以此作为填充文件的大小。
 				auto const pad_size = piece_length() - (off % piece_length());
 				TORRENT_ASSERT(pad_size < piece_length());
 				TORRENT_ASSERT(pad_size > 0);
+
+				// 生成填充文件条目
 				new_files.emplace_back();
 				auto& pad = new_files.back();
 				pad.size = static_cast<std::uint64_t>(pad_size);
@@ -1837,6 +1865,7 @@ namespace {
 				pad.set_name(name);
 				pad.pad_file = true;
 
+				// 如果原文件有哈希值或修改时间，则为填充文件添加占位值（如 nullptr 或 0）。
 				if (!m_file_hashes.empty())
 					new_file_hashes.push_back(nullptr);
 				if (!m_mtime.empty())
@@ -1844,17 +1873,26 @@ namespace {
 			}
 		};
 
+		// 遍历重新排序后的文件索引（new_order）
 		for (file_index_t i : new_order)
-		{
+		{	
+			// 如果启用了向后兼容模式，则每次处理索引为 i 的文件之前，调用 add_pad_file 插入填充文件。
 			if (backwards_compatible)
 				add_pad_file(i);
 
+			// 确保 new_order 中当前索引代表的文件，不是填充文件
 			TORRENT_ASSERT(!m_files[i].pad_file);
+			// 将当前文件从 m_files 移动到 new_files。
 			new_files.emplace_back(std::move(m_files[i]));
 
+			// 如果文件索引 i 在 m_file_hashes 的范围内，则将对应的哈希值添加到 new_file_hashes。
+			// 如果文件索引超出范围，但 m_file_hashes 不为空，则为该文件添加一个占位条目（nullptr）。
 			if (i < m_file_hashes.end_index())
+			// 当前文件索引 i 有哈希值
 				new_file_hashes.push_back(m_file_hashes[i]);
 			else if (!m_file_hashes.empty())
+			// 虽然当前文件没有哈希值，但其他文件有哈希值。
+			// canonicalize_impl() 是结构调整函数，不是数据计算函数，哈希计算通常由专门的哈希生成器在后续步骤处理。
 				new_file_hashes.push_back(nullptr);
 
 			if (i < m_mtime.end_index())
@@ -1864,13 +1902,45 @@ namespace {
 
 			auto& file = new_files.back();
 			TORRENT_ASSERT(off < max_file_offset - static_cast<std::int64_t>(file.size));
+			// 更新偏移量（如果当前文件前添加了填充文件，offset 会增加填充文件的大小）
 			file.offset = static_cast<std::uint64_t>(off);
 			off += file.size;
 
 			// we don't pad single-file torrents. That would make it impossible
 			// to have single-file hybrid torrents.
+			// 我们不填充单文件种子，否则会使单文件混合种子变得不可能
+			// 这段代码涉及到 BitTorrent 协议中单文件(single-file)和多文件(multi-file)种子处理的特殊逻辑。
+			/**
+			 * 例如以下单文件混合种子：
+			 * ```json
+			 * {
+			 *    "info": {
+			 *      "name": "ubuntu-22.04.iso",
+			 *      "length": 30k,
+			 *      "piece length": 16k,
+			 *      "pieces": "a1b2...",          // v1 的 SHA-1 哈希
+			 *      "file tree": {                // v2 的 Merkle 结构
+			 *        "ubuntu-22.04.iso": {
+			 *          "": {
+			 *            "length": 3512729600,
+			 *            "pieces root": "a3f4..." // v2 的 BLAKE3 根哈希
+			 *          }
+			 *        }
+			 *      },
+			 *      "meta version": 2             // 标识 v2 元数据
+			 *    },
+			 *    "announce": "http://tracker.example.com/announce"
+			 *  }
+			 * ```
+			 * v1 的文件布局是 name(文件名)，没地方插入填充文件。
+			 * v2 的文件布局是 "file tree"，可以在其中插入填充文件。
+			 * 
+			 * 于是，填充后：
+			 * v1 的布局 [文件数据 30KB]            （不填充，直接分 2 pieces: 0-16KB, 16-30KB）
+			 * v2 的布局 [文件数据 30KB][填充 2KB]  （填充后大小=32KB，分 2 pieces: 0-16KB, 16-32KB）
+			 */
 			if (!backwards_compatible && num_files() > 1)
-				add_pad_file(i);
+				add_pad_file(i); // 即使多次调用 add_pad_file(i)，只要偏移量已经对齐，就不会重复插入填充文件。
 		}
 
 		m_files = std::move(new_files);
