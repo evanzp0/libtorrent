@@ -1968,18 +1968,25 @@ namespace {
 		// symbolic links in the torrent. If we find one symbolic link, we'll
 		// build the hash table of files it's allowed to refer to, but don't pay
 		// that price up-front.
-		// 用于存储 torrent 文件中所有文件的路径和索引，只有在发现符号链接时才会初始化。
+		// 符号链接比较特殊，这个函数是在假定种子文件中不存在符号链接的情况下进行了优化。
+		// 如果我们发现了一个符号链接，我们才会构建一个允许被引用的文件的哈希表，
+		// 但不会一开始就付出（构建哈希表带来的）代价。
+		//
+		// 用于存储 torrent 文件中所有文件的路径和索引。
+		// 在第一次遇到 flag_symlink 文件时，遍历所有文件，将 文件路径 → 文件索引 存入哈希表
 		std::unordered_map<std::string, file_index_t> file_map;
 		bool file_map_initialized = false;
 
 		// lazily instantiated set of all valid directories a symlink may point to
 		// TODO: in C++17 this could be string_view
-		// 用于存储 torrent 文件中所有目录的路径，只有在需要时才会初始化。
+		// 用于存储 torrent 文件中所有目录的路径。
+		// 当需要验证符号链接指向目录时（且 file_map 中未找到匹配），解析 m_paths 中所有路径的父目录，存入集合。
 		std::unordered_set<std::string> dir_map;
 		bool dir_map_initialized = false;
 
 		// symbolic links that points to directories
 		// 用于存储符号链接的目标路径（如果目标是目录）。
+		// 当发现符号链接指向目录时，记录 符号链接路径 → 目标目录路径 的映射
 		std::unordered_map<std::string, std::string> dir_links;
 
 		// we validate symlinks in (potentially) 2 passes over the files.
