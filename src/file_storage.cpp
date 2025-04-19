@@ -2053,7 +2053,7 @@ namespace {
 
 				// it may point to a directory that doesn't have any files (but only
 				// other directories), in which case it won't show up in m_paths
-				// 它可能指向一个没有任何文件（但只包含其他目录）的目录，在这种情况下，它不会出现在 m_paths 中。
+				// target 可能指向一个没有任何文件（但只包含其他目录）的目录，在这种情况下，它不会出现在 m_paths 中（也就是说 file_map 中找不到）。
 				if (!dir_map_initialized)
 				{
 					// 初始化 dir_map，即存储所有有效目录路径的集合。
@@ -2080,7 +2080,7 @@ namespace {
 					dir_map_initialized = true;
 				}
 
-				// 如果链接文件的目标指向 torrent 文件中的某个目录，则在 m_symlinks 和 dir_links 中保留该目标路径。
+				// 如果 target 代表是 torrent 文件中的某个目录，则在 m_symlinks[i] 和 dir_links[i] 中保留该目录名(target)。
 				if (dir_map.count(target))
 				{
 					// it points to a sub directory within the torrent, that's OK
@@ -2302,6 +2302,11 @@ namespace aux {
 		return true;
 	}
 
+	/**
+	 * 用于计算 某个文件在 Torrent 中占用的 piece（分块）范围，返回 [begin_piece, end_piece) 的左闭右开区间。
+	 * 
+	 * 通过文件偏移量和分块大小，确定文件覆盖的 piece 索引。
+	 */
 	std::tuple<piece_index_t, piece_index_t>
 	file_piece_range_exclusive(file_storage const& fs, file_index_t const file)
 	{
@@ -2319,6 +2324,9 @@ namespace aux {
 		return std::make_tuple(begin_piece, end_piece);
 	}
 
+	/**
+	 * 计算一个文件在 file_storage 中所覆盖的 piece 索引范围（包含起始和结束 piece）
+	 */
 	std::tuple<piece_index_t, piece_index_t>
 	file_piece_range_inclusive(file_storage const& fs, file_index_t const file)
 	{
@@ -2336,6 +2344,9 @@ namespace aux {
 			(fs.total_size() + fs.piece_length() - 1) / fs.piece_length());
 	}
 
+	/**
+	 * 计算 file_storage 实际文件的大小
+	 */
 	std::int64_t size_on_disk(file_storage const& fs)
 	{
 		std::int64_t ret = 0;
