@@ -2001,13 +2001,15 @@ namespace {
 			if (!(file_flags(i) & file_storage::flag_symlink)) continue;
 
 			if (!file_map_initialized)
+			// file_map 惰性初始化
 			{
-				// 发现符号链接，初始化 file_map，将所有文件的路径和索引，添加到 file_map 中
+				// 发现符号链接，初始化 file_map，将所有文件的 torrent 内部路径和索引，添加到 file_map 中
 				for (auto const j : file_range())
 					file_map.insert({internal_file_path(j), j});
 				file_map_initialized = true;
 			}
 
+			// 取出要要清理的符号链接对象
 			aux::file_entry const& fe = m_files[i];
 			TORRENT_ASSERT(fe.symlink_index < int(m_symlinks.size()));
 
@@ -2016,8 +2018,8 @@ namespace {
 			// symlink targets are only allowed to point to files or directories in
 			// this torrent.
 			// 符号链接的目标仅允许指向此种子文件中的文件或目录。
-			{
-				// target：符号链接的目标路径
+			{	
+				// target：符号链接的目标路径(symlink fe 指向的文件或目录)
 				std::string target = m_symlinks[fe.symlink_index];
 
 				// 如果目标是绝对路径，则在 m_symlinks 中将其修改为指向自身
@@ -2030,21 +2032,21 @@ namespace {
 					continue;
 				}
 
-				// 如果 target 指向 torrent 文件中的某个文件，则在 m_symlinks 中保留该 target 路径
+				// 如果 target（字符串） 指向 torrent 文件中的某个文件或目录，则在 m_symlinks 中保留该 target 路径。
 				// iter 是连接文件指向的内部文件路径
 				auto const iter = file_map.find(target);
 				if (iter != file_map.end())
 				{
-					m_symlinks[fe.symlink_index] = target;
+					m_symlinks[fe.symlink_index] = target; // 这句可以省略的吧？
 					if (file_flags(iter->second) & file_storage::flag_symlink)
 					{
-						// 如果被链接文件指向的torrent 内部文件还是一个链接文件，就先存放在 dir_links 中。
+						// 如果 target 代表的文件仍是一个链接文件，就先将 target 存放在 dir_links 中。
+						// 因为我们不知道 target 文件所指向的是文件还是目录，所以做出保守假设，认为它是指向目录的。
 
 						// we don't know whether this symlink is a file or a
 						// directory, so make the conservative assumption that it's a
 						// directory
-						// 我们不知道这个符号链接是指向文件还是目录，所以做出保守假设，认为它是指向目录的
-						dir_links[internal_file_path(i)] = target;
+						dir_links[internal_file_path(i)] = target; // 表示一个 m_files[i] 的文件，其实是一个指向 target 目录的链接文件。
 					}
 					continue;
 				}
