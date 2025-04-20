@@ -2099,7 +2099,7 @@ namespace {
 			if (fe.path_index < aux::file_entry::path_is_absolute)
 			{
 				std::string target = m_paths[fe.path_index];
-				append_path(target, m_symlinks[fe.symlink_index]); // 为何这两者可以进行拼接?
+				append_path(target, m_symlinks[fe.symlink_index]); // 为何这两者可以进行拼接? 非合规路径（有 .. 这种）：代码会尝试处理，但因验证失败而修复为指向自身。
 
 				// 验证目标路径是否合法 ----------
 
