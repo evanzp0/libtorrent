@@ -1,0 +1,59 @@
+@startuml classes overview
+
+participant "simple_client" as simple_client
+participant "session" as session
+participant "session_impl" as session_impl
+participant "torrent" as torrent
+participant "torrent_plugin" as torrent_plugin
+participant "add_torrent_params" as add_torrent_params
+participant "torrent_info" as torrent_info
+
+activate simple_client
+
+simple_client -> add_torrent_params: new add_torrent_params()
+activate add_torrent_params
+return p
+
+simple_client -> torrent_info: new torrent_info(argv[1])
+activate torrent_info
+return ti
+
+simple_client -> simple_client: p.ti = ti
+activate simple_client
+deactivate simple_client
+
+simple_client -> session: add_torrent(p)
+activate session
+
+    session -> session_impl: add_torrent(p)
+    activate session_impl
+        session_impl -> session_impl: add_torrent_impl(params, ec)
+        activate session_impl
+        return torrent, infohash, is_exist
+
+        session_impl -> torrent: set_ip_filter(m_ip_filter)
+        activate torrent
+        return
+
+        session_impl -> torrent: start()
+        activate torrent
+        deactivate torrent
+
+        session_impl -> torrent_plugin: new(ext(handle, userdata))
+        activate torrent_plugin
+        return tp
+
+        session_impl -> torrent: add_extension(tp)
+        activate torrent
+        deactivate torrent
+
+        session_impl -> session_impl: add_extensions_to_torrent(torrent_ptr, userdata)
+        activate session_impl
+        return
+
+    deactivate session_impl
+
+return 
+
+deactivate simple_client
+@enduml

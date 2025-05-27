@@ -473,22 +473,30 @@ bool is_downloading_state(int const st)
 		return counters::num_downloading_torrents;
 	}
 
+	// 更新torrent的仪表盘状态
 	void torrent::update_gauge()
 	{
-		int const new_gauge_state = current_stats_state() - counters::num_checking_torrents;
-		TORRENT_ASSERT(new_gauge_state >= 0);
-		TORRENT_ASSERT(new_gauge_state <= no_gauge_state);
-
-		if (new_gauge_state == int(m_current_gauge_state)) return;
-
-		if (m_current_gauge_state != no_gauge_state)
-			inc_stats_counter(m_current_gauge_state + counters::num_checking_torrents, -1);
-		if (new_gauge_state != no_gauge_state)
-			inc_stats_counter(new_gauge_state + counters::num_checking_torrents, 1);
-
-		TORRENT_ASSERT(new_gauge_state >= 0);
-		TORRENT_ASSERT(new_gauge_state <= no_gauge_state);
-		m_current_gauge_state = static_cast<std::uint32_t>(new_gauge_state);
+	    // 计算新的仪表盘状态值
+	    int const new_gauge_state = current_stats_state() - counters::num_checking_torrents;
+	    // 断言新的仪表盘状态值在有效范围内
+	    TORRENT_ASSERT(new_gauge_state >= 0);
+	    TORRENT_ASSERT(new_gauge_state <= no_gauge_state);
+	
+	    // 如果新的仪表盘状态与当前状态相同，则无需更新，直接返回
+	    if (new_gauge_state == int(m_current_gauge_state)) return;
+	
+	    // 如果当前仪表盘状态不是无状态，则减少相应状态的计数器
+	    if (m_current_gauge_state != no_gauge_state)
+	        inc_stats_counter(m_current_gauge_state + counters::num_checking_torrents, -1);
+	    // 如果新的仪表盘状态不是无状态，则增加相应状态的计数器
+	    if (new_gauge_state != no_gauge_state)
+	        inc_stats_counter(new_gauge_state + counters::num_checking_torrents, 1);
+	
+	    // 再次断言新的仪表盘状态值在有效范围内
+	    TORRENT_ASSERT(new_gauge_state >= 0);
+	    TORRENT_ASSERT(new_gauge_state <= no_gauge_state);
+	    // 更新当前的仪表盘状态值
+	    m_current_gauge_state = static_cast<std::uint32_t>(new_gauge_state);
 	}
 
 	void torrent::leave_seed_mode(seed_mode_t const checking)
@@ -1491,6 +1499,7 @@ bool is_downloading_state(int const st)
 		m_extensions.push_back(std::move(ext));
 		auto& ext_ref = m_extensions.back();
 
+		// 对每个 peer 都添加新的扩展
 		for (auto p : m_connections)
 		{
 			TORRENT_INCREMENT(m_iterating_connections);
@@ -11813,6 +11822,7 @@ namespace {
 		TORRENT_ASSERT(find(list.begin(), list.end(), this) == list.end());
 #endif
 
+		// 在 torrent_state_updates 链表（状态有更新的 torrent 的链表）中添加 torrent
 		m_links[aux::session_interface::torrent_state_updates].insert(list, this);
 	}
 

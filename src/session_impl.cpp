@@ -5023,12 +5023,20 @@ namespace {
 		torrent_ptr->start();
 
 #ifndef TORRENT_DISABLE_EXTENSIONS
+		// 第一次添加扩展插件
+		// 用户可以通过 add_torrent_params 动态地为每个 torrent 配置不同的插件。
+		// extensions 是通过 add_torrent_params.extensions 传入的，表示用户在创建或添加 torrent 时显式指定的插件列表（例如通过 add_torrent_params 的配置）。
 		for (auto& ext : extensions)
 		{
 			std::shared_ptr<torrent_plugin> tp(ext(handle, userdata));
 			if (tp) torrent_ptr->add_extension(std::move(tp));
 		}
 
+		// 第二次添加扩展插件
+		// 添加全局会话级别的扩展插件。
+		// m_ses_extensions 是 session_impl 的成员变量，存储了通过 session_handle::add_extension() 注册的全局插件（例如所有 torrent 共享的插件，如 ut_metadata、ut_pex 等）。
+		// 这些插件是会话级别的，对所有 torrent 生效。
+		// 通常是一些通用功能插件（例如 DHT 扩展、Peer Exchange 等），需要在所有 torrent 中启用。
 		add_extensions_to_torrent(torrent_ptr, userdata);
 #endif
 
